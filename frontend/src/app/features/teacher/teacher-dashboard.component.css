@@ -6,13 +6,14 @@
 
 /* Top Nav */
 .top-nav {
-  background: #ffffff;
-  border-bottom: 3px solid #e0f2fe;
+  background: var(--bg-surface);
+  border-bottom: 3px solid var(--border-color);
   padding: 0.85rem 2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .nav-brand {
@@ -28,17 +29,19 @@
 .brand-name {
   font-family: var(--font-heading);
   font-size: 1.4rem;
-  color: #0369a1;
+  color: var(--primary-hover);
   font-weight: 700;
+  transition: color 0.3s;
 }
 
 .badge-role {
-  background: #e0f2fe;
-  color: #0284c7;
+  background: var(--primary-light);
+  color: var(--primary);
   font-size: 0.75rem;
   font-weight: 800;
   padding: 0.2rem 0.6rem;
   border-radius: var(--radius-full);
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .nav-user {
@@ -51,8 +54,8 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 2px solid #38bdf8;
-  background: #f0f9ff;
+  border: 2px solid var(--primary);
+  background: var(--bg-surface-alt);
 }
 
 .user-info {
@@ -63,12 +66,14 @@
 .user-name {
   font-weight: 700;
   font-size: 0.95rem;
-  color: #0f172a;
+  color: var(--text-main);
+  transition: color 0.3s;
 }
 
 .user-grade {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--text-muted);
+  transition: color 0.3s;
 }
 
 /* Main Container */
@@ -84,23 +89,26 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
-  border: 3px solid #bae6fd;
+  background: linear-gradient(135deg, var(--bg-surface) 0%, var(--primary-light) 100%);
+  border: 3px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 1.75rem 2rem;
   margin-bottom: 2rem;
   box-shadow: var(--shadow-sm);
+  transition: background 0.3s, border-color 0.3s;
 }
 
 .banner-text h1 {
   font-size: 1.85rem;
-  color: #0369a1;
+  color: var(--primary-hover);
   margin-bottom: 0.3rem;
+  transition: color 0.3s;
 }
 
 .banner-text p {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 1.05rem;
+  transition: color 0.3s;
 }
 
 /* Métricas del Semáforo */
@@ -112,13 +120,13 @@
 }
 
 .metric-card {
-  background: #ffffff;
+  background: var(--bg-surface);
   border-radius: var(--radius-md);
   padding: 1.25rem;
   display: flex;
   align-items: center;
   gap: 1rem;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--border-color);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -129,7 +137,7 @@
 }
 
 .metric-card.active {
-  box-shadow: 0 0 0 3px #38bdf8;
+  box-shadow: 0 0 0 3px var(--primary);
 }
 
 .metric-icon {
@@ -138,16 +146,18 @@
 
 .metric-info h3 {
   font-size: 0.9rem;
-  color: #475569;
+  color: var(--text-muted);
   font-weight: 700;
+  transition: color 0.3s;
 }
 
 .metric-value {
   font-size: 1.85rem;
   font-weight: 800;
   font-family: var(--font-heading);
-  color: #0f172a;
+  color: var(--text-main);
   display: block;
+  transition: color 0.3s;
 }
 
 .metric-tag {
@@ -177,24 +187,28 @@
   align-items: center;
   gap: 0.5rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--text-muted);
+  transition: color 0.3s;
 }
 
 .custom-select {
   padding: 0.5rem 1rem;
   border-radius: var(--radius-full);
-  border: 2px solid #cbd5e1;
-  background: #ffffff;
+  border: 2px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-main);
   font-weight: 700;
   font-family: var(--font-heading);
   outline: none;
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 }
 
 .view-toggle {
   display: flex;
-  background: #e2e8f0;
+  background: var(--border-color);
   border-radius: var(--radius-full);
   padding: 0.25rem;
+  transition: background-color 0.3s;
 }
 
 .toggle-btn {
@@ -207,12 +221,12 @@
   font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .toggle-btn.active {
-  background: #ffffff;
-  color: #0369a1;
+  background: var(--bg-surface);
+  color: var(--primary-hover);
   box-shadow: 0 2px 4px rgba(0,0,0,0.08);
 }
 
@@ -228,7 +242,7 @@
   flex-direction: column;
   justify-content: space-between;
   position: relative;
-  background: #ffffff;
+  background: var(--bg-surface);
 }
 
 .border-green { border-color: var(--semaforo-green-border); }
@@ -243,12 +257,13 @@
 }
 
 .grade-tag {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--bg-surface-alt);
+  color: var(--text-muted);
   font-size: 0.8rem;
   font-weight: 700;
   padding: 0.25rem 0.6rem;
   border-radius: var(--radius-full);
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .student-profile {
@@ -260,42 +275,47 @@
   width: 76px;
   height: 76px;
   border-radius: 50%;
-  background: #f8fafc;
-  border: 3px solid #e2e8f0;
+  background: var(--bg-surface-alt);
+  border: 3px solid var(--border-color);
   margin-bottom: 0.5rem;
 }
 
 .student-name {
   font-size: 1.2rem;
-  color: #0f172a;
+  color: var(--text-main);
+  transition: color 0.3s;
 }
 
 .student-id {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--text-muted);
   font-weight: 600;
+  transition: color 0.3s;
 }
 
 .login-detail-box {
-  background: #f8fafc;
+  background: var(--bg-surface-alt);
   border-radius: var(--radius-sm);
   padding: 0.75rem;
   margin-bottom: 1rem;
   font-size: 0.85rem;
+  transition: background-color 0.3s;
 }
 
 .status-desc {
   font-weight: 600;
-  color: #334155;
+  color: var(--text-main);
   margin-bottom: 0.4rem;
+  transition: color 0.3s;
 }
 
 .last-login {
-  color: #64748b;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   gap: 0.35rem;
   font-size: 0.8rem;
+  transition: color 0.3s;
 }
 
 .student-card-actions {
@@ -304,13 +324,15 @@
 }
 
 .btn-action {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: var(--primary-light);
+  color: var(--primary-hover);
   width: 100%;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .btn-action:hover {
-  background: #bae6fd;
+  background: var(--primary);
+  color: #ffffff;
 }
 
 /* Tabla */
@@ -326,18 +348,21 @@
 }
 
 .students-table th {
-  background: #f8fafc;
+  background: var(--bg-surface-alt);
   padding: 0.85rem 1rem;
   font-family: var(--font-heading);
-  color: #475569;
+  color: var(--text-muted);
   font-size: 0.95rem;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--border-color);
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .students-table td {
   padding: 1rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border-color);
   font-size: 0.9rem;
+  color: var(--text-main);
+  transition: border-color 0.3s, color 0.3s;
 }
 
 .table-user {
@@ -354,7 +379,8 @@
 
 .table-sub {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--text-muted);
+  transition: color 0.3s;
 }
 
 .days-pill {
@@ -371,7 +397,8 @@
 
 .table-desc {
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--text-muted);
+  transition: color 0.3s;
 }
 
 /* Modales */
@@ -388,12 +415,13 @@
 }
 
 .modal-card {
-  background: #ffffff;
+  background: var(--bg-surface);
   border-radius: var(--radius-lg);
   max-width: 600px;
   width: 100%;
   padding: 2rem;
   box-shadow: var(--shadow-lg);
+  transition: background-color 0.3s;
 }
 
 .modal-header {
@@ -413,20 +441,24 @@
   font-family: var(--font-heading);
   font-size: 0.95rem;
   margin-bottom: 0.35rem;
-  color: #334155;
+  color: var(--text-main);
+  transition: color 0.3s;
 }
 
 .form-control {
   width: 100%;
   padding: 0.65rem 1rem;
-  border: 2px solid #cbd5e1;
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-sm);
   font-family: var(--font-body);
+  background: var(--bg-surface-alt);
+  color: var(--text-main);
   outline: none;
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 }
 
 .form-control:focus {
-  border-color: #38bdf8;
+  border-color: var(--primary);
 }
 
 .form-row {
@@ -445,7 +477,8 @@
 .loading-state, .empty-state {
   text-align: center;
   padding: 3rem;
-  color: #64748b;
+  color: var(--text-muted);
+  transition: color 0.3s;
 }
 
 .spinner-icon {
@@ -462,11 +495,12 @@
 
 /* PESTAÑAS PRINCIPALES DEL PORTAL */
 .portal-nav-tabs {
-  background: #ffffff;
-  border-bottom: 2px solid #e2e8f0;
+  background: var(--bg-surface);
+  border-bottom: 2px solid var(--border-color);
   padding: 0 2rem;
   display: flex;
   gap: 1.5rem;
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .portal-tab-btn {
@@ -474,7 +508,7 @@
   font-family: var(--font-heading);
   font-size: 1.05rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--text-muted);
   border: none;
   background: transparent;
   cursor: pointer;
@@ -483,11 +517,11 @@
 }
 
 .portal-tab-btn:hover {
-  color: #0369a1;
+  color: var(--primary-hover);
 }
 
 .portal-tab-btn.active {
-  color: #0284c7;
+  color: var(--primary);
   font-weight: 800;
 }
 
@@ -498,7 +532,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: #0284c7;
+  background: var(--primary);
   border-radius: 3px 3px 0 0;
 }
 
@@ -545,8 +579,8 @@
 }
 
 .management-header-card {
-  background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
-  border: 3px solid #bae6fd;
+  background: linear-gradient(135deg, var(--semaforo-green-bg) 0%, var(--primary-light) 100%);
+  border: 3px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 1.75rem 2rem;
   display: flex;
@@ -554,17 +588,20 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
+  transition: background 0.3s, border-color 0.3s;
 }
 
 .mgmt-title-block h2 {
   font-size: 1.6rem;
-  color: #0369a1;
+  color: var(--primary-hover);
   margin-bottom: 0.25rem;
+  transition: color 0.3s;
 }
 
 .mgmt-title-block p {
-  color: #475569;
+  color: var(--text-muted);
   font-size: 0.95rem;
+  transition: color 0.3s;
 }
 
 .mgmt-actions-block {
@@ -574,14 +611,15 @@
 
 /* Barra de curso destino */
 .course-target-bar {
-  background: #ffffff;
-  border: 2px solid #e0f2fe;
+  background: var(--bg-surface);
+  border: 2px solid var(--border-color);
   padding: 1.25rem 1.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
   flex-wrap: wrap;
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .course-target-label {
@@ -596,13 +634,15 @@
 
 .course-target-label strong {
   font-size: 1.05rem;
-  color: #0f172a;
+  color: var(--text-main);
+  transition: color 0.3s;
 }
 
 .course-target-label p {
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--text-muted);
   margin: 0;
+  transition: color 0.3s;
 }
 
 .course-selector-box {
@@ -616,14 +656,15 @@
 .course-select-control {
   width: 100%;
   padding: 0.65rem 1rem;
-  border: 2px solid #38bdf8;
+  border: 2px solid var(--primary);
   border-radius: var(--radius-sm);
-  background: #f0f9ff;
+  background: var(--primary-light);
   font-family: var(--font-heading);
   font-size: 0.95rem;
   font-weight: 700;
-  color: #0369a1;
+  color: var(--primary-hover);
   outline: none;
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 }
 
 /* Filtros de Alumnos */
@@ -647,21 +688,23 @@
   top: 50%;
   transform: translateY(-50%);
   font-size: 1rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .filter-input {
   width: 100%;
   padding: 0.65rem 1rem 0.65rem 2.6rem;
-  border: 2px solid #cbd5e1;
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-sm);
-  background: #ffffff;
+  background: var(--bg-surface);
+  color: var(--text-main);
   outline: none;
   font-family: var(--font-body);
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 }
 
 .filter-input:focus {
-  border-color: #38bdf8;
+  border-color: var(--primary);
 }
 
 .grade-filter-box {
@@ -669,17 +712,20 @@
   align-items: center;
   gap: 0.5rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--text-main);
+  transition: color 0.3s;
 }
 
 .filter-select {
   padding: 0.6rem 1rem;
-  border: 2px solid #cbd5e1;
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-sm);
-  background: #ffffff;
+  background: var(--bg-surface);
+  color: var(--text-main);
   font-family: var(--font-heading);
   font-weight: 600;
   outline: none;
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 }
 
 /* Tabla de gestión */
@@ -689,39 +735,44 @@
 }
 
 .mgmt-table th {
-  background: #f8fafc;
+  background: var(--bg-surface-alt);
   padding: 1rem 1.25rem;
   font-family: var(--font-heading);
   font-size: 0.9rem;
   font-weight: 700;
-  color: #475569;
+  color: var(--text-muted);
   text-align: left;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--border-color);
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .mgmt-table td {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border-color);
   vertical-align: middle;
+  color: var(--text-main);
+  transition: color 0.3s, border-color 0.3s;
 }
 
 .badge-code {
   font-family: monospace;
   font-weight: 700;
-  background: #f1f5f9;
+  background: var(--bg-surface-alt);
   padding: 0.25rem 0.6rem;
   border-radius: 4px;
-  color: #334155;
-  border: 1px solid #e2e8f0;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .grade-pill {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: var(--primary-light);
+  color: var(--primary-hover);
   font-weight: 700;
   padding: 0.25rem 0.6rem;
   border-radius: var(--radius-full);
   font-size: 0.85rem;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .courses-tags-container {
@@ -731,9 +782,9 @@
 }
 
 .enrolled-badge {
-  background: #f0fdf4;
+  background: var(--semaforo-green-bg);
   color: #166534;
-  border: 1px solid #bbf7d0;
+  border: 1px solid var(--semaforo-green-border);
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   font-size: 0.8rem;
@@ -741,22 +792,23 @@
 }
 
 .no-courses-tag {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-style: italic;
   font-size: 0.85rem;
+  transition: color 0.3s;
 }
 
 .already-enrolled-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: #dcfce7;
+  background: var(--semaforo-green-bg);
   color: #15803d;
   font-weight: 800;
   font-size: 0.85rem;
   padding: 0.4rem 0.8rem;
   border-radius: var(--radius-full);
-  border: 1px solid #86efac;
+  border: 1px solid var(--semaforo-green-border);
 }
 
 .btn-enroll {

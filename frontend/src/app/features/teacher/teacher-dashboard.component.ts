@@ -7,6 +7,7 @@ import { StudentStatus, SemaforoSummaryMetrics } from '../../core/models/semafor
 import { CreateContent } from '../../core/models/content.model';
 import { Course, TeacherStudent } from '../../core/models/user.model';
 
+
 @Component({
   selector: 'app-teacher-dashboard',
   standalone: true,

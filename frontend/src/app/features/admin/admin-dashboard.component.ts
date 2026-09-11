@@ -6,6 +6,7 @@ import { TeacherService } from '../../core/services/teacher.service';
 import { SemaforoSummaryMetrics } from '../../core/models/semaforo.model';
 import { SystemInspectorComponent } from './system-inspector/system-inspector.component';
 
+
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,

@@ -32,9 +32,9 @@
 }
 
 .login-card {
-  background: #ffffff;
+  background: var(--bg-surface);
   border-radius: var(--radius-lg);
-  border: 4px solid #bae6fd;
+  border: 4px solid var(--border-color);
   box-shadow: 0 16px 32px -4px rgba(14, 116, 144, 0.15), 0 0 0 8px rgba(224, 242, 254, 0.6);
   padding: 2.5rem 2rem;
   text-align: center;
@@ -51,11 +51,12 @@
   justify-content: center;
   width: 76px;
   height: 76px;
-  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  background: linear-gradient(135deg, var(--primary-light) 0%, var(--border-color) 100%);
   border-radius: 50%;
-  border: 4px solid #38bdf8;
+  border: 4px solid var(--primary);
   box-shadow: 0 8px 16px rgba(56, 189, 248, 0.25);
   margin-bottom: 0.75rem;
+  transition: background 0.3s, border-color 0.3s;
 }
 
 .mascot-emoji {
@@ -64,26 +65,29 @@
 
 .portal-title {
   font-size: 2.25rem;
-  color: #0369a1;
+  color: var(--primary-hover);
   letter-spacing: -0.02em;
+  transition: color 0.3s;
 }
 
 .portal-subtitle {
   font-size: 1.05rem;
   font-weight: 700;
-  color: #0284c7;
+  color: var(--primary);
   margin-top: 0.2rem;
+  transition: color 0.3s;
 }
 
 /* PESTAÑAS AUTH (INICIAR SESIÓN / REGISTRO) */
 .auth-tabs {
   display: flex;
-  background: #f1f5f9;
+  background: var(--bg-surface-alt);
   padding: 0.35rem;
   border-radius: var(--radius-md);
   margin-bottom: 1.75rem;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--border-color);
   gap: 0.35rem;
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .tab-btn {
@@ -94,20 +98,20 @@
   font-family: var(--font-heading);
   font-size: 1.05rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--text-muted);
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .tab-btn.active {
-  background: #ffffff;
-  color: #0284c7;
+  background: var(--bg-surface);
+  color: var(--primary-hover);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
 }
 
 .tab-btn:hover:not(.active) {
-  color: #1e293b;
+  color: var(--text-main);
 }
 
 /* Formulario */
@@ -127,8 +131,9 @@
   font-family: var(--font-heading);
   font-size: 1rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-main);
   margin-bottom: 0.4rem;
+  transition: color 0.3s;
 }
 
 .label-icon {
@@ -140,18 +145,18 @@
   padding: 0.85rem 1.25rem;
   font-size: 1.05rem;
   font-family: var(--font-body);
-  border: 2px solid #cbd5e1;
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-md);
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: var(--bg-surface-alt);
+  color: var(--text-main);
   outline: none;
   transition: all 0.2s ease;
   box-sizing: border-box;
 }
 
 .input-box input:focus {
-  border-color: #38bdf8;
-  background-color: #ffffff;
+  border-color: var(--primary);
+  background-color: var(--bg-surface);
   box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.2);
 }
 
@@ -161,10 +166,10 @@
   font-size: 1.05rem;
   font-family: var(--font-body);
   font-weight: 600;
-  border: 2px solid #cbd5e1;
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-md);
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: var(--bg-surface-alt);
+  color: var(--text-main);
   outline: none;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -172,8 +177,8 @@
 }
 
 .custom-form-select:focus {
-  border-color: #38bdf8;
-  background-color: #ffffff;
+  border-color: var(--primary);
+  background-color: var(--bg-surface);
   box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.2);
 }
 
@@ -192,9 +197,9 @@
   align-items: center;
   justify-content: center;
   padding: 0.75rem 0.5rem;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-md);
-  background: #f8fafc;
+  background: var(--bg-surface-alt);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -202,12 +207,12 @@
 .role-card:hover {
   transform: translateY(-2px);
   border-color: #93c5fd;
-  background: #f0f9ff;
+  background: var(--primary-light);
 }
 
 .role-card.selected {
-  border-color: #0284c7;
-  background: #e0f2fe;
+  border-color: var(--primary-hover);
+  background: var(--primary-light);
   box-shadow: 0 4px 12px rgba(2, 132, 199, 0.18);
 }
 
@@ -220,21 +225,23 @@
   font-family: var(--font-heading);
   font-weight: 800;
   font-size: 0.95rem;
-  color: #0f172a;
+  color: var(--text-main);
+  transition: color 0.3s;
 }
 
 .role-sub {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--text-muted);
   font-weight: 600;
+  transition: color 0.3s;
 }
 
 .role-card.selected .role-title {
-  color: #0369a1;
+  color: var(--primary-hover);
 }
 
 .role-card.selected .role-sub {
-  color: #0284c7;
+  color: var(--primary);
 }
 
 /* Filas dobles */
@@ -252,8 +259,8 @@
 
 /* Banners */
 .error-banner {
-  background-color: #fef2f2;
-  border: 2px solid #fecaca;
+  background-color: var(--semaforo-red-bg);
+  border: 2px solid var(--semaforo-red-border);
   color: #b91c1c;
   padding: 0.75rem 1rem;
   border-radius: var(--radius-sm);
@@ -267,8 +274,8 @@
 }
 
 .success-banner {
-  background-color: #f0fdf4;
-  border: 2px solid #bbf7d0;
+  background-color: var(--semaforo-green-bg);
+  border: 2px solid var(--semaforo-green-border);
   color: #15803d;
   padding: 0.75rem 1rem;
   border-radius: var(--radius-sm);
@@ -286,11 +293,12 @@
   margin-top: 1.25rem;
   font-size: 0.92rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-muted);
+  transition: color 0.3s;
 }
 
 .register-prompt a {
-  color: #0284c7;
+  color: var(--primary-hover);
   text-decoration: none;
   font-weight: 700;
   transition: color 0.15s;
@@ -298,13 +306,14 @@
 
 .register-prompt a:hover {
   text-decoration: underline;
-  color: #0369a1;
+  color: var(--primary);
 }
 
 .login-footer {
   text-align: center;
   margin-top: 1.5rem;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 0.85rem;
   font-weight: 700;
+  transition: color 0.3s;
 }

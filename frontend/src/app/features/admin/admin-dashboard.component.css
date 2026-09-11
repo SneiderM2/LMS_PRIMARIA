@@ -3,12 +3,13 @@
 }
 
 .admin-nav {
-  background: #ffffff;
-  border-bottom: 3px solid #e2e8f0;
+  background: var(--bg-surface);
+  border-bottom: 3px solid var(--border-color);
   padding: 0.85rem 2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 }
 
 .nav-brand {
@@ -25,16 +26,18 @@
   font-family: var(--font-heading);
   font-size: 1.35rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-main);
+  transition: color 0.3s;
 }
 
 .admin-tag {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--bg-surface-alt);
+  color: var(--text-muted);
   font-size: 0.8rem;
   font-weight: 800;
   padding: 0.2rem 0.6rem;
   border-radius: var(--radius-full);
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .user-pill {
@@ -45,7 +48,8 @@
 
 .user-greeting {
   font-size: 0.95rem;
-  color: #334155;
+  color: var(--text-muted);
+  transition: color 0.3s;
 }
 
 .admin-container {
@@ -55,22 +59,25 @@
 }
 
 .admin-banner {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-surface-alt) 100%);
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 2rem;
+  transition: background 0.3s;
 }
 
 .admin-banner h1 {
   font-size: 1.85rem;
-  color: #0f172a;
+  color: var(--text-main);
   margin-bottom: 0.25rem;
+  transition: color 0.3s;
 }
 
 .admin-banner p {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 1.05rem;
+  transition: color 0.3s;
 }
 
 .metrics-row {
@@ -81,14 +88,15 @@
 }
 
 .metric-box {
-  background: #ffffff;
-  border: 2px solid #e2e8f0;
+  background: var(--bg-surface);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .box-icon {
@@ -100,19 +108,21 @@
   font-size: 2rem;
   font-weight: 800;
   font-family: var(--font-heading);
-  color: #0f172a;
+  color: var(--text-main);
+  transition: color 0.3s;
 }
 
 .box-label {
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--text-muted);
   font-weight: 700;
   margin-top: 0.25rem;
+  transition: color 0.3s;
 }
 
-.box-green { border-color: var(--semaforo-green-border); background: #f0fdf4; }
-.box-yellow { border-color: var(--semaforo-yellow-border); background: #fefce8; }
-.box-red { border-color: var(--semaforo-red-border); background: #fef2f2; }
+.box-green { border-color: var(--semaforo-green-border); background: var(--semaforo-green-bg); }
+.box-yellow { border-color: var(--semaforo-yellow-border); background: var(--semaforo-yellow-bg); }
+.box-red { border-color: var(--semaforo-red-border); background: var(--semaforo-red-bg); }
 
 .quick-admin-grid {
   display: grid;
@@ -122,12 +132,14 @@
 
 .quick-card h3 {
   font-size: 1.25rem;
-  color: #0f172a;
+  color: var(--text-main);
   margin-bottom: 0.5rem;
+  transition: color 0.3s;
 }
 
 .quick-card p {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 0.95rem;
   margin-bottom: 1.25rem;
+  transition: color 0.3s;
 }

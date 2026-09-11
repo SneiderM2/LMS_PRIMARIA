@@ -1,0 +1,23 @@
+<div [class.floating-container]="floating" [class.inline-container]="!floating">
+  <button 
+    type="button"
+    class="theme-toggle-btn" 
+    [class.dark-active]="themeService.isDarkMode()"
+    (click)="toggle()"
+    [attr.aria-label]="themeService.isDarkMode() ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'"
+    [title]="themeService.isDarkMode() ? '☀️ Cambiar a Modo Claro' : '🌙 Cambiar a Modo Oscuro'">
+    
+    <span class="theme-icon">
+      {{ themeService.isDarkMode() ? '🌙' : '☀️' }}
+    </span>
+
+    <span class="theme-text">
+      Tema: <strong>{{ themeService.isDarkMode() ? 'Oscuro' : 'Claro' }}</strong>
+    </span>
+
+    <!-- Switch pill -->
+    <div class="toggle-pill">
+      <div class="pill-dot" [class.dot-dark]="themeService.isDarkMode()"></div>
+    </div>
+  </button>
+</div>

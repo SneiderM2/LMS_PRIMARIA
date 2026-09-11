@@ -1,0 +1,99 @@
+.floating-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 99999;
+}
+
+.inline-container {
+  display: inline-flex;
+  align-items: center;
+}
+
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: #ffffff;
+  color: #1e293b;
+  border: 2px solid #38bdf8;
+  border-radius: 9999px;
+  padding: 0.45rem 1rem;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-family: var(--font-heading, sans-serif);
+  font-size: 0.9rem;
+  font-weight: 700;
+  user-select: none;
+  outline: none;
+}
+
+.theme-toggle-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  border-color: #0284c7;
+}
+
+.theme-toggle-btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.theme-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.theme-text {
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.theme-text strong {
+  font-weight: 800;
+  color: #0284c7;
+}
+
+/* Switch pill */
+.toggle-pill {
+  width: 32px;
+  height: 18px;
+  background: #e0f2fe;
+  border-radius: 9999px;
+  position: relative;
+  border: 1px solid #bae6fd;
+  transition: background-color 0.25s;
+}
+
+.pill-dot {
+  width: 12px;
+  height: 12px;
+  background: #f59e0b;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.25s;
+}
+
+/* Estado activo en modo oscuro */
+.theme-toggle-btn.dark-active {
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: #a855f7;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.theme-toggle-btn.dark-active .theme-text strong {
+  color: #c084fc;
+}
+
+.theme-toggle-btn.dark-active .toggle-pill {
+  background: #334155;
+  border-color: #475569;
+}
+
+.theme-toggle-btn.dark-active .pill-dot {
+  transform: translateX(14px);
+  background: #c084fc;
+}
