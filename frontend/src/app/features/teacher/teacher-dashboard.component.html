@@ -1,0 +1,584 @@
+<div class="dashboard-page">
+  
+  <!-- Barra de Navegación Superior -->
+  <header class="top-nav">
+    <div class="nav-brand">
+      <span class="brand-icon">🏫</span>
+      <span class="brand-name">Portal Docente</span>
+      <span class="badge-role">Primaria • MySQL</span>
+    </div>
+
+    <div class="nav-user">
+      <img [src]="authService.currentUser()?.avatarUrl" alt="Avatar" class="user-avatar" />
+      <div class="user-info">
+        <span class="user-name">{{ authService.currentUser()?.fullName }}</span>
+        <span class="user-grade">{{ authService.currentUser()?.gradeLevel || 'Docente de Primaria' }}</span>
+      </div>
+      <button class="btn btn-secondary btn-sm" (click)="logout()">
+        🚪 Salir
+      </button>
+    </div>
+  </header>
+
+  <!-- PESTAÑAS PRINCIPALES DEL PORTAL -->
+  <div class="portal-nav-tabs">
+    <button
+      class="portal-tab-btn"
+      [class.active]="activeTab === 'semaforo'"
+      (click)="switchTab('semaforo')"
+    >
+      🚦 Monitoreo Semáforo y Tareas
+    </button>
+    <button
+      class="portal-tab-btn"
+      [class.active]="activeTab === 'students'"
+      (click)="switchTab('students')"
+    >
+      🎓 Gestión de Alumnos y Matrícula
+    </button>
+  </div>
+
+  <!-- Toast flotante de notificación -->
+  <div *ngIf="enrollNotification" class="toast-notification" [ngClass]="'toast-' + enrollNotification.type">
+    <span class="toast-icon">{{ enrollNotification.type === 'success' ? '✅' : enrollNotification.type === 'info' ? 'ℹ️' : '⚠️' }}</span>
+    <span>{{ enrollNotification.message }}</span>
+  </div>
+
+  <main class="main-container">
+
+    <!-- ========================================================================= -->
+    <!-- PESTAÑA 1: MONITOREO SEMÁFORO Y TAREAS                                    -->
+    <!-- ========================================================================= -->
+    <div *ngIf="activeTab === 'semaforo'">
+      
+      <!-- Banner y Acciones Rápidas -->
+      <section class="banner-section">
+        <div class="banner-text">
+          <h1>Monitoreo de Asistencia y Tareas 🚦</h1>
+          <p>Revisa el estado de actividad de tus alumnos en MySQL y publica nuevas actividades interactivas.</p>
+        </div>
+        <div class="banner-actions">
+          <button class="btn btn-primary" (click)="openCreateModal()">
+            ➕ Publicar Tarea o Recurso
+          </button>
+        </div>
+      </section>
+
+      <!-- Métricas del Semáforo (Tarjetas Interactivas) -->
+      <section class="metrics-grid">
+        <div class="metric-card card-all" (click)="setStatusFilter('All')" [class.active]="selectedStatusFilter === 'All'">
+          <div class="metric-icon">👥</div>
+          <div class="metric-info">
+            <h3>Total Estudiantes</h3>
+            <span class="metric-value">{{ metrics.totalStudents }}</span>
+          </div>
+        </div>
+
+        <div class="metric-card card-green" (click)="setStatusFilter('Green')" [class.active]="selectedStatusFilter === 'Green'">
+          <div class="metric-icon">🟢</div>
+          <div class="metric-info">
+            <h3>Ingresaron Hoy</h3>
+            <span class="metric-value">{{ metrics.greenCount }}</span>
+            <span class="metric-tag">Al día</span>
+          </div>
+        </div>
+
+        <div class="metric-card card-yellow" (click)="setStatusFilter('Yellow')" [class.active]="selectedStatusFilter === 'Yellow'">
+          <div class="metric-icon">🟡</div>
+          <div class="metric-info">
+            <h3>2 a 4 Días Ausentes</h3>
+            <span class="metric-value">{{ metrics.yellowCount }}</span>
+            <span class="metric-tag">En alerta</span>
+          </div>
+        </div>
+
+        <div class="metric-card card-red" (click)="setStatusFilter('Red')" [class.active]="selectedStatusFilter === 'Red'">
+          <div class="metric-icon">🔴</div>
+          <div class="metric-info">
+            <h3>5+ Días Ausentes</h3>
+            <span class="metric-value">{{ metrics.redCount }}</span>
+            <span class="metric-tag">Riesgo / Deserción</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Controles de Filtros y Vista -->
+      <section class="controls-bar">
+        <div class="filter-group">
+          <label for="gradeSelect">Filtrar por Grado:</label>
+          <select id="gradeSelect" [(ngModel)]="selectedGrade" (change)="loadData()" class="custom-select">
+            <option value="">Todos los Grados</option>
+            <option value="1°">1° Primaria</option>
+            <option value="2°">2° Primaria</option>
+            <option value="3°">3° Primaria</option>
+            <option value="4°">4° Primaria</option>
+            <option value="5°">5° Primaria</option>
+          </select>
+        </div>
+
+        <div class="view-toggle">
+          <button class="toggle-btn" [class.active]="viewMode === 'cards'" (click)="viewMode = 'cards'">
+            🗂️ Tarjetas
+          </button>
+          <button class="toggle-btn" [class.active]="viewMode === 'table'" (click)="viewMode = 'table'">
+            📋 Tabla
+          </button>
+        </div>
+      </section>
+
+      <!-- Estado de Carga -->
+      <div *ngIf="isLoading" class="loading-state">
+        <span class="spinner-icon">🔄</span>
+        <p>Consultando el estado de los niños en la base de datos MySQL...</p>
+      </div>
+
+      <!-- VISTA EN TARJETAS DEL SEMÁFORO -->
+      <section *ngIf="!isLoading && viewMode === 'cards'" class="students-grid">
+        <div *ngFor="let student of filteredStudents" class="card-fun student-card" [ngClass]="'border-' + student.semaforoColor.toLowerCase()">
+          
+          <div class="card-top-indicator">
+            <span class="semaforo-badge" [ngClass]="'badge-' + student.semaforoColor.toLowerCase()">
+              <span class="semaforo-dot" [ngClass]="'dot-' + student.semaforoColor.toLowerCase()"></span>
+              {{ student.semaforoLabel }}
+            </span>
+            <span class="grade-tag">{{ student.gradeLevel }}</span>
+          </div>
+
+          <div class="student-profile">
+            <img [src]="student.avatarUrl" [alt]="student.fullName" class="student-avatar" />
+            <h3 class="student-name">{{ student.fullName }}</h3>
+            <span class="student-id">ID: {{ student.id }}</span>
+          </div>
+
+          <div class="login-detail-box">
+            <p class="status-desc">{{ student.description }}</p>
+            <div class="last-login">
+              <span class="clock-icon">🕒</span>
+              <span *ngIf="student.lastLoginDate">
+                Última actividad: {{ student.lastLoginDate | date:'dd/MM/yyyy, hh:mm a' }}
+              </span>
+              <span *ngIf="!student.lastLoginDate" class="text-danger">
+                Sin actividad registrada
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Estado Vacío -->
+        <div *ngIf="filteredStudents.length === 0" class="empty-state">
+          <span class="empty-icon">🔍</span>
+          <h3>No hay estudiantes registrados en este filtro</h3>
+          <p>Puedes registrar nuevos alumnos en la pestaña <strong>"Gestión de Alumnos"</strong> o desde el Login.</p>
+        </div>
+      </section>
+
+      <!-- VISTA EN TABLA DEL SEMÁFORO -->
+      <section *ngIf="!isLoading && viewMode === 'table'" class="table-container card-fun">
+        <table class="students-table">
+          <thead>
+            <tr>
+              <th>Semáforo</th>
+              <th>Estudiante</th>
+              <th>Grado</th>
+              <th>Días Inactivo</th>
+              <th>Última Actividad</th>
+              <th>Diagnóstico</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let student of filteredStudents">
+              <td>
+                <span class="semaforo-badge" [ngClass]="'badge-' + student.semaforoColor.toLowerCase()">
+                  <span class="semaforo-dot" [ngClass]="'dot-' + student.semaforoColor.toLowerCase()"></span>
+                  {{ student.semaforoColor === 'Green' ? 'Verde' : student.semaforoColor === 'Yellow' ? 'Amarillo' : 'Rojo' }}
+                </span>
+              </td>
+              <td>
+                <div class="table-user">
+                  <img [src]="student.avatarUrl" alt="" class="table-avatar" />
+                  <div>
+                    <strong>{{ student.fullName }}</strong>
+                    <div class="table-sub">{{ student.id }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>{{ student.gradeLevel }}</td>
+              <td>
+                <span class="days-pill" [ngClass]="'pill-' + student.semaforoColor.toLowerCase()">
+                  {{ student.inactiveDays === 999 ? 'N/A' : student.inactiveDays + ' día(s)' }}
+                </span>
+              </td>
+              <td>
+                {{ student.lastLoginDate ? (student.lastLoginDate | date:'dd/MM/yyyy HH:mm') : 'Sin registros' }}
+              </td>
+              <td class="table-desc">{{ student.description }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- PESTAÑA 2: GESTIÓN DE ALUMNOS Y MATRÍCULA A CURSOS                        -->
+    <!-- ========================================================================= -->
+    <div *ngIf="activeTab === 'students'" class="management-module">
+      
+      <!-- Encabezado de Gestión -->
+      <section class="management-header-card">
+        <div class="mgmt-title-block">
+          <h2>🎓 Directorio de Estudiantes y Matrícula a Cursos</h2>
+          <p>Registra nuevos alumnos en la plataforma y matricúlalos con 1 clic en tus materias dictadas.</p>
+        </div>
+        <div class="mgmt-actions-block">
+          <button class="btn btn-secondary" (click)="openCreateCourseModal()">
+            📚 Nueva Materia/Curso
+          </button>
+          <button class="btn btn-primary" (click)="openCreateStudentModal()">
+            ➕ Registrar Nuevo Estudiante
+          </button>
+        </div>
+      </section>
+
+      <!-- Selector del Curso Destino para Matrícula -->
+      <section class="course-target-bar card-fun">
+        <div class="course-target-label">
+          <span class="target-icon">🎯</span>
+          <div>
+            <strong>Materia Destino para Matricular:</strong>
+            <p>Selecciona el curso al que deseas matricular a los estudiantes de la lista inferior:</p>
+          </div>
+        </div>
+
+        <div class="course-selector-box">
+          <select [(ngModel)]="selectedCourseId" class="course-select-control">
+            <option *ngIf="courses.length === 0" [ngValue]="null">No tienes materias creadas aún</option>
+            <option *ngFor="let c of courses" [ngValue]="c.id">
+              {{ c.nombre }} • Grado: {{ c.grado }} (Grupo {{ c.grupo }}) — {{ c.totalStudents }} alumno(s) inscritos
+            </option>
+          </select>
+
+          <button *ngIf="courses.length === 0" class="btn btn-sm btn-primary" (click)="openCreateCourseModal()">
+            Crear mi primera materia
+          </button>
+        </div>
+      </section>
+
+      <!-- Barra de Búsqueda y Filtros de Alumnos -->
+      <section class="students-filter-bar">
+        <div class="search-input-box">
+          <span class="search-icon">🔍</span>
+          <input
+            type="text"
+            [(ngModel)]="studentSearch"
+            (input)="applyStudentFilters()"
+            placeholder="Buscar por nombre o carnet/documento escolar..."
+            class="filter-input"
+          />
+        </div>
+
+        <div class="grade-filter-box">
+          <label>Grado:</label>
+          <select [(ngModel)]="studentGradeFilter" (change)="loadAllStudents()" class="filter-select">
+            <option value="">Todos los Grados</option>
+            <option value="1°">1° Primaria</option>
+            <option value="2°">2° Primaria</option>
+            <option value="3°">3° Primaria</option>
+            <option value="4°">4° Primaria</option>
+            <option value="5°">5° Primaria</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Lista / Tabla de Alumnos para Matrícula -->
+      <div *ngIf="isLoadingStudents" class="loading-state">
+        <span class="spinner-icon">🔄</span>
+        <p>Cargando lista de estudiantes de MySQL...</p>
+      </div>
+
+      <section *ngIf="!isLoadingStudents" class="table-container card-fun">
+        <table class="mgmt-table">
+          <thead>
+            <tr>
+              <th>Estudiante</th>
+              <th>Carnet / ID</th>
+              <th>Grado</th>
+              <th>Materias Matriculadas</th>
+              <th>Acción de Matrícula</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let student of filteredAllStudents">
+              <td>
+                <div class="table-user">
+                  <img [src]="student.avatarUrl" [alt]="student.fullName" class="table-avatar" />
+                  <strong>{{ student.fullName }}</strong>
+                </div>
+              </td>
+              <td>
+                <span class="badge-code">{{ student.username }}</span>
+              </td>
+              <td>
+                <span class="grade-pill">{{ student.grade }}</span>
+              </td>
+              <td>
+                <div class="courses-tags-container">
+                  <span *ngFor="let c of student.enrolledCourses" class="enrolled-badge">
+                    📖 {{ c.courseName }} ({{ c.group }})
+                  </span>
+                  <span *ngIf="student.enrolledCourses.length === 0" class="no-courses-tag">
+                    Sin materias asignadas
+                  </span>
+                </div>
+              </td>
+              <td>
+                <!-- Si ya está matriculado en el curso seleccionado -->
+                <div *ngIf="isStudentEnrolledInCourse(student, selectedCourseId)" class="already-enrolled-badge">
+                  <span class="check-icon">✓</span> Matriculado(a)
+                </div>
+
+                <!-- Si no está matriculado en el curso seleccionado -->
+                <button
+                  *ngIf="!isStudentEnrolledInCourse(student, selectedCourseId)"
+                  class="btn btn-sm btn-enroll"
+                  [disabled]="!selectedCourseId || enrollingMap[student.id]"
+                  (click)="enrollStudent(student)"
+                >
+                  <span *ngIf="!enrollingMap[student.id]">➕ Matricular</span>
+                  <span *ngIf="enrollingMap[student.id]">⏳ Matriculando...</span>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div *ngIf="filteredAllStudents.length === 0" class="empty-state">
+          <span class="empty-icon">🎒</span>
+          <h3>No se encontraron estudiantes</h3>
+          <p>Usa el botón superior <strong>"➕ Registrar Nuevo Estudiante"</strong> para añadir al primer alumno.</p>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: REGISTRAR NUEVO ESTUDIANTE DIRECTAMENTE                            -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" *ngIf="showCreateStudentModal" (click)="closeCreateStudentModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>🎒 Registrar Nuevo Alumno en la Plataforma</h2>
+        <button class="btn-close" (click)="closeCreateStudentModal()">✕</button>
+      </div>
+
+      <div *ngIf="createStudentError" class="error-banner">
+        ⚠️ {{ createStudentError }}
+      </div>
+
+      <form (ngSubmit)="saveStudent()" class="modal-form">
+        <div class="form-group">
+          <label>Carnet / Documento Escolar (ID único)</label>
+          <input
+            type="text"
+            [(ngModel)]="newStudent.username"
+            name="username"
+            required
+            placeholder="Ej: EST-107 o 1029384756"
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Nombre Completo del Estudiante</label>
+          <input
+            type="text"
+            [(ngModel)]="newStudent.fullName"
+            name="fullName"
+            required
+            placeholder="Ej: Camilo Andrés Restrepo"
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Grado Escolar</label>
+            <select [(ngModel)]="newStudent.grade" name="grade" class="form-control">
+              <option value="1°">1° Primaria</option>
+              <option value="2°">2° Primaria</option>
+              <option value="3°">3° Primaria</option>
+              <option value="4°">4° Primaria</option>
+              <option value="5°">5° Primaria</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Contraseña (Por defecto: 123456)</label>
+            <input
+              type="password"
+              [(ngModel)]="newStudent.password"
+              name="password"
+              placeholder="123456"
+              class="form-control"
+            />
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeCreateStudentModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isCreatingStudent">
+            {{ isCreatingStudent ? 'Registrando en MySQL...' : '✅ Guardar Estudiante' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: CREAR NUEVA MATERIA / CURSO                                        -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" *ngIf="showCreateCourseModal" (click)="closeCreateCourseModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>📚 Crear Nueva Materia / Curso</h2>
+        <button class="btn-close" (click)="closeCreateCourseModal()">✕</button>
+      </div>
+
+      <form (ngSubmit)="saveCourse()" class="modal-form">
+        <div class="form-group">
+          <label>Nombre de la Materia</label>
+          <input
+            type="text"
+            [(ngModel)]="newCourse.nombre"
+            name="nombre"
+            required
+            placeholder="Ej: Matemáticas Divertidas, Ciencias Naturales, Arte"
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Grado Escolar</label>
+            <select [(ngModel)]="newCourse.grado" name="grado" class="form-control">
+              <option value="1°">1° Primaria</option>
+              <option value="2°">2° Primaria</option>
+              <option value="3°">3° Primaria</option>
+              <option value="4°">4° Primaria</option>
+              <option value="5°">5° Primaria</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Grupo / Sección</label>
+            <input
+              type="text"
+              [(ngModel)]="newCourse.grupo"
+              name="grupo"
+              required
+              placeholder="Ej: A, B o 101"
+              class="form-control"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Descripción del Curso (Opcional)</label>
+          <textarea
+            [(ngModel)]="newCourse.descripcion"
+            name="descripcion"
+            rows="2"
+            placeholder="Breve descripción de los temas a tratar..."
+            class="form-control"
+          ></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeCreateCourseModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isCreatingCourse">
+            {{ isCreatingCourse ? 'Creando...' : '🚀 Crear Materia' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: PUBLICAR CONTENIDO / TAREA                                         -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" *ngIf="showCreateModal" (click)="closeCreateModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>✨ Nueva Actividad Escolar</h2>
+        <button class="btn-close" (click)="closeCreateModal()">✕</button>
+      </div>
+
+      <form (ngSubmit)="saveContent()" class="modal-form">
+        <div class="form-group">
+          <label>Título de la Actividad</label>
+          <input type="text" [(ngModel)]="newContent.title" name="title" required placeholder="Ej: Sumas Mágicas con Dinosaurios" class="form-control" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tipo de Contenido</label>
+            <select [(ngModel)]="newContent.type" name="type" class="form-control">
+              <option value="Assignment">📝 Tarea (Requiere entrega de archivo)</option>
+              <option value="Video">🎥 Video Educativo (YouTube / Link)</option>
+              <option value="Pdf">📄 Lectura o Guía PDF</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Materia</label>
+            <select [(ngModel)]="newContent.subject" name="subject" class="form-control">
+              <option *ngFor="let c of courses" [value]="c.nombre">{{ c.nombre }}</option>
+              <option value="Matemáticas">📐 Matemáticas</option>
+              <option value="Ciencias Naturales">🔬 Ciencias Naturales</option>
+              <option value="Lengua y Literatura">📖 Lengua y Literatura</option>
+              <option value="Artes y Creatividad">🎨 Artes y Creatividad</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Grado Escolar</label>
+            <select [(ngModel)]="newContent.gradeLevel" name="gradeLevel" class="form-control">
+              <option value="1°">1° Primaria</option>
+              <option value="2°">2° Primaria</option>
+              <option value="3°">3° Primaria</option>
+              <option value="4°">4° Primaria</option>
+              <option value="5°">5° Primaria</option>
+            </select>
+          </div>
+
+          <div class="form-group" *ngIf="newContent.type === 'Assignment'">
+            <label>Fecha Límite de Entrega</label>
+            <input type="date" [(ngModel)]="newContent.dueDate" name="dueDate" class="form-control" />
+          </div>
+        </div>
+
+        <div class="form-group" *ngIf="newContent.type === 'Video'">
+          <label>Enlace del Video (YouTube / Web)</label>
+          <input type="url" [(ngModel)]="newContent.fileUrl" name="fileUrl" placeholder="https://youtube.com/watch?v=..." class="form-control" />
+        </div>
+
+        <div class="form-group">
+          <label>Instrucciones Divertidas para los Niños</label>
+          <textarea [(ngModel)]="newContent.description" name="description" rows="3" placeholder="Explica claramente lo que el alumno debe hacer..." class="form-control"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeCreateModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isSavingContent">
+            {{ isSavingContent ? 'Guardando...' : '🚀 Publicar para los Niños' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>

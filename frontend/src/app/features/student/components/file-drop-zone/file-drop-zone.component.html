@@ -1,0 +1,110 @@
+<div class="dropzone-modal-backdrop" (click)="cancelled.emit()">
+  <div class="dropzone-card" (click)="$event.stopPropagation()">
+    <!-- Confeti festivo generado por CSS -->
+    <div class="confetti-container" *ngIf="showConfetti">
+      <div class="confetti c1"></div>
+      <div class="confetti c2"></div>
+      <div class="confetti c3"></div>
+      <div class="confetti c4"></div>
+      <div class="confetti c5"></div>
+      <div class="confetti c6"></div>
+      <div class="confetti c7"></div>
+      <div class="confetti c8"></div>
+    </div>
+
+    <!-- Cabecera del modal -->
+    <div class="modal-header">
+      <div class="title-group">
+        <span class="header-icon">🚀</span>
+        <div>
+          <h2>Entregar mi Tarea</h2>
+          <p class="subtitle">{{ assignmentTitle }}</p>
+        </div>
+      </div>
+      <button class="btn-close" (click)="cancelled.emit()" aria-label="Cerrar modal">✕</button>
+    </div>
+
+    <!-- Estado de éxito al finalizar -->
+    <div class="success-screen" *ngIf="uploadSuccess">
+      <div class="celebrate-emoji bounce-animation">🎉⭐🎈</div>
+      <h3 class="success-title">¡Misión Cumplida!</h3>
+      <p class="success-desc">Tu tarea ya está en el escritorio de tu profesor. ¡Gran trabajo, campeón/campeona!</p>
+    </div>
+
+    <!-- Formulario / Zona de Arrastre -->
+    <div class="dropzone-body" *ngIf="!uploadSuccess">
+      
+      <!-- Zona Drag & Drop activa si no hay archivo seleccionado -->
+      <div *ngIf="!selectedFile"
+           class="drop-area"
+           [class.dragging]="isDragging"
+           (dragover)="onDragOver($event)"
+           (dragleave)="onDragLeave($event)"
+           (drop)="onDrop($event)"
+           (click)="fileInput.click()">
+        
+        <input #fileInput
+               type="file"
+               style="display: none"
+               (change)="onFileSelected($event)"
+               accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" />
+
+        <div class="drop-illustration">
+          <span class="icon-cloud" [class.shake]="isDragging">📂</span>
+          <span class="icon-sparkle">✨</span>
+        </div>
+
+        <h3 class="drop-title">
+          {{ isDragging ? '¡Suelta tu tarea aquí!' : 'Arrastra tu tarea aquí' }}
+        </h3>
+        <p class="drop-subtitle">o haz un clic grande para buscarla en tu computadora 💻</p>
+
+        <div class="format-badges">
+          <span class="format-badge">📄 PDF</span>
+          <span class="format-badge">🖼️ Fotos (JPG, PNG)</span>
+          <span class="format-badge">📝 Word</span>
+        </div>
+      </div>
+
+      <!-- Archivo Seleccionado con Previsualización -->
+      <div *ngIf="selectedFile" class="file-preview-card">
+        <div class="file-icon-box">
+          <span class="big-file-icon">📑</span>
+        </div>
+        <div class="file-details">
+          <h4 class="file-name" [title]="selectedFile.name">{{ selectedFile.name }}</h4>
+          <span class="file-size">📦 {{ formatFileSize(selectedFile.size) }}</span>
+          <span class="file-ready">✅ ¡Archivo listo para enviar!</span>
+        </div>
+        <button class="btn-remove" (click)="removeFile()" title="Cambiar archivo">
+          🗑️ Quitar
+        </button>
+      </div>
+
+      <!-- Alerta de Error -->
+      <div *ngIf="errorMessage" class="error-alert">
+        <span class="alert-icon">⚠️</span>
+        <span>{{ errorMessage }}</span>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-cancel" (click)="cancelled.emit()" [disabled]="isUploading">
+          Cancelar
+        </button>
+
+        <button *ngIf="selectedFile"
+                type="button"
+                class="btn btn-primary btn-submit-task"
+                (click)="submitAssignment()"
+                [disabled]="isUploading">
+          <span *ngIf="!isUploading">🚀 ¡Enviar al Profe!</span>
+          <span *ngIf="isUploading" class="uploading-spinner">
+            ⏳ Enviando tu tarea...
+          </span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>

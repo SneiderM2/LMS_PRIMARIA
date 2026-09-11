@@ -1,0 +1,170 @@
+<div class="student-page">
+  
+  <!-- Barra Superior Escolar -->
+  <header class="student-nav">
+    <div class="brand">
+      <span class="brand-mascot">🎒</span>
+      <span class="brand-title">Mi Escuela Mágica</span>
+    </div>
+
+    <div class="student-badge-group">
+      <img [src]="authService.currentUser()?.avatarUrl" alt="Mi Avatar" class="kid-nav-avatar" />
+      <div class="kid-nav-info">
+        <span class="kid-name">{{ authService.currentUser()?.fullName }}</span>
+        <span class="kid-grade">⭐ {{ authService.currentUser()?.gradeLevel || '2° Primaria' }}</span>
+      </div>
+      <button class="btn btn-secondary btn-sm btn-logout" (click)="logout()">
+        🚪 Salir
+      </button>
+    </div>
+  </header>
+
+  <main class="student-container">
+    
+    <!-- Hero Banner de Bienvenida -->
+    <section class="welcome-hero">
+      <div class="welcome-text">
+        <span class="welcome-tag">✨ ¡Bienvenido de nuevo!</span>
+        <h1>¡Hola, {{ authService.currentUser()?.fullName }}! 🚀</h1>
+        <p>¿Qué aventura emocionante descubriremos hoy en clases?</p>
+      </div>
+      <div class="welcome-badge-icon bounce-animation">
+        <span>🏆</span>
+      </div>
+    </section>
+
+    <!-- Selector de Materias Favoritas (Tarjetas Temáticas) -->
+    <section class="subjects-section">
+      <h2 class="section-title">📚 Mis Materias</h2>
+      <div class="subjects-grid">
+        <button
+          *ngFor="let sub of subjects"
+          type="button"
+          class="subject-card"
+          [class.active]="selectedSubject === sub.name"
+          (click)="selectSubject(sub.name)"
+        >
+          <span class="subject-icon">{{ sub.icon }}</span>
+          <span class="subject-name">{{ sub.name }}</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Lista de Actividades y Tareas -->
+    <section class="activities-section">
+      <div class="activities-header">
+        <h2 class="section-title">
+          🎯 Mis Tareas y Recursos
+          <span class="badge-count" *ngIf="!isLoading">({{ filteredContents.length }})</span>
+        </h2>
+      </div>
+
+      <!-- Spinner de Carga -->
+      <div *ngIf="isLoading" class="student-loading">
+        <span class="loading-icon">🌟</span>
+        <p>Buscando tus tareas mágicas...</p>
+      </div>
+
+      <!-- Tarjetas de Actividades -->
+      <div *ngIf="!isLoading" class="activities-grid">
+        <div *ngFor="let item of filteredContents" class="card-fun activity-card">
+          
+          <!-- Encabezado de la Tarjeta -->
+          <div class="card-header-bar">
+            <span class="subject-pill">{{ item.subject }}</span>
+
+            <!-- Insignia del tipo de contenido -->
+            <span class="type-badge" [ngSwitch]="item.type">
+              <span *ngSwitchCase="'Assignment'" class="type-assignment">📝 Tarea</span>
+              <span *ngSwitchCase="'Video'" class="type-video">🎥 Video</span>
+              <span *ngSwitchCase="'Pdf'" class="type-pdf">📄 Guía de Lectura</span>
+            </span>
+          </div>
+
+          <!-- Contenido Central -->
+          <div class="activity-body">
+            <h3 class="activity-title">{{ item.title }}</h3>
+            <p class="activity-desc">{{ item.description }}</p>
+
+            <!-- Fecha de Entrega Amigable para Niños -->
+            <div *ngIf="item.dueDate" class="due-box">
+              <span class="due-icon">⏰</span>
+              <span class="due-text">
+                Entregar antes de: <strong>{{ item.dueDate | date:'EEEE, d \'de\' MMMM' }}</strong>
+              </span>
+            </div>
+
+            <!-- Estado de Entrega -->
+            <div *ngIf="item.type === 'Assignment'" class="submission-status">
+              <div *ngIf="item.hasSubmitted" class="status-box delivered">
+                <span class="status-icon">🎉</span>
+                <div>
+                  <strong>¡Tarea entregada!</strong>
+                  <div class="file-tag">📎 {{ item.mySubmission?.originalFileName }}</div>
+                </div>
+              </div>
+
+              <div *ngIf="!item.hasSubmitted" class="status-box pending">
+                <span class="status-icon">⏳</span>
+                <span>Pendiente por entregar</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Acciones según el tipo de actividad -->
+          <div class="activity-footer">
+            
+            <!-- Si es Tarea: Botón Drag & Drop -->
+            <button
+              *ngIf="item.type === 'Assignment'"
+              class="btn btn-primary btn-submit-action"
+              (click)="openSubmissionModal(item)"
+            >
+              <span *ngIf="!item.hasSubmitted">🚀 ¡Subir mi Tarea!</span>
+              <span *ngIf="item.hasSubmitted">🔄 Cambiar mi Tarea</span>
+            </button>
+
+            <!-- Si es Video: Abrir Video -->
+            <button
+              *ngIf="item.type === 'Video'"
+              class="btn btn-success btn-media"
+              (click)="openMedia(item.fileUrl)"
+            >
+              ▶️ ¡Ver Video Ahora!
+            </button>
+
+            <!-- Si es PDF: Descargar Cartilla -->
+            <button
+              *ngIf="item.type === 'Pdf'"
+              class="btn btn-secondary btn-media"
+              (click)="openMedia(item.fileUrl)"
+            >
+              📥 Ver Cartilla PDF
+            </button>
+
+          </div>
+
+        </div>
+
+        <!-- Mensaje si no hay actividades -->
+        <div *ngIf="filteredContents.length === 0" class="no-tasks card-fun">
+          <span class="no-tasks-emoji">🎈</span>
+          <h3>¡Yupi! No tienes tareas en esta materia</h3>
+          <p>Disfruta jugando o revisa las otras materias escolares.</p>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL DE ENTREGA DRAG & DROP -->
+  <app-file-drop-zone
+    *ngIf="showDropZone && activeAssignmentId"
+    [assignmentId]="activeAssignmentId"
+    [assignmentTitle]="activeAssignmentTitle"
+    (submitted)="onAssignmentSubmitted()"
+    (cancelled)="closeSubmissionModal()"
+  ></app-file-drop-zone>
+
+</div>

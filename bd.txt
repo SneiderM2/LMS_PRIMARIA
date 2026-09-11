@@ -1,0 +1,388 @@
+
+CREATE DATABASE IF NOT EXISTS lms_scikids
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+
+USE lms_scikids;
+
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP TABLE IF EXISTS archivos_entrega;
+DROP TABLE IF EXISTS entregas;
+DROP TABLE IF EXISTS tareas;
+DROP TABLE IF EXISTS materiales;
+DROP TABLE IF EXISTS inscripciones;
+DROP TABLE IF EXISTS cursos;
+DROP TABLE IF EXISTS alumnos;
+DROP TABLE IF EXISTS perfiles;
+DROP TABLE IF EXISTS usuarios;
+DROP TABLE IF EXISTS grados;
+DROP TABLE IF EXISTS roles;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+
+
+CREATE TABLE roles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(30) NOT NULL,
+    descripcion VARCHAR(150),
+
+    CONSTRAINT uq_roles_nombre
+        UNIQUE (nombre)
+) ENGINE=InnoDB;
+
+
+
+CREATE TABLE grados (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(30) NOT NULL,
+    descripcion VARCHAR(150),
+
+    CONSTRAINT uq_grados_nombre
+        UNIQUE (nombre)
+) ENGINE=InnoDB;
+
+
+CREATE TABLE usuarios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    rol_id INT NOT NULL,
+    username VARCHAR(100) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+
+    fecha_creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_usuarios_username
+        UNIQUE (username),
+
+    CONSTRAINT fk_usuarios_roles
+        FOREIGN KEY (rol_id)
+        REFERENCES roles(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+
+
+CREATE TABLE perfiles (
+    usuario_id INT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    apellido VARCHAR(100) NOT NULL,
+    avatar_url VARCHAR(255),
+
+    CONSTRAINT fk_perfiles_usuarios
+        FOREIGN KEY (usuario_id)
+        REFERENCES usuarios(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+
+CREATE TABLE alumnos (
+    usuario_id INT PRIMARY KEY,
+    grado_id INT NOT NULL,
+
+    CONSTRAINT fk_alumnos_usuarios
+        FOREIGN KEY (usuario_id)
+        REFERENCES usuarios(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_alumnos_grados
+        FOREIGN KEY (grado_id)
+        REFERENCES grados(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+
+
+CREATE TABLE cursos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    nombre VARCHAR(100) NOT NULL,
+    grado_id INT NOT NULL,
+    grupo VARCHAR(10) NOT NULL,
+
+    docente_id INT NOT NULL,
+
+    descripcion TEXT,
+
+    fecha_creacion DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
+
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+
+    CONSTRAINT fk_cursos_grados
+        FOREIGN KEY (grado_id)
+        REFERENCES grados(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_cursos_docentes
+        FOREIGN KEY (docente_id)
+        REFERENCES usuarios(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT uq_cursos_nombre_grado_grupo
+        UNIQUE (nombre, grado_id, grupo)
+) ENGINE=InnoDB;
+
+
+
+CREATE TABLE inscripciones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    curso_id INT NOT NULL,
+    alumno_id INT NOT NULL,
+
+    fecha_registro DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
+
+    estado ENUM(
+        'ACTIVA',
+        'RETIRADA'
+    ) NOT NULL DEFAULT 'ACTIVA',
+
+    CONSTRAINT fk_inscripciones_cursos
+        FOREIGN KEY (curso_id)
+        REFERENCES cursos(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_inscripciones_alumnos
+        FOREIGN KEY (alumno_id)
+        REFERENCES alumnos(usuario_id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_inscripcion_curso_alumno
+        UNIQUE (curso_id, alumno_id)
+) ENGINE=InnoDB;
+
+
+CREATE TABLE tareas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    curso_id INT NOT NULL,
+
+    titulo VARCHAR(150) NOT NULL,
+    descripcion TEXT,
+
+    fecha_publicacion DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
+
+    fecha_limite DATETIME NOT NULL,
+
+    puntaje_maximo DECIMAL(5,2) NOT NULL DEFAULT 100.00,
+
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+
+    CONSTRAINT fk_tareas_cursos
+        FOREIGN KEY (curso_id)
+        REFERENCES cursos(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT chk_tareas_puntaje
+        CHECK (puntaje_maximo >= 0),
+
+    CONSTRAINT chk_tareas_fechas
+        CHECK (fecha_limite >= fecha_publicacion)
+) ENGINE=InnoDB;
+
+
+
+CREATE TABLE entregas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    tarea_id INT NOT NULL,
+    alumno_id INT NOT NULL,
+
+    contenido_texto TEXT,
+
+    fecha_entrega DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
+
+    estado ENUM(
+        'ENVIADA',
+        'CALIFICADA'
+    ) NOT NULL DEFAULT 'ENVIADA',
+
+    calificacion DECIMAL(5,2),
+
+    retroalimentacion TEXT,
+
+    fecha_calificacion DATETIME,
+
+    CONSTRAINT fk_entregas_tareas
+        FOREIGN KEY (tarea_id)
+        REFERENCES tareas(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_entregas_alumnos
+        FOREIGN KEY (alumno_id)
+        REFERENCES alumnos(usuario_id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+ 
+    CONSTRAINT uq_entrega_tarea_alumno
+        UNIQUE (tarea_id, alumno_id),
+
+    CONSTRAINT chk_entregas_calificacion
+        CHECK (
+            calificacion IS NULL
+            OR calificacion >= 0
+        ),
+
+    CONSTRAINT chk_entregas_fecha_calificacion
+        CHECK (
+            fecha_calificacion IS NULL
+            OR fecha_calificacion >= fecha_entrega
+        )
+) ENGINE=InnoDB;
+
+
+CREATE TABLE archivos_entrega (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    entrega_id INT NOT NULL,
+
+    nombre_original VARCHAR(255) NOT NULL,
+    nombre_archivo VARCHAR(255) NOT NULL,
+
+    ruta_archivo VARCHAR(500) NOT NULL,
+
+    tipo_mime VARCHAR(100) NOT NULL,
+
+    tamano_bytes BIGINT UNSIGNED NOT NULL,
+
+    fecha_subida DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_archivos_entrega
+        FOREIGN KEY (entrega_id)
+        REFERENCES entregas(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT chk_archivos_tamano
+        CHECK (tamano_bytes > 0)
+) ENGINE=InnoDB;
+
+
+CREATE TABLE materiales (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    curso_id INT NOT NULL,
+
+    titulo VARCHAR(150) NOT NULL,
+    descripcion TEXT,
+
+    tipo ENUM(
+        'DOCUMENTO',
+        'VIDEO',
+        'IMAGEN',
+        'ENLACE',
+        'OTRO'
+    ) NOT NULL,
+
+    recurso_url VARCHAR(500) NOT NULL,
+
+    fecha_publicacion DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
+
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+
+    CONSTRAINT fk_materiales_cursos
+        FOREIGN KEY (curso_id)
+        REFERENCES cursos(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+
+
+CREATE INDEX idx_usuarios_rol
+    ON usuarios(rol_id);
+
+CREATE INDEX idx_alumnos_grado
+    ON alumnos(grado_id);
+
+CREATE INDEX idx_cursos_grado
+    ON cursos(grado_id);
+
+CREATE INDEX idx_cursos_docente
+    ON cursos(docente_id);
+
+CREATE INDEX idx_inscripciones_curso
+    ON inscripciones(curso_id);
+
+CREATE INDEX idx_inscripciones_alumno
+    ON inscripciones(alumno_id);
+
+CREATE INDEX idx_tareas_curso
+    ON tareas(curso_id);
+
+CREATE INDEX idx_entregas_tarea
+    ON entregas(tarea_id);
+
+CREATE INDEX idx_entregas_alumno
+    ON entregas(alumno_id);
+
+CREATE INDEX idx_archivos_entrega
+    ON archivos_entrega(entrega_id);
+
+CREATE INDEX idx_materiales_curso
+    ON materiales(curso_id);
+
+
+
+INSERT INTO roles (nombre, descripcion)
+VALUES
+(
+    'ADMINISTRADOR',
+    'Administra usuarios, cursos y configuración del LMS.'
+),
+(
+    'DOCENTE',
+    'Gestiona cursos, materiales, tareas y calificaciones.'
+),
+(
+    'ALUMNO',
+    'Consulta cursos, materiales y entrega actividades.'
+);
+
+
+/* =========================================================
+   16. DATOS INICIALES: GRADOS
+   ========================================================= */
+
+INSERT INTO grados (nombre, descripcion)
+VALUES
+(
+    '1°',
+    'Primer grado de primaria.'
+),
+(
+    '2°',
+    'Segundo grado de primaria.'
+),
+(
+    '3°',
+    'Tercer grado de primaria.'
+),
+(
+    '4°',
+    'Cuarto grado de primaria.'
+),
+(
+    '5°',
+    'Quinto grado de primaria.'
+);

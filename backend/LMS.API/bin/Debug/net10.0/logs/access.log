@@ -1,0 +1,99 @@
+[2026-09-11 07:59:57] ::1 | OPTIONS /api/auth/login | 204 | 56ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:05:23] ::1 | OPTIONS /api/auth/login | 204 | 427ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:05:23] ::1 | POST /api/auth/login | 200 | 3475ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:05:27] ::1 | OPTIONS /api/teacher/students-status | 204 | 1ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:05:27] ::1 | OPTIONS /api/teacher/metrics | 204 | 2ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:05:27] ::1 | OPTIONS /api/teacher/courses | 204 | 1ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:05:27] ::1 | OPTIONS /api/teacher/students | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:05:27] ::1 | GET /api/teacher/courses | 200 | 507ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:05:27] ::1 | GET /api/teacher/students | 200 | 512ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:05:27] ::1 | GET /api/teacher/metrics | 200 | 587ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:05:27] ::1 | GET /api/teacher/students-status | 200 | 594ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:24] ::1 | OPTIONS /api/auth/register | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:24] ::1 | POST /api/auth/register | 201 | 984ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:25] ::1 | OPTIONS /api/teacher/metrics | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:25] ::1 | GET /api/teacher/metrics | 200 | 29ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:31] ::1 | OPTIONS /api/teacher/students-status | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:31] ::1 | OPTIONS /api/teacher/metrics | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:31] ::1 | OPTIONS /api/teacher/students | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:31] ::1 | OPTIONS /api/teacher/courses | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:31] ::1 | GET /api/teacher/students-status | 200 | 39ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:31] ::1 | GET /api/teacher/metrics | 200 | 38ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:31] ::1 | GET /api/teacher/students | 200 | 50ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:31] ::1 | GET /api/teacher/courses | 200 | 72ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:37] ::1 | OPTIONS /api/teacher/metrics | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:37] ::1 | GET /api/teacher/metrics | 200 | 26ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:39] ::1 | OPTIONS /api/teacher/students-status | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:39] ::1 | OPTIONS /api/teacher/students | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:39] ::1 | OPTIONS /api/teacher/courses | 204 | 3ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:39] ::1 | GET /api/teacher/metrics | 200 | 44ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:39] ::1 | GET /api/teacher/students-status | 200 | 42ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:39] ::1 | GET /api/teacher/students | 200 | 34ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:39] ::1 | GET /api/teacher/courses | 200 | 23ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 08:06:42] ::1 | GET /api/teacher/metrics | 200 | 22ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:32:19] ::1 | OPTIONS /api/auth/login | 204 | 122ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:42:39] ::1 | OPTIONS /api/auth/login | 204 | 48ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:42:39] ::1 | POST /api/auth/login | 401 | 209ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:42:41] ::1 | POST /api/auth/login | 401 | 63ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:44:14] ::1 | OPTIONS /api/auth/login | 204 | 59ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:44:14] ::1 | POST /api/auth/login | 401 | 479ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:06] ::1 | OPTIONS /api/auth/register | 204 | 1ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:07] ::1 | POST /api/auth/register | 201 | 1084ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:08] ::1 | OPTIONS /api/teacher/metrics | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:08] ::1 | OPTIONS /api/systemfiles/htaccess | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:08] ::1 | OPTIONS /api/systemfiles/logs | 204 | 2ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:08] ::1 | GET /api/systemfiles/logs | 200 | 172ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:08] ::1 | GET /api/systemfiles/htaccess | 200 | 181ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:08] ::1 | GET /api/teacher/metrics | 200 | 350ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:23] ::1 | OPTIONS /api/systemfiles/logs/content?fileName=access.log | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:23] ::1 | GET /api/systemfiles/logs/content?fileName=access.log | 200 | 80ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:46] ::1 | OPTIONS /api/systemfiles/logs | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:46] ::1 | OPTIONS /api/systemfiles/logs/content?fileName=access.log | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:46] ::1 | GET /api/systemfiles/logs | 200 | 4ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:45:46] ::1 | GET /api/systemfiles/logs/content?fileName=access.log | 200 | 30ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:23] ::1 | OPTIONS /api/auth/register | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:23] ::1 | POST /api/auth/register | 201 | 584ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:23] ::1 | OPTIONS /api/student/dashboard | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:23] ::1 | GET /api/student/dashboard | 200 | 297ms | User:sneider morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:48] ::1 | OPTIONS /api/auth/login | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:48] ::1 | POST /api/auth/login | 401 | 246ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:58] ::1 | OPTIONS /api/auth/login | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:58] ::1 | POST /api/auth/login | 200 | 237ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:59] ::1 | OPTIONS /api/teacher/metrics | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:59] ::1 | OPTIONS /api/systemfiles/htaccess | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:59] ::1 | OPTIONS /api/systemfiles/logs | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:59] ::1 | GET /api/systemfiles/logs | 200 | 3ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:59] ::1 | GET /api/systemfiles/htaccess | 200 | 8ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:46:59] ::1 | GET /api/teacher/metrics | 200 | 82ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:47:10] ::1 | OPTIONS /api/systemfiles/logs/content?fileName=access.log | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:47:10] ::1 | GET /api/systemfiles/logs/content?fileName=access.log | 200 | 17ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:47:18] ::1 | OPTIONS /api/systemfiles/htaccess | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:47:18] ::1 | GET /api/systemfiles/htaccess | 200 | 3ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:51:58] ::1 | OPTIONS /api/systemfiles/logs/content?fileName=access.log | 204 | 9ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:51:58] ::1 | GET /api/systemfiles/logs/content?fileName=access.log | 200 | 83ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:52:35] ::1 | OPTIONS /api/systemfiles/logs | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:52:35] ::1 | OPTIONS /api/systemfiles/logs/content?fileName=access.log | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:52:35] ::1 | GET /api/systemfiles/logs | 200 | 16ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:52:35] ::1 | GET /api/systemfiles/logs/content?fileName=access.log | 200 | 61ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:52:51] ::1 | OPTIONS /api/auth/login | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:52:51] ::1 | POST /api/auth/login | 200 | 416ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:52:52] ::1 | OPTIONS /api/student/dashboard | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:52:52] ::1 | GET /api/student/dashboard | 200 | 72ms | User:sneider morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:53:03] ::1 | OPTIONS /api/student/dashboard | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 14:53:03] ::1 | GET /api/student/dashboard | 200 | 42ms | User:sneider morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 15:28:35] ::1 | OPTIONS /api/student/dashboard | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 15:28:35] ::1 | GET /api/student/dashboard | 200 | 125ms | User:sneider morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:29] ::1 | OPTIONS /api/student/dashboard | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:29] ::1 | GET /api/student/dashboard | 200 | 66ms | User:sneider morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:40] ::1 | OPTIONS /api/auth/login | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:40] ::1 | POST /api/auth/login | 200 | 8378ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:49] ::1 | OPTIONS /api/teacher/metrics | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:49] ::1 | OPTIONS /api/systemfiles/htaccess | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:49] ::1 | OPTIONS /api/systemfiles/logs | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:49] ::1 | GET /api/systemfiles/logs | 200 | 2ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:49] ::1 | GET /api/systemfiles/htaccess | 200 | 8ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:49] ::1 | GET /api/teacher/metrics | 200 | 52ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:57] ::1 | OPTIONS /api/systemfiles/logs/content?fileName=access.log | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:00:57] ::1 | GET /api/systemfiles/logs/content?fileName=access.log | 200 | 57ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:01:11] ::1 | OPTIONS /api/systemfiles/htaccess | 204 | 0ms | User:- | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36
+[2026-09-11 16:01:11] ::1 | GET /api/systemfiles/htaccess | 200 | 4ms | User:oscar morales | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36

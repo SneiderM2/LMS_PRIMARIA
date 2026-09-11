@@ -1,0 +1,287 @@
+/* ==========================================================================
+   LMS Primaria - Sistema de Diseño Lúdico y Accesible para Niños
+   ========================================================================== */
+
+:root {
+  /* Paleta de Colores Estimulante para Primaria */
+  --primary: #38bdf8;        /* Azul Cielo Brillante */
+  --primary-hover: #0284c7;
+  --primary-light: #e0f2fe;
+  
+  --secondary: #fb923c;      /* Naranja Alegría */
+  --secondary-hover: #ea580c;
+  --secondary-light: #ffedd5;
+
+  --accent-yellow: #facc15;  /* Amarillo Sol */
+  --accent-purple: #a855f7;  /* Violeta Mágico */
+  --accent-pink: #f472b6;    /* Rosa Algodón */
+
+  /* Semáforo de Asistencia Escolar */
+  --semaforo-green: #22c55e;
+  --semaforo-green-bg: #dcfce7;
+  --semaforo-green-border: #86efac;
+  --semaforo-green-glow: rgba(34, 197, 94, 0.4);
+
+  --semaforo-yellow: #eab308;
+  --semaforo-yellow-bg: #fef9c3;
+  --semaforo-yellow-border: #fde047;
+  --semaforo-yellow-glow: rgba(234, 179, 8, 0.4);
+
+  --semaforo-red: #ef4444;
+  --semaforo-red-bg: #fee2e2;
+  --semaforo-red-border: #fca5a5;
+  --semaforo-red-glow: rgba(239, 68, 68, 0.4);
+
+  /* Fondos y Superficies */
+  --bg-main: #f0f9ff;        /* Fondo Nube Suave */
+  --bg-surface: #ffffff;
+  --bg-surface-alt: #f8fafc;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+
+  /* Sombras y 3D Efectos Lúdicos */
+  --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 6px 12px -2px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 24px -4px rgba(15, 23, 42, 0.12);
+  --shadow-chunky: 0 6px 0px rgba(0, 0, 0, 0.12);
+  --shadow-chunky-pressed: 0 2px 0px rgba(0, 0, 0, 0.12);
+
+  /* Tipografía */
+  --font-heading: 'Fredoka', cursive, sans-serif;
+  --font-body: 'Nunito', system-ui, -apple-system, sans-serif;
+
+  /* Radios de borde súper amigables */
+  --radius-sm: 0.75rem;
+  --radius-md: 1.25rem;
+  --radius-lg: 1.75rem;
+  --radius-full: 9999px;
+}
+
+/* Reset y base */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-body);
+  color: var(--text-main);
+  background-color: var(--bg-main);
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.08) 0%, transparent 20%),
+    radial-gradient(circle at 90% 80%, rgba(251, 146, 60, 0.08) 0%, transparent 20%),
+    radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.05) 0%, transparent 30%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+/* Tipografía de títulos */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* ==========================================================================
+   Botones Lúdicos "Chunky" para Niños y Profesores
+   ========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  text-decoration: none;
+  outline: none;
+  user-select: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 0 #0369a1, 0 8px 16px rgba(2, 132, 199, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #0369a1, 0 10px 20px rgba(2, 132, 199, 0.35);
+}
+
+.btn-primary:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #0369a1, 0 2px 5px rgba(2, 132, 199, 0.2);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 0 #c2410c, 0 8px 16px rgba(234, 88, 12, 0.3);
+}
+
+.btn-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #c2410c, 0 10px 20px rgba(234, 88, 12, 0.35);
+}
+
+.btn-secondary:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #c2410c;
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 0 #15803d, 0 8px 16px rgba(22, 163, 74, 0.3);
+}
+
+.btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #15803d, 0 10px 20px rgba(22, 163, 74, 0.35);
+}
+
+.btn-success:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #15803d;
+}
+
+.btn-sm {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.btn-lg {
+  padding: 1rem 2rem;
+  font-size: 1.25rem;
+}
+
+/* ==========================================================================
+   Tarjetas Lúdicas (Cards)
+   ========================================================================== */
+.card-fun {
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  border: 3px solid rgba(226, 232, 240, 0.8);
+  box-shadow: var(--shadow-md);
+  padding: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-fun:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+/* ==========================================================================
+   Insignias del Semáforo (Traffic Light Badges)
+   ========================================================================== */
+.semaforo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.85rem;
+  font-family: var(--font-heading);
+  letter-spacing: 0.02em;
+}
+
+.semaforo-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Verde: Hoy */
+.badge-green {
+  background-color: var(--semaforo-green-bg);
+  color: #15803d;
+  border: 2px solid var(--semaforo-green-border);
+}
+.dot-green {
+  background-color: var(--semaforo-green);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+  animation: pulse-green 2s infinite;
+}
+
+/* Amarillo: 2 a 4 días */
+.badge-yellow {
+  background-color: var(--semaforo-yellow-bg);
+  color: #a16207;
+  border: 2px solid var(--semaforo-yellow-border);
+}
+.dot-yellow {
+  background-color: var(--semaforo-yellow);
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.25);
+  animation: pulse-yellow 2s infinite;
+}
+
+/* Rojo: 5 o más días */
+.badge-red {
+  background-color: var(--semaforo-red-bg);
+  color: #b91c1c;
+  border: 2px solid var(--semaforo-red-border);
+}
+.dot-red {
+  background-color: var(--semaforo-red);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+  animation: pulse-red 1.5s infinite;
+}
+
+/* Animaciones de Pulso para los Semáforos */
+@keyframes pulse-green {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3); }
+  50% { transform: scale(1.15); box-shadow: 0 0 0 7px rgba(34, 197, 94, 0.15); }
+}
+
+@keyframes pulse-yellow {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.3); }
+  50% { transform: scale(1.15); box-shadow: 0 0 0 7px rgba(234, 179, 8, 0.15); }
+}
+
+@keyframes pulse-red {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35); }
+  50% { transform: scale(1.2); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.18); }
+}
+
+/* ==========================================================================
+   Confetti y Animaciones Festivas
+   ========================================================================== */
+@keyframes bounce-fun {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.bounce-animation {
+  animation: bounce-fun 2s infinite ease-in-out;
+}
+
+/* Scrollbar amigable */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

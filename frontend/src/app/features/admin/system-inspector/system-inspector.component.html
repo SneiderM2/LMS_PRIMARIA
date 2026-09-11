@@ -1,0 +1,142 @@
+<div class="system-inspector card-fun">
+  <!-- Cabecera de Inspección de Seguridad -->
+  <div class="inspector-header">
+    <div class="header-titles">
+      <div class="shield-badge">
+        <span class="badge-icon">🛡️</span>
+        <span class="badge-role">Rol Requerido: <code>.admin</code> / Administrador</span>
+      </div>
+      <h2>Auditoría del Sistema y Archivos de Configuración</h2>
+      <p class="header-desc">
+        Inspección en tiempo real de directivas del servidor web (<code>.htaccess</code>) y registros de actividad (<code>access.log</code>, <code>error.log</code>).
+      </p>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-secondary btn-sm" (click)="refreshCurrent()" [disabled]="isLoading()" title="Actualizar datos">
+        <span [class.spin]="isLoading()">🔄</span> Recargar
+      </button>
+      <button class="btn btn-secondary btn-sm" (click)="copyToClipboard()" [disabled]="!currentContent() || isLoading()" title="Copiar texto">
+        📋 Copiar
+      </button>
+      <button *ngIf="activeTab() === 'logs' && selectedLogName()" class="btn btn-danger btn-sm" (click)="clearCurrentLog()" [disabled]="isLoading()" title="Vaciar este archivo de log">
+        🗑️ Limpiar Log
+      </button>
+    </div>
+  </div>
+
+  <!-- Alertas informativas / errores -->
+  <div *ngIf="errorMessage()" class="alert alert-danger">
+    <span>⚠️</span>
+    <div class="alert-content">
+      <strong>Error de Acceso / Sistema:</strong>
+      <p>{{ errorMessage() }}</p>
+    </div>
+  </div>
+
+  <div *ngIf="successMessage()" class="alert alert-success">
+    <span>✅</span>
+    <div class="alert-content">
+      <p>{{ successMessage() }}</p>
+    </div>
+  </div>
+
+  <!-- Pestañas Principales (.htaccess vs Logs) -->
+  <div class="inspector-tabs">
+    <button 
+      class="tab-btn" 
+      [class.active]="activeTab() === 'htaccess'" 
+      (click)="selectTab('htaccess')">
+      ⚙️ Configuración (.htaccess)
+    </button>
+    <button 
+      class="tab-btn" 
+      [class.active]="activeTab() === 'logs'" 
+      (click)="selectTab('logs')">
+      📋 Registros del Servidor (*.log)
+      <span *ngIf="logFiles().length > 0" class="tab-pill">{{ logFiles().length }}</span>
+    </button>
+  </div>
+
+  <!-- Sub-barra de archivos de log disponibles si la pestaña logs está activa -->
+  <div *ngIf="activeTab() === 'logs'" class="logs-selector-bar">
+    <span class="selector-label">Archivos disponibles:</span>
+    <div class="log-chips">
+      <button 
+        *ngFor="let file of logFiles()" 
+        class="chip-btn"
+        [class.selected]="selectedLogName() === file.name"
+        (click)="loadLog(file.name)">
+        <span class="chip-name">{{ file.name }}</span>
+        <span class="chip-meta">{{ formatFileSize(file.size) }}</span>
+      </button>
+
+      <span *ngIf="logFiles().length === 0 && !isLoading()" class="empty-hint">
+        No se han generado archivos de log aún en el servidor.
+      </span>
+    </div>
+  </div>
+
+  <!-- Barra de Metadatos del Archivo y Filtro de Búsqueda -->
+  <div class="file-toolbar">
+    <div class="file-info-pill">
+      <span class="pill-dot"></span>
+      <strong class="file-name">{{ currentFileName() }}</strong>
+      <span class="file-divider">|</span>
+      <span class="file-stat">Tamaño: <strong>{{ formatFileSize(fileSize()) }}</strong></span>
+      <span *ngIf="lastModified()" class="file-divider">|</span>
+      <span *ngIf="lastModified()" class="file-stat">Modificado: <strong>{{ lastModified() | date:'yyyy-MM-dd HH:mm:ss' }}</strong></span>
+      <span class="file-divider">|</span>
+      <span class="file-stat">Líneas: <strong>{{ filteredLines.length }}</strong></span>
+    </div>
+
+    <div class="filter-box">
+      <span class="search-icon">🔍</span>
+      <input 
+        type="text" 
+        [ngModel]="filterQuery()"
+        (ngModelChange)="filterQuery.set($event)"
+        placeholder="Filtrar por texto, ERROR, 401, GET..." 
+        class="search-input" />
+      <button *ngIf="filterQuery()" class="clear-search" (click)="filterQuery.set('')">✕</button>
+    </div>
+  </div>
+
+  <!-- Visualizador de Código / Logs estilo Terminal -->
+  <div class="terminal-container">
+    <div class="terminal-bar">
+      <div class="terminal-dots">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+      </div>
+      <span class="terminal-title">Consola de Auditoría — {{ currentFileName() }}</span>
+      <span class="terminal-status" [class.loading]="isLoading()">
+        {{ isLoading() ? 'Leyendo...' : 'Listo' }}
+      </span>
+    </div>
+
+    <div class="terminal-body" [class.is-loading]="isLoading()">
+      <div *ngIf="isLoading()" class="terminal-loader">
+        <div class="spinner"></div>
+        <p>Consultando archivo protegido en el servidor...</p>
+      </div>
+
+      <div *ngIf="!isLoading() && filteredLines.length === 0" class="terminal-empty">
+        <span class="empty-icon">📭</span>
+        <p *ngIf="filterQuery()">No se encontraron coincidencias para "{{ filterQuery() }}" en este archivo.</p>
+        <p *ngIf="!filterQuery()">El archivo está vacío.</p>
+      </div>
+
+      <div *ngIf="!isLoading() && filteredLines.length > 0" class="code-lines">
+        <div 
+          *ngFor="let line of filteredLines; let i = index" 
+          class="code-line"
+          [ngClass]="getLineClass(line)">
+          <span class="line-num">{{ i + 1 }}</span>
+          <span class="line-content">{{ line || ' ' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

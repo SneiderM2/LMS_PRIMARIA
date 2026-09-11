@@ -1,0 +1,189 @@
+<div class="login-wrapper">
+  <!-- Ilustraciones flotantes de fondo -->
+  <div class="floating-bg-item bg-star-1">⭐</div>
+  <div class="floating-bg-item bg-rocket">🚀</div>
+  <div class="floating-bg-item bg-pencil">✏️</div>
+  <div class="floating-bg-item bg-globe">🌍</div>
+  <div class="floating-bg-item bg-star-2">✨</div>
+
+  <div class="login-container">
+    <div class="login-card">
+
+      <!-- Encabezado con Mascota Escolar -->
+      <div class="login-header">
+        <div class="mascot-badge bounce-animation">
+          <span class="mascot-emoji">🎒</span>
+        </div>
+        <h1 class="portal-title">Aula Mágica</h1>
+        <p class="portal-subtitle">Plataforma Virtual de Primaria</p>
+      </div>
+
+      <!-- Selector de Pestañas: Iniciar Sesión / Crear Cuenta -->
+      <div class="auth-tabs">
+        <button type="button" class="tab-btn" [class.active]="activeTab === 'login'" (click)="switchTab('login')">
+          🔑 Iniciar Sesión
+        </button>
+        <button type="button" class="tab-btn" [class.active]="activeTab === 'register'" (click)="switchTab('register')">
+          ✨ Crear Cuenta
+        </button>
+      </div>
+
+      <!-- Banner de Mensajes de Error o Éxito -->
+      <div *ngIf="errorMessage" class="error-banner">
+        <span class="error-icon">⚠️</span>
+        <span>{{ errorMessage }}</span>
+      </div>
+
+      <div *ngIf="successMessage" class="success-banner">
+        <span class="success-icon">🎉</span>
+        <span>{{ successMessage }}</span>
+      </div>
+
+      <!-- FORMULARIO 1: INICIAR SESIÓN -->
+      <form *ngIf="activeTab === 'login'" (ngSubmit)="onLogin()" class="login-form">
+
+        <div class="form-group">
+          <label for="studentId">
+            <span class="label-icon">🆔</span> Carnet o Documento de Identidad
+          </label>
+          <div class="input-box">
+            <input id="studentId" type="text" name="id" [(ngModel)]="id"
+              placeholder="Ej: EST-101, DOC-2024 o 1029384756" required autocomplete="username" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">
+            <span class="label-icon">🔒</span> Tu Contraseña
+          </label>
+          <div class="input-box">
+            <input id="password" type="password" name="password" [(ngModel)]="password" placeholder="••••••••" required
+              autocomplete="current-password" />
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg btn-block" [disabled]="isLoading">
+          <span *ngIf="!isLoading">🚀 ¡Entrar a mi Aula Virtual!</span>
+          <span *ngIf="isLoading">⏳ Abriendo las puertas...</span>
+        </button>
+
+        <div class="register-prompt">
+          <p>¿Aún no tienes cuenta escolar? <a href="javascript:void(0)" (click)="switchTab('register')">Regístrate
+              gratis aquí</a></p>
+        </div>
+
+      </form>
+
+      <!-- FORMULARIO 2: CREAR CUENTA / REGISTRO DINÁMICO -->
+      <form *ngIf="activeTab === 'register'" (ngSubmit)="onRegister()" class="login-form">
+
+        <!-- Selección de Rol / Perfil -->
+        <div class="form-group">
+          <label class="section-label">
+            <span class="label-icon">👤</span> Selecciona tu Perfil:
+          </label>
+          <div class="role-selector-grid">
+            <button type="button" class="role-card" [class.selected]="regRole === 'Student'"
+              (click)="regRole = 'Student'">
+              <span class="role-emoji">🎒</span>
+              <span class="role-title">Estudiante</span>
+              <span class="role-sub">Primaria</span>
+            </button>
+
+            <button type="button" class="role-card" [class.selected]="regRole === 'Teacher'"
+              (click)="regRole = 'Teacher'">
+              <span class="role-emoji">👩‍🏫</span>
+              <span class="role-title">Docente</span>
+              <span class="role-sub">Profesor(a)</span>
+            </button>
+
+            <button type="button" class="role-card" [class.selected]="regRole === 'Admin'" (click)="regRole = 'Admin'">
+              <span class="role-emoji">👑</span>
+              <span class="role-title">Admin</span>
+              <span class="role-sub">Dirección</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Documento o Carnet -->
+        <div class="form-group">
+          <label for="regId">
+            <span class="label-icon">🆔</span> Carnet o Documento (ID único de acceso)
+          </label>
+          <div class="input-box">
+            <input id="regId" type="text" name="regId" [(ngModel)]="regId"
+              placeholder="Ej: EST-101, 1029384756 o mi_usuario" required />
+          </div>
+        </div>
+
+        <!-- Nombre Completo -->
+        <div class="form-group">
+          <label for="regFullName">
+            <span class="label-icon">📛</span> Nombre Completo
+          </label>
+          <div class="input-box">
+            <input id="regFullName" type="text" name="regFullName" [(ngModel)]="regFullName"
+              placeholder="Ej: Sofía Martínez Gómez" required />
+          </div>
+        </div>
+
+        <!-- Grado (Solo para Estudiantes) -->
+        <div *ngIf="regRole === 'Student'" class="form-group grade-selector-group">
+          <label for="regGrade">
+            <span class="label-icon">📚</span> Grado Escolar de Primaria
+          </label>
+          <div class="input-box">
+            <select id="regGrade" name="regGrade" [(ngModel)]="regGrade" class="custom-form-select">
+              <option value="1°">1° Primaria (Primer Grado)</option>
+              <option value="2°">2° Primaria (Segundo Grado)</option>
+              <option value="3°">3° Primaria (Tercer Grado)</option>
+              <option value="4°">4° Primaria (Cuarto Grado)</option>
+              <option value="5°">5° Primaria (Quinto Grado)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Contraseña y Confirmación -->
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="regPassword">
+              <span class="label-icon">🔒</span> Contraseña
+            </label>
+            <div class="input-box">
+              <input id="regPassword" type="password" name="regPassword" [(ngModel)]="regPassword"
+                placeholder="Mínimo 4 caracteres" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="regConfirmPassword">
+              <span class="label-icon">🔐</span> Repetir
+            </label>
+            <div class="input-box">
+              <input id="regConfirmPassword" type="password" name="regConfirmPassword" [(ngModel)]="regConfirmPassword"
+                placeholder="Confirma tu clave" required />
+            </div>
+          </div>
+        </div>
+
+        <!-- Botón de Registro -->
+        <button type="submit" class="btn btn-primary btn-lg btn-block" [disabled]="isLoading">
+          <span *ngIf="!isLoading">🎉 ¡Crear mi Cuenta y Entrar!</span>
+          <span *ngIf="isLoading">⏳ Registrando en MySQL...</span>
+        </button>
+
+        <div class="register-prompt">
+          <p>¿Ya tienes una cuenta registrada? <a href="javascript:void(0)" (click)="switchTab('login')">Inicia sesión
+              aquí</a></p>
+        </div>
+
+      </form>
+
+    </div>
+
+    <!-- Pie de página escolar -->
+    <div class="login-footer">
+      <p>🏫 Colegio Primaria Siglo XXI • LMS Scikids</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,133 @@
+.admin-page {
+  min-height: 100vh;
+}
+
+.admin-nav {
+  background: #ffffff;
+  border-bottom: 3px solid #e2e8f0;
+  padding: 0.85rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.brand-icon {
+  font-size: 2rem;
+}
+
+.brand-title {
+  font-family: var(--font-heading);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.admin-tag {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+}
+
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-greeting {
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.admin-container {
+  max-width: 1150px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.admin-banner {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.admin-banner h1 {
+  font-size: 1.85rem;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+}
+
+.admin-banner p {
+  color: #64748b;
+  font-size: 1.05rem;
+}
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.metric-box {
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.box-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.box-val {
+  font-size: 2rem;
+  font-weight: 800;
+  font-family: var(--font-heading);
+  color: #0f172a;
+}
+
+.box-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 700;
+  margin-top: 0.25rem;
+}
+
+.box-green { border-color: var(--semaforo-green-border); background: #f0fdf4; }
+.box-yellow { border-color: var(--semaforo-yellow-border); background: #fefce8; }
+.box-red { border-color: var(--semaforo-red-border); background: #fef2f2; }
+
+.quick-admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.quick-card h3 {
+  font-size: 1.25rem;
+  color: #0f172a;
+  margin-bottom: 0.5rem;
+}
+
+.quick-card p {
+  color: #64748b;
+  font-size: 0.95rem;
+  margin-bottom: 1.25rem;
+}

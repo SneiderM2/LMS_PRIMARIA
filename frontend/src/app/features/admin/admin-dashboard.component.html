@@ -1,0 +1,69 @@
+<div class="admin-page">
+  <header class="admin-nav">
+    <div class="nav-brand">
+      <span class="brand-icon">🏫</span>
+      <span class="brand-title">LMS Primaria • Panel Directivo</span>
+      <span class="admin-tag">Administración</span>
+    </div>
+
+    <div class="user-pill">
+      <span class="user-greeting">Hola, <strong>{{ authService.currentUser()?.fullName }}</strong></span>
+      <button class="btn btn-secondary btn-sm" (click)="logout()">🚪 Salir</button>
+    </div>
+  </header>
+
+  <main class="admin-container">
+    <div class="admin-banner card-fun">
+      <div class="banner-content">
+        <h1>Control y Supervisión General 🎓</h1>
+        <p>Visión global del desempeño escolar, asistencia diaria y gestión del cuerpo docente.</p>
+      </div>
+      <button class="btn btn-primary" (click)="goToTeacherView()">
+        🚦 Abrir Semáforo de Asistencia
+      </button>
+    </div>
+
+    <div class="metrics-row">
+      <div class="metric-box box-total">
+        <span class="box-icon">🎒</span>
+        <span class="box-val">{{ metrics.totalStudents }}</span>
+        <span class="box-label">Estudiantes Matriculados</span>
+      </div>
+
+      <div class="metric-box box-green">
+        <span class="box-icon">🟢</span>
+        <span class="box-val">{{ metrics.greenCount }}</span>
+        <span class="box-label">Presentes Hoy</span>
+      </div>
+
+      <div class="metric-box box-yellow">
+        <span class="box-icon">🟡</span>
+        <span class="box-val">{{ metrics.yellowCount }}</span>
+        <span class="box-label">Ausencia Moderada (2-4 días)</span>
+      </div>
+
+      <div class="metric-box box-red">
+        <span class="box-icon">🔴</span>
+        <span class="box-val">{{ metrics.redCount }}</span>
+        <span class="box-label">Riesgo Crítico (5+ días)</span>
+      </div>
+    </div>
+
+    <div class="quick-admin-grid">
+      <div class="card-fun quick-card">
+        <h3>👥 Gestión de Docentes y Alumnos</h3>
+        <p>Alta de matrículas escolares, asignación de cursos de 1° a 6° de primaria y credenciales.</p>
+        <button class="btn btn-secondary btn-sm" (click)="goToTeacherView()">Ver Estado de Aulas</button>
+      </div>
+
+      <div class="card-fun quick-card">
+        <h3>📊 Reporte de Asistencia Semáforo</h3>
+        <p>Descarga informes consolidados de asistencia para comités de convivencia y padres de familia.</p>
+        <button class="btn btn-primary btn-sm" (click)="goToTeacherView()">Consultar Semáforo</button>
+      </div>
+    </div>
+
+    <!-- Módulo Seguro de Auditoría de Logs y .htaccess (Exclusivo .admin / Administrador) -->
+    <app-system-inspector></app-system-inspector>
+  </main>
+</div>

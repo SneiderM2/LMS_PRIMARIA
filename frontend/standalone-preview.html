@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LMS Primaria • Vista Previa Interactiva🎒✨</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --secondary: #fb923c;
+      --secondary-hover: #ea580c;
+      --accent-yellow: #facc15;
+      --accent-purple: #a855f7;
+      --semaforo-green: #22c55e;
+      --semaforo-green-bg: #dcfce7;
+      --semaforo-green-border: #86efac;
+      --semaforo-yellow: #eab308;
+      --semaforo-yellow-bg: #fef9c3;
+      --semaforo-yellow-border: #fde047;
+      --semaforo-red: #ef4444;
+      --semaforo-red-bg: #fee2e2;
+      --semaforo-red-border: #fca5a5;
+      --bg-main: #f0f9ff;
+      --bg-surface: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --radius-sm: 0.75rem;
+      --radius-md: 1.25rem;
+      --radius-lg: 1.75rem;
+      --radius-full: 9999px;
+      --font-heading: 'Fredoka', cursive, sans-serif;
+      --font-body: 'Nunito', system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      color: var(--text-main);
+      background-color: var(--bg-main);
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.1) 0%, transparent 25%),
+        radial-gradient(circle at 90% 80%, rgba(251, 146, 60, 0.1) 0%, transparent 25%);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      font-family: var(--font-heading);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      font-family: var(--font-heading);
+      font-size: 1.05rem;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius-full);
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+      text-decoration: none;
+      outline: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 0 #0369a1, 0 8px 16px rgba(2, 132, 199, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #0369a1, 0 10px 20px rgba(2, 132, 199, 0.35);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 0 #c2410c, 0 8px 16px rgba(234, 88, 12, 0.3);
+    }
+
+    .btn-secondary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #c2410c;
+    }
+
+    .btn-sm {
+      padding: 0.4rem 0.9rem;
+      font-size: 0.9rem;
+    }
+
+    .btn-block {
+      width: 100%;
+    }
+
+    .card-fun {
+      background: #ffffff;
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      box-shadow: 0 10px 20px -3px rgba(0, 0, 0, 0.05);
+      border: 3px solid #e2e8f0;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .view-container {
+      display: none;
+    }
+
+    .view-container.active {
+      display: block;
+    }
+
+    /* Login Styles */
+    .login-wrapper {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .login-card {
+      background: white;
+      border-radius: var(--radius-lg);
+      border: 4px solid #bae6fd;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 20px 35px -5px rgba(2, 132, 199, 0.15);
+      text-align: center;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 700;
+      font-size: 0.95rem;
+      margin-bottom: 0.4rem;
+      color: #334155;
+    }
+
+    .form-input,
+    .form-select {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border: 2px solid #cbd5e1;
+      border-radius: var(--radius-sm);
+      font-size: 1rem;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+    }
+
+    /* Tabs Login */
+    .auth-tab-bar {
+      display: flex;
+      background: #f1f5f9;
+      padding: 0.35rem;
+      border-radius: var(--radius-md);
+      margin-bottom: 1.5rem;
+      gap: 0.35rem;
+    }
+
+    .auth-tab {
+      flex: 1;
+      padding: 0.65rem;
+      border: none;
+      background: transparent;
+      font-family: var(--font-heading);
+      font-size: 1rem;
+      font-weight: 700;
+      color: #64748b;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .auth-tab.active {
+      background: white;
+      color: #0284c7;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Role Pills */
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .role-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.65rem 0.3rem;
+      border: 2px solid #e2e8f0;
+      border-radius: var(--radius-sm);
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: var(--font-heading);
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .role-btn.active {
+      border-color: #0284c7;
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+
+    /* Dashboard Navigation */
+    .app-header {
+      background: white;
+      border-bottom: 3px solid #e0f2fe;
+      padding: 0.85rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .brand-title {
+      font-size: 1.4rem;
+      color: #0369a1;
+      font-weight: 700;
+    }
+
+    .dashboard-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* Pestañas del portal */
+    .portal-tabs {
+      background: white;
+      border-bottom: 2px solid #e2e8f0;
+      padding: 0 2rem;
+      display: flex;
+      gap: 1.5rem;
+    }
+
+    .portal-tab {
+      padding: 1rem 0.5rem;
+      font-family: var(--font-heading);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #64748b;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .portal-tab.active {
+      color: #0284c7;
+      font-weight: 800;
+    }
+
+    .portal-tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: #0284c7;
+      border-radius: 3px 3px 0 0;
+    }
+
+    .hero-banner {
+      background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+      border: 3px solid #38bdf8;
+      border-radius: var(--radius-lg);
+      padding: 1.75rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      border: 3px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .stat-card:hover,
+    .stat-card.active {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+      border-color: #38bdf8;
+    }
+
+    .stat-icon {
+      font-size: 2.25rem;
+    }
+
+    .stat-val {
+      font-size: 1.75rem;
+      font-weight: 900;
+      color: #0f172a;
+      font-family: var(--font-heading);
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #64748b;
+    }
+
+    .students-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .student-card {
+      background: white;
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      border: 3px solid;
+    }
+
+    .student-avatar {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: #f0f9ff;
+      border: 3px solid #e0f2fe;
+      margin: 0 auto 0.5rem;
+      display: block;
+    }
+
+    /* Badges */
+    .semaforo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: var(--radius-full);
+      font-size: 0.85rem;
+      font-weight: 800;
+    }
+
+    .badge-green {
+      background: var(--semaforo-green-bg);
+      color: #166534;
+      border: 1px solid var(--semaforo-green-border);
+    }
+
+    .badge-yellow {
+      background: var(--semaforo-yellow-bg);
+      color: #854d0e;
+      border: 1px solid var(--semaforo-yellow-border);
+    }
+
+    .badge-red {
+      background: var(--semaforo-red-bg);
+      color: #991b1b;
+      border: 1px solid var(--semaforo-red-border);
+    }
+
+    .semaforo-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .dot-green {
+      background: var(--semaforo-green);
+    }
+
+    .dot-yellow {
+      background: var(--semaforo-yellow);
+    }
+
+    .dot-red {
+      background: var(--semaforo-red);
+    }
+
+    /* Gestión Table */
+    .mgmt-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .mgmt-table th {
+      background: #f8fafc;
+      padding: 1rem 1.25rem;
+      font-family: var(--font-heading);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #475569;
+      text-align: left;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .mgmt-table td {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+
+    .badge-code {
+      font-family: monospace;
+      font-weight: 700;
+      background: #f1f5f9;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      color: #334155;
+    }
+
+    .grade-pill {
+      background: #e0f2fe;
+      color: #0369a1;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-full);
+      font-size: 0.85rem;
+    }
+
+    .enrolled-tag {
+      background: #f0fdf4;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-right: 0.25rem;
+      display: inline-block;
+    }
+
+    .btn-enroll {
+      background: #0284c7;
+      color: white;
+      border: none;
+      padding: 0.4rem 0.8rem;
+      border-radius: var(--radius-sm);
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-enroll:hover {
+      background: #0369a1;
+    }
+
+    .btn-enrolled {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+      padding: 0.4rem 0.8rem;
+      border-radius: var(--radius-sm);
+      font-weight: 800;
+      display: inline-block;
+    }
+
+    /* Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-box {
+      background: white;
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Vista: Login y Registro -->
+  <div id="view-login" class="view-container active">
+    <div class="login-wrapper">
+      <div class="login-card">
+        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎒✨</div>
+        <h1 style="color: #0369a1; font-size: 2.2rem; margin-bottom: 0.25rem;">Aula Mágica</h1>
+        <p style="color: #0284c7; font-weight: 700; margin-bottom: 1.5rem;">Plataforma Escolar • MySQL lms_scikids</p>
+
+        <!-- Selector de Pestañas: Login vs Registro -->
+        <div class="auth-tab-bar">
+          <button class="auth-tab active" id="tab-login" onclick="toggleAuthTab('login')">🔑 Iniciar Sesión</button>
+          <button class="auth-tab" id="tab-register" onclick="toggleAuthTab('register')">✨ Crear Cuenta</button>
+        </div>
+
+        <!-- FORMULARIO LOGIN -->
+        <div id="form-login-pane">
+          <div class="form-group">
+            <label>🆔 Carnet o Documento</label>
+            <input type="text" id="login-id" class="form-input" placeholder="Ej: EST-101, DOC-2024 o tu ID"
+              value="DOC-2024">
+          </div>
+          <div class="form-group">
+            <label>🔒 Contraseña</label>
+            <input type="password" id="login-pwd" class="form-input" value="123456">
+          </div>
+          <button class="btn btn-primary btn-block" onclick="handleLogin()">
+            🚀 ¡Entrar a mi Aula!
+          </button>
+        </div>
+
+        <!-- FORMULARIO REGISTRO DINÁMICO -->
+        <div id="form-register-pane" style="display: none;">
+          <label style="display: block; text-align: left; font-weight: 700; font-size: 0.9rem; margin-bottom: 0.4rem;">
+            👤 Selecciona tu Perfil:
+          </label>
+          <div class="role-grid">
+            <button class="role-btn active" id="btn-role-student" onclick="setRegisterRole('Student')">
+              <span>🎒</span> Estudiante
+            </button>
+            <button class="role-btn" id="btn-role-teacher" onclick="setRegisterRole('Teacher')">
+              <span>👩‍🏫</span> Docente
+            </button>
+            <button class="role-btn" id="btn-role-admin" onclick="setRegisterRole('Admin')">
+              <span>👑</span> Admin
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label>🆔 Carnet o Documento (ID único)</label>
+            <input type="text" id="reg-id" class="form-input" placeholder="Ej: EST-2026 o 1029384756">
+          </div>
+          <div class="form-group">
+            <label>📛 Nombre Completo</label>
+            <input type="text" id="reg-name" class="form-input" placeholder="Ej: Juan Camilo Pérez">
+          </div>
+          <div class="form-group" id="reg-grade-group">
+            <label>📚 Grado Escolar (Primaria)</label>
+            <select id="reg-grade" class="form-select">
+              <option value="1°">1° Primaria</option>
+              <option value="2°">2° Primaria</option>
+              <option value="3°">3° Primaria</option>
+              <option value="4°">4° Primaria</option>
+              <option value="5°">5° Primaria</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>🔒 Contraseña</label>
+            <input type="password" id="reg-pwd" class="form-input" placeholder="Mínimo 4 caracteres" value="123456">
+          </div>
+
+          <button class="btn btn-primary btn-block" onclick="handleRegister()">
+            🎉 ¡Registrarme y Comenzar!
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Vista: Dashboard Docente -->
+  <div id="view-teacher" class="view-container">
+    <header class="app-header">
+      <div class="brand-group">
+        <span style="font-size: 2rem;">🏫</span>
+        <span class="brand-title">Portal Docente • Primaria</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <span id="teacher-profile-name" style="font-weight: 800; color: #1e293b;">Profa. Valentina Rodríguez</span>
+        <button class="btn btn-secondary btn-sm" onclick="logout()">🚪 Salir</button>
+      </div>
+    </header>
+
+    <!-- Barra de Pestañas del Portal Docente -->
+    <div class="portal-tabs">
+      <button class="portal-tab active" id="ptab-semaforo" onclick="setPortalTab('semaforo')">
+        🚦 Monitoreo Semáforo y Tareas
+      </button>
+      <button class="portal-tab" id="ptab-students" onclick="setPortalTab('students')">
+        🎓 Gestión de Alumnos y Matrícula
+      </button>
+    </div>
+
+    <main class="dashboard-content">
+
+      <!-- SUB-VISTA 1: SEMÁFORO -->
+      <div id="teacher-tab-semaforo">
+        <div class="hero-banner">
+          <div>
+            <h1 style="color: #0369a1; font-size: 1.8rem;">Semáforo de Asistencia Escolar 🚦</h1>
+            <p style="color: #64748b;">Monitorea la actividad de los niños y publica nuevas tareas interactivas.</p>
+          </div>
+          <button class="btn btn-primary" onclick="alert('Formulario de nueva actividad listo!')">
+            ➕ Publicar Tarea o Video
+          </button>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card active" onclick="filterSemaforo('All')">
+            <span class="stat-icon">👥</span>
+            <div>
+              <div class="stat-val" id="count-total">0</div>
+              <div class="stat-label">Total Alumnos</div>
+            </div>
+          </div>
+          <div class="stat-card" onclick="filterSemaforo('Green')">
+            <span class="stat-icon">🟢</span>
+            <div>
+              <div class="stat-val" id="count-green">0</div>
+              <div class="stat-label">Presentes Hoy</div>
+            </div>
+          </div>
+          <div class="stat-card" onclick="filterSemaforo('Yellow')">
+            <span class="stat-icon">🟡</span>
+            <div>
+              <div class="stat-val" id="count-yellow">0</div>
+              <div class="stat-label">Alerta (2-4 días)</div>
+            </div>
+          </div>
+          <div class="stat-card" onclick="filterSemaforo('Red')">
+            <span class="stat-icon">🔴</span>
+            <div>
+              <div class="stat-val" id="count-red">0</div>
+              <div class="stat-label">Riesgo (5+ días)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="students-grid" id="students-grid"></div>
+      </div>
+
+      <!-- SUB-VISTA 2: GESTIÓN DE ALUMNOS Y MATRÍCULA -->
+      <div id="teacher-tab-students" style="display: none;">
+
+        <div class="hero-banner" style="background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);">
+          <div>
+            <h2 style="color: #0369a1; font-size: 1.8rem;">Directorio Escolar y Matrícula a Materias 🎓</h2>
+            <p style="color: #475569;">Registra nuevos alumnos y asígnalos a los cursos que dictas en el colegio.</p>
+          </div>
+          <button class="btn btn-primary" onclick="openCreateStudentModal()">
+            ➕ Registrar Nuevo Alumno
+          </button>
+        </div>
+
+        <div class="card-fun"
+          style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 2rem;">🎯</span>
+            <div>
+              <strong>Materia seleccionada para matricular:</strong>
+              <p style="font-size: 0.85rem; color: #64748b;">Los alumnos en los que hagas clic se inscribirán en este
+                curso:</p>
+            </div>
+          </div>
+          <select id="select-course-target" class="form-select"
+            style="max-width: 380px; font-weight: 700; color: #0284c7;">
+            <option value="Matemáticas 2° A">📐 Matemáticas 2° A</option>
+            <option value="Ciencias Naturales 2°">🔬 Ciencias Naturales 2°</option>
+            <option value="Artes y Creatividad">🎨 Artes y Creatividad</option>
+          </select>
+        </div>
+
+        <div class="card-fun" style="padding: 0;">
+          <table class="mgmt-table">
+            <thead>
+              <tr>
+                <th>Estudiante</th>
+                <th>Carnet / ID</th>
+                <th>Grado</th>
+                <th>Materias Asignadas</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="mgmt-students-tbody"></tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Vista: Estudiante -->
+  <div id="view-student" class="view-container">
+    <header class="app-header">
+      <div class="brand-group">
+        <span style="font-size: 2rem;">🎒</span>
+        <span class="brand-title">Mi Escuela Mágica</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <span id="student-profile-name" style="font-weight: 800; color: #0284c7;">¡Hola, Estudiante!</span>
+        <button class="btn btn-secondary btn-sm" onclick="logout()">🚪 Salir</button>
+      </div>
+    </header>
+    <main class="dashboard-content">
+      <div class="hero-banner">
+        <div>
+          <h1 style="color: #0369a1; font-size: 2rem;">¡Bienvenido a tu Aula Escolar! 🚀</h1>
+          <p style="color: #0284c7;">Consulta tus materias y sube tus tareas para ganar estrellitas.</p>
+        </div>
+      </div>
+      <div class="card-fun" style="text-align: center; padding: 3rem;">
+        <span style="font-size: 3rem;">🌟</span>
+        <h3 style="color: #0369a1; margin-top: 0.5rem;">Estás conectado a la base de datos MySQL</h3>
+        <p style="color: #64748b;">Tu progreso ha sido registrado en el semáforo como 🟢 Activo Hoy.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal Registrar Nuevo Alumno -->
+  <div class="modal-overlay" id="modal-new-student">
+    <div class="modal-box">
+      <h2 style="color: #0369a1; margin-bottom: 1rem;">🎒 Registrar Nuevo Alumno</h2>
+      <div class="form-group">
+        <label>Carnet / Documento:</label>
+        <input type="text" id="new-stud-id" class="form-input" placeholder="Ej: EST-108">
+      </div>
+      <div class="form-group">
+        <label>Nombre Completo:</label>
+        <input type="text" id="new-stud-name" class="form-input" placeholder="Ej: Laura Castro Pérez">
+      </div>
+      <div class="form-group">
+        <label>Grado Escolar:</label>
+        <select id="new-stud-grade" class="form-select">
+          <option value="1°">1° Primaria</option>
+          <option value="2°">2° Primaria</option>
+          <option value="3°">3° Primaria</option>
+          <option value="4°">4° Primaria</option>
+          <option value="5°">5° Primaria</option>
+        </select>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button class="btn btn-secondary" onclick="closeCreateStudentModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveNewStudent()">✅ Guardar Alumno</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let registeredRole = 'Student';
+    let currentFilter = 'All';
+
+    // Lista inicial de estudiantes (sin seeding predeterminado de pruebas fijas)
+    let students = [
+      { id: 'EST-101', name: 'Mateo Gómez', grade: '2° Primaria', color: 'Green', days: 0, label: 'Activo Hoy', desc: 'Ingresó hoy.', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=mateo101', courses: ['Matemáticas 2° A'] },
+      { id: 'EST-102', name: 'Sofía Martínez', grade: '2° Primaria', color: 'Green', days: 0, label: 'Activo Hoy', desc: 'Ingresó hoy.', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=sofia102', courses: ['Matemáticas 2° A'] },
+      { id: 'EST-103', name: 'Lucas Fernández', grade: '2° Primaria', color: 'Yellow', days: 2, label: 'Inactivo (2 días)', desc: '2 días ausente.', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=lucas103', courses: [] }
+    ];
+
+    function toggleAuthTab(tab) {
+      document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+      document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+      document.getElementById('form-login-pane').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('form-register-pane').style.display = tab === 'register' ? 'block' : 'none';
+    }
+
+    function setRegisterRole(role) {
+      registeredRole = role;
+      document.getElementById('btn-role-student').classList.toggle('active', role === 'Student');
+      document.getElementById('btn-role-teacher').classList.toggle('active', role === 'Teacher');
+      document.getElementById('btn-role-admin').classList.toggle('active', role === 'Admin');
+      document.getElementById('reg-grade-group').style.display = role === 'Student' ? 'block' : 'none';
+    }
+
+    function handleLogin() {
+      const id = document.getElementById('login-id').value.trim();
+      if (id.startsWith('DOC') || id === 'admin' || id.toLowerCase().includes('profe')) {
+        switchView('view-teacher');
+      } else {
+        const stud = students.find(s => s.id.toLowerCase() === id.toLowerCase());
+        if (stud) {
+          stud.color = 'Green';
+          stud.days = 0;
+          stud.label = 'Activo Hoy';
+          document.getElementById('student-profile-name').innerText = '¡Hola, ' + stud.name + '!';
+        }
+        switchView('view-student');
+      }
+    }
+
+    function handleRegister() {
+      const id = document.getElementById('reg-id').value.trim();
+      const name = document.getElementById('reg-name').value.trim();
+      const grade = document.getElementById('reg-grade').value;
+
+      if (!id || !name) {
+        alert('Por favor completa tu Documento y Nombre Completo.');
+        return;
+      }
+
+      if (registeredRole === 'Student') {
+        const newStud = {
+          id: id,
+          name: name,
+          grade: grade + ' Primaria',
+          color: 'Green',
+          days: 0,
+          label: 'Activo Hoy',
+          desc: 'Recién registrado.',
+          avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${id}`,
+          courses: []
+        };
+        students.push(newStud);
+        document.getElementById('student-profile-name').innerText = '¡Hola, ' + name + '!';
+        alert(`¡Bienvenido(a) ${name}! Tu cuenta de Estudiante ha sido creada.`);
+        switchView('view-student');
+      } else {
+        document.getElementById('teacher-profile-name').innerText = name;
+        alert(`¡Bienvenido(a) ${name}! Tu cuenta de Docente ha sido creada.`);
+        switchView('view-teacher');
+      }
+    }
+
+    function switchView(viewId) {
+      document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
+      document.getElementById(viewId).classList.add('active');
+      if (viewId === 'view-teacher') {
+        updateStats();
+        renderStudents();
+        renderMgmtTable();
+      }
+    }
+
+    function logout() {
+      switchView('view-login');
+    }
+
+    function setPortalTab(tab) {
+      document.getElementById('ptab-semaforo').classList.toggle('active', tab === 'semaforo');
+      document.getElementById('ptab-students').classList.toggle('active', tab === 'students');
+      document.getElementById('teacher-tab-semaforo').style.display = tab === 'semaforo' ? 'block' : 'none';
+      document.getElementById('teacher-tab-students').style.display = tab === 'students' ? 'block' : 'none';
+    }
+
+    function updateStats() {
+      document.getElementById('count-total').innerText = students.length;
+      document.getElementById('count-green').innerText = students.filter(s => s.color === 'Green').length;
+      document.getElementById('count-yellow').innerText = students.filter(s => s.color === 'Yellow').length;
+      document.getElementById('count-red').innerText = students.filter(s => s.color === 'Red').length;
+    }
+
+    function renderStudents() {
+      const grid = document.getElementById('students-grid');
+      const filtered = currentFilter === 'All' ? students : students.filter(s => s.color === currentFilter);
+
+      grid.innerHTML = filtered.map(s => `
+        <div class="student-card" style="border-color: var(--semaforo-${s.color.toLowerCase()}-border);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="semaforo-badge badge-${s.color.toLowerCase()}">
+              <span class="semaforo-dot dot-${s.color.toLowerCase()}"></span>
+              ${s.label}
+            </span>
+            <span class="grade-pill">${s.grade}</span>
+          </div>
+          <div style="text-align: center; margin: 1rem 0;">
+            <img src="${s.avatar}" alt="" class="student-avatar">
+            <h3 style="font-size: 1.2rem; color: #0f172a;">${s.name}</h3>
+            <span style="font-size: 0.8rem; color: #64748b; font-weight: 600;">ID: ${s.id}</span>
+          </div>
+          <div style="background: #f8fafc; padding: 0.75rem; border-radius: 0.5rem; font-size: 0.85rem; margin-bottom: 1rem;">
+            ${s.desc}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderMgmtTable() {
+      const tbody = document.getElementById('mgmt-students-tbody');
+      const currentCourse = document.getElementById('select-course-target').value;
+
+      tbody.innerHTML = students.map(s => {
+        const isEnrolled = s.courses.includes(currentCourse);
+        return `
+          <tr>
+            <td>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <img src="${s.avatar}" style="width: 36px; height: 36px; border-radius: 50%;">
+                <strong>${s.name}</strong>
+              </div>
+            </td>
+            <td><span class="badge-code">${s.id}</span></td>
+            <td><span class="grade-pill">${s.grade}</span></td>
+            <td>
+              ${s.courses.length > 0
+            ? s.courses.map(c => `<span class="enrolled-tag">📖 ${c}</span>`).join('')
+            : '<span style="color: #94a3b8; font-size: 0.85rem;">Sin materias</span>'}
+            </td>
+            <td>
+              ${isEnrolled
+            ? `<span class="btn-enrolled">✓ Matriculado(a)</span>`
+            : `<button class="btn-enroll" onclick="enrollInPreview('${s.id}')">➕ Matricular</button>`}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function enrollInPreview(studentId) {
+      const currentCourse = document.getElementById('select-course-target').value;
+      const stud = students.find(s => s.id === studentId);
+      if (stud && !stud.courses.includes(currentCourse)) {
+        stud.courses.push(currentCourse);
+        alert(`¡${stud.name} fue matriculado(a) exitosamente en ${currentCourse}! 🎉`);
+        renderMgmtTable();
+      }
+    }
+
+    function filterSemaforo(color) {
+      currentFilter = color;
+      document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+      renderStudents();
+    }
+
+    function openCreateStudentModal() {
+      document.getElementById('modal-new-student').classList.add('active');
+    }
+
+    function closeCreateStudentModal() {
+      document.getElementById('modal-new-student').classList.remove('active');
+    }
+
+    function saveNewStudent() {
+      const id = document.getElementById('new-stud-id').value.trim();
+      const name = document.getElementById('new-stud-name').value.trim();
+      const grade = document.getElementById('new-stud-grade').value;
+
+      if (!id || !name) {
+        alert('Por favor completa todos los campos.');
+        return;
+      }
+
+      students.push({
+        id: id,
+        name: name,
+        grade: grade + ' Primaria',
+        color: 'Green',
+        days: 0,
+        label: 'Activo Hoy',
+        desc: 'Recién matriculado por docente.',
+        avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${id}`,
+        courses: [document.getElementById('select-course-target').value]
+      });
+
+      closeCreateStudentModal();
+      alert(`¡Estudiante ${name} registrado y matriculado con éxito! 🎓`);
+      updateStats();
+      renderStudents();
+      renderMgmtTable();
+    }
+
+    document.getElementById('select-course-target').addEventListener('change', renderMgmtTable);
+
+    updateStats();
+    renderStudents();
+    renderMgmtTable();
+  </script>
+</body>
+
+</html>
