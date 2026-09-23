@@ -130,3 +130,4 @@ c:\Users\SNEIDER\Documents\LMS\backend\LMS.API\obj\Debug\net10.0\refint\LMS.API.
 c:\Users\SNEIDER\Documents\LMS\backend\LMS.API\obj\Debug\net10.0\LMS.API.pdb
 c:\Users\SNEIDER\Documents\LMS\backend\LMS.API\obj\Debug\net10.0\LMS.API.genruntimeconfig.cache
 c:\Users\SNEIDER\Documents\LMS\backend\LMS.API\obj\Debug\net10.0\ref\LMS.API.dll
+C:\Users\SNEIDER\Documents\LMS\backend\LMS.API\obj\Debug\net10.0\LMS.API.sourcelink.json
