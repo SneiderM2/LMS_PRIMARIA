@@ -10,6 +10,7 @@
   <ItemGroup>
     <!-- Seguridad y autenticación -->
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.76.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
 
     <!-- Entity Framework Core 9 + Pomelo MySQL 9 (última estable con soporte MySQL) -->

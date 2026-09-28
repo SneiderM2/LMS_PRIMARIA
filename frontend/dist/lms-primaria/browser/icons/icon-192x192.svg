@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="pwaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="192" height="192" rx="42" fill="url(#pwaGrad)"/>
+  <!-- Mochila Escolar Divertida / SciKids Backpack -->
+  <g transform="translate(36, 32)" filter="url(#shadow)">
+    <!-- Asa superior -->
+    <path d="M 40 28 C 40 10, 80 10, 80 28" fill="none" stroke="#fed7aa" stroke-width="8" stroke-linecap="round"/>
+    <!-- Cuerpo de mochila -->
+    <rect x="15" y="24" width="90" height="92" rx="20" fill="#f97316"/>
+    <!-- Bolsillo frontal -->
+    <rect x="25" y="60" width="70" height="46" rx="14" fill="#fb923c"/>
+    <rect x="42" y="70" width="36" height="8" rx="4" fill="#ea580c"/>
+    <!-- Estrella dorada brillante -->
+    <polygon points="60,78 63,85 71,85 64,89 67,96 60,92 53,96 56,89 49,85 57,85" fill="#facc15"/>
+    <!-- Detalles de correas laterales -->
+    <rect x="8" y="42" width="10" height="40" rx="5" fill="#ea580c"/>
+    <rect x="102" y="42" width="10" height="40" rx="5" fill="#ea580c"/>
+  </g>
+</svg>

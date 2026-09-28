@@ -1,0 +1,23 @@
+<div class="timeout-backdrop" *ngIf="visible">
+  <div class="timeout-card animate-bounce-in">
+    <div class="timeout-icon-circle">
+      <span class="sand-clock">⏳</span>
+    </div>
+    
+    <h3 class="timeout-title">¿Sigues ahí, amiguito?</h3>
+    <p class="timeout-subtitle">Hemos notado que llevas un momento sin interactuar en tu aula escolar.</p>
+
+    <div class="countdown-badge">
+      <span class="clock-label">Tu sesión se cerrará automáticamente en:</span>
+      <span class="clock-digits">{{ formattedTime }}</span>
+    </div>
+
+    <p class="timeout-help">Haz clic abajo para renovar tu sesión y seguir aprendiendo con tus clases y tareas.</p>
+
+    <div class="timeout-actions">
+      <button type="button" class="btn-continue" (click)="onContinue()">
+        ✨ ¡Sí, seguir conectado!
+      </button>
+    </div>
+  </div>
+</div>

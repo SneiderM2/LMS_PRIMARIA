@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using LMS.API.DTOs;
 using LMS.API.Middleware;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -262,4 +263,241 @@ public class SystemFilesController : ControllerBase
 
         return Ok(new { message = $"El archivo '{safeFileName}' ha sido reiniciado.", fileName = safeFileName });
     }
+
+    /// <summary>
+    /// Lee y parsea de forma segura el archivo de log especificado en una lista de objetos estructurados.
+    /// Sanitiza rutas absolutas de servidor y extrae fecha, nivel (INFO/WARNING/ERROR), usuario y mensaje.
+    /// GET: /api/systemfiles/logs/parsed?fileName=access.log&level=ALL&user=&date=
+    /// </summary>
+    [HttpGet("logs/parsed")]
+    [ProducesResponseType(typeof(List<ParsedLogEntryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetParsedLogs(
+        [FromQuery] string fileName = "access.log",
+        [FromQuery] string? level = null,
+        [FromQuery] string? user = null,
+        [FromQuery] string? date = null)
+    {
+        if (!IsAdminUser())
+        {
+            return Forbid();
+        }
+
+        var safeFileName = Path.GetFileName(fileName);
+        if (safeFileName != fileName || safeFileName.Contains(".."))
+        {
+            return BadRequest(new { message = "Nombre de archivo no permitido." });
+        }
+
+        var logsDir = GetLogsDirectory();
+        var fullPath = Path.GetFullPath(Path.Combine(logsDir, safeFileName));
+        var fullDir = Path.GetFullPath(logsDir);
+
+        if (!fullPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "Ruta no autorizada." });
+        }
+
+        if (!System.IO.File.Exists(fullPath))
+        {
+            return NotFound(new { message = $"El archivo de log '{safeFileName}' no existe." });
+        }
+
+        var entries = new List<ParsedLogEntryDto>();
+
+        using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        using (var reader = new StreamReader(fs))
+        {
+            string? line;
+            int counter = 0;
+            ParsedLogEntryDto? currentEntry = null;
+
+            while ((line = await reader.ReadLineAsync()) != null)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                // Si la línea comienza con espacios / tabuladores (como StackTrace: ...), anexar al detalle de la entrada anterior
+                if (line.StartsWith(" ") || line.StartsWith("\t") || line.StartsWith("StackTrace:"))
+                {
+                    if (currentEntry != null)
+                    {
+                        currentEntry.Details = (currentEntry.Details == null)
+                            ? SanitizePath(line.Trim())
+                            : currentEntry.Details + "\n" + SanitizePath(line.Trim());
+                    }
+                    continue;
+                }
+
+                // Detectar si la línea comienza con marca de tiempo [YYYY-MM-DD HH:mm:ss]
+                if (line.StartsWith("[") && line.Length >= 21 && line[20] == ']')
+                {
+                    var timestamp = line.Substring(1, 19);
+                    var remainder = line.Substring(22).Trim();
+
+                    var entry = ParseLogLine(timestamp, remainder, ++counter);
+
+                    // Filtrado
+                    if (!string.IsNullOrWhiteSpace(level) && !level.Equals("ALL", StringComparison.OrdinalIgnoreCase) && !entry.Level.Equals(level, StringComparison.OrdinalIgnoreCase))
+                    {
+                        currentEntry = null;
+                        continue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(user) && !entry.User.Contains(user, StringComparison.OrdinalIgnoreCase))
+                    {
+                        currentEntry = null;
+                        continue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(date) && !entry.Timestamp.StartsWith(date, StringComparison.OrdinalIgnoreCase))
+                    {
+                        currentEntry = null;
+                        continue;
+                    }
+
+                    entries.Add(entry);
+                    currentEntry = entry;
+                }
+                else
+                {
+                    // Registro simple sin formato estricto
+                    if (currentEntry != null)
+                    {
+                        currentEntry.Details = (currentEntry.Details == null) ? SanitizePath(line) : currentEntry.Details + "\n" + SanitizePath(line);
+                    }
+                }
+            }
+        }
+
+        entries.Reverse(); // Ordenar del más reciente al más antiguo
+        return Ok(entries);
+    }
+
+    private static ParsedLogEntryDto ParseLogLine(string timestamp, string remainder, int index)
+    {
+        var entry = new ParsedLogEntryDto
+        {
+            Id = $"log-{index}-{DateTime.UtcNow.Ticks % 100000}",
+            Timestamp = timestamp,
+            Level = "INFO",
+            User = "-"
+        };
+
+        // Caso 1: [EXCEPTION] IP | METHOD PATH | ELAPSEDms | Exception: message
+        if (remainder.StartsWith("[EXCEPTION]"))
+        {
+            entry.Level = "ERROR";
+            var parts = remainder.Substring(11).Trim().Split('|');
+            if (parts.Length > 0) entry.ClientIp = parts[0].Trim();
+            if (parts.Length > 1) ParseMethodPath(parts[1].Trim(), entry);
+            if (parts.Length > 2 && parts[2].Contains("ms"))
+            {
+                var msStr = parts[2].Replace("ms", "").Trim();
+                if (long.TryParse(msStr, out var ms)) entry.ElapsedMs = ms;
+            }
+            if (parts.Length > 3)
+            {
+                entry.Message = SanitizePath(string.Join(" | ", parts.Skip(3)).Trim());
+            }
+            else
+            {
+                entry.Message = "Excepción no controlada en el servidor.";
+            }
+            return entry;
+        }
+
+        // Caso 2: [HTTP-4xx / 5xx] IP | METHOD PATH | ELAPSEDms
+        if (remainder.StartsWith("[HTTP-"))
+        {
+            var endBracket = remainder.IndexOf(']');
+            if (endBracket > 6)
+            {
+                var codeStr = remainder.Substring(6, endBracket - 6);
+                if (int.TryParse(codeStr, out var status))
+                {
+                    entry.StatusCode = status;
+                    entry.Level = status >= 500 ? "ERROR" : "WARNING";
+                }
+            }
+            var subParts = remainder.Substring(endBracket + 1).Trim().Split('|');
+            if (subParts.Length > 0) entry.ClientIp = subParts[0].Trim();
+            if (subParts.Length > 1) ParseMethodPath(subParts[1].Trim(), entry);
+            entry.Message = $"Respuesta HTTP con código de error {entry.StatusCode}";
+            return entry;
+        }
+
+        // Caso 3: [INFO] / [WARNING] / [ERROR] mensaje simple
+        if (remainder.StartsWith("[") && remainder.Contains("]"))
+        {
+            var endBracket = remainder.IndexOf(']');
+            var tag = remainder.Substring(1, endBracket - 1).ToUpperInvariant();
+            if (tag == "ERROR" || tag == "WARNING" || tag == "INFO")
+            {
+                entry.Level = tag;
+                entry.Message = SanitizePath(remainder.Substring(endBracket + 1).Trim());
+                return entry;
+            }
+        }
+
+        // Caso 4: Formato AccessLog: {ip} | {method} {path} | {status} | {elapsedMs}ms | User:{userId} | {userAgent}
+        var accessTokens = remainder.Split('|');
+        if (accessTokens.Length >= 4)
+        {
+            entry.ClientIp = accessTokens[0].Trim();
+            ParseMethodPath(accessTokens[1].Trim(), entry);
+
+            if (int.TryParse(accessTokens[2].Trim(), out var code))
+            {
+                entry.StatusCode = code;
+                if (code >= 500) entry.Level = "ERROR";
+                else if (code >= 400) entry.Level = "WARNING";
+                else entry.Level = "INFO";
+            }
+
+            if (accessTokens.Length > 3)
+            {
+                var msStr = accessTokens[3].Replace("ms", "").Trim();
+                if (long.TryParse(msStr, out var ms)) entry.ElapsedMs = ms;
+            }
+
+            if (accessTokens.Length > 4 && accessTokens[4].Contains("User:"))
+            {
+                var userPart = accessTokens[4].Replace("User:", "").Trim();
+                if (!string.IsNullOrWhiteSpace(userPart) && userPart != "-")
+                {
+                    entry.User = userPart;
+                }
+            }
+
+            if (accessTokens.Length > 5)
+            {
+                entry.Details = SanitizePath(accessTokens[5].Trim());
+            }
+
+            entry.Message = $"{entry.HttpMethod} {entry.Path} (HTTP {entry.StatusCode})";
+            return entry;
+        }
+
+        // Si no cumple patrón específico, dejar como mensaje general
+        entry.Message = SanitizePath(remainder);
+        return entry;
+    }
+
+    private static void ParseMethodPath(string text, ParsedLogEntryDto entry)
+    {
+        var parts = text.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length > 0) entry.HttpMethod = parts[0].Trim();
+        if (parts.Length > 1) entry.Path = SanitizePath(parts[1].Trim());
+    }
+
+    private static string SanitizePath(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(input, @"[A-Za-z]:\\[^:\s\r\n]+", "[SERVER_INTERNAL_PATH]");
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"/(?:var|home|usr|etc)/[^\s\r\n]+", "[SERVER_INTERNAL_PATH]");
+        return sanitized;
+    }
 }
+

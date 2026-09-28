@@ -5,6 +5,39 @@ import { StudentStatus, SemaforoSummaryMetrics } from '../models/semaforo.model'
 import { Content, CreateContent, StudentSubmission } from '../models/content.model';
 import { Course, TeacherStudent } from '../models/user.model';
 
+export interface TeacherMetrics {
+  totalStudents: number;
+  pendingGradingCount: number;
+  activeTasksCount: number;
+  submissionRate: number;
+}
+
+export interface TeacherActivity {
+  id: number;
+  kind: 'Tarea' | 'Material';
+  courseId: number;
+  courseName: string;
+  gradeName: string;
+  title: string;
+  description?: string;
+  createdAt: string;
+  dueDate?: string;
+  maxScore?: number;
+  isActive: boolean;
+  submissionsCount: number;
+  pendingGradingCount: number;
+  resourceUrl?: string;
+  resourceType?: string;
+}
+
+export interface UpdateActivityDto {
+  title: string;
+  description?: string;
+  dueDate?: string;
+  maxScore?: number;
+  resourceUrl?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -29,6 +62,25 @@ export class TeacherService {
     return this.http.get<SemaforoSummaryMetrics>(`${this.API_URL}/metrics`, { params });
   }
 
+  // --- Métricas Académicas y Gestión de Actividades CRUD ---
+  public getAcademicMetrics(): Observable<TeacherMetrics> {
+    return this.http.get<TeacherMetrics>(`${this.API_URL}/academic-metrics`);
+  }
+
+  public getActivities(): Observable<TeacherActivity[]> {
+    return this.http.get<TeacherActivity[]>(`${this.API_URL}/activities`);
+  }
+
+  public updateActivity(id: number, kind: string, dto: UpdateActivityDto): Observable<{ message: string }> {
+    const params = new HttpParams().set('kind', kind);
+    return this.http.put<{ message: string }>(`${this.API_URL}/activities/${id}`, dto, { params });
+  }
+
+  public toggleActivityStatus(id: number, kind: string): Observable<{ message: string; isActive: boolean }> {
+    const params = new HttpParams().set('kind', kind);
+    return this.http.patch<{ message: string; isActive: boolean }>(`${this.API_URL}/activities/${id}/toggle-status`, {}, { params });
+  }
+
   // --- Gestión de Estudiantes y Matrícula ---
   public getAllStudents(grade?: string): Observable<TeacherStudent[]> {
     let params = new HttpParams();
@@ -50,9 +102,20 @@ export class TeacherService {
     return this.http.post<Course>(`${this.API_URL}/courses`, dto);
   }
 
+  public updateCourse(courseId: number, dto: { nombre: string; grado: string; grupo: string; descripcion?: string }): Observable<any> {
+    return this.http.put<any>(`${this.API_URL}/courses/${courseId}`, dto);
+  }
+
   public enrollStudent(courseId: number, studentId: string | number): Observable<{ message: string; yaMatriculado?: boolean; studentName?: string; courseName?: string }> {
     return this.http.post<{ message: string; yaMatriculado?: boolean; studentName?: string; courseName?: string }>(
       `${this.API_URL}/courses/${courseId}/enroll`,
+      { studentId: studentId.toString() }
+    );
+  }
+
+  public unenrollStudent(courseId: number, studentId: string | number): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${this.API_URL}/courses/${courseId}/unenroll`,
       { studentId: studentId.toString() }
     );
   }
@@ -68,7 +131,14 @@ export class TeacherService {
     return this.http.post<{ fileUrl: string; originalName: string }>(`${this.API_URL}/upload-resource`, formData);
   }
 
-  public getAssignmentSubmissions(assignmentId: string): Observable<StudentSubmission[]> {
+  public getAssignmentSubmissions(assignmentId: string | number): Observable<StudentSubmission[]> {
     return this.http.get<StudentSubmission[]>(`${this.API_URL}/submissions/${assignmentId}`);
+  }
+
+  public gradeSubmission(submissionId: number, grade: number, feedback?: string): Observable<{ message: string; submissionId: number; grade: number; feedback?: string; status: string }> {
+    return this.http.post<{ message: string; submissionId: number; grade: number; feedback?: string; status: string }>(
+      `${this.API_URL}/submissions/${submissionId}/grade`,
+      { grade, feedback }
+    );
   }
 }

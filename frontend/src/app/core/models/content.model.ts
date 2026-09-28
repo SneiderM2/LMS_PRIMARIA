@@ -1,15 +1,18 @@
 export type ContentType = 'Video' | 'Pdf' | 'Assignment';
 
 export interface StudentSubmission {
+  submissionId?: number;
   id: string;
   assignmentId: string;
   studentId: string;
   studentName: string;
+  studentAvatarUrl?: string;
   fileUrl: string;
   originalFileName: string;
   submittedAt: string | Date;
   feedback?: string;
   grade?: number;
+  status?: string;
 }
 
 export interface Content {

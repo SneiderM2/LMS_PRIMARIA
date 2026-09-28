@@ -8,11 +8,14 @@ export interface User {
   gradeLevel?: string;
   lastLoginDate?: string | Date;
   avatarUrl: string;
+  dataPolicyAccepted?: boolean;
 }
 
 export interface LoginRequest {
   id: string;
   password: string;
+  honeypotTrap?: string;
+  captchaToken?: string;
 }
 
 export interface RegisterRequest {
@@ -21,12 +24,14 @@ export interface RegisterRequest {
   password: string;
   role: UserRole;
   grade?: string;
+  honeypotTrap?: string;
 }
 
 export interface LoginResponse {
   token: string;
   expiration: string;
   user: User;
+  requiresPolicyAcceptance?: boolean;
 }
 
 export interface TeacherStudent {

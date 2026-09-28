@@ -1,10 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { StudentService } from '../../core/services/student.service';
+import { StudentService, StudentMetrics, StudentCoursesCatalog } from '../../core/services/student.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Content } from '../../core/models/content.model';
 import { FileDropZoneComponent } from './components/file-drop-zone/file-drop-zone.component';
-
 
 @Component({
   selector: 'app-student-dashboard',
@@ -18,6 +17,26 @@ export class StudentDashboardComponent implements OnInit {
   public filteredContents: Content[] = [];
   public isLoading = true;
   public selectedSubject: string = 'Todas';
+
+  // Pestañas del estudiante
+  public activeTab: 'activities' | 'courses' = 'activities';
+
+  // Métricas del Estudiante
+  public metrics: StudentMetrics = {
+    enrolledCoursesCount: 0,
+    cumulativeGpa: 5.0,
+    pendingActivitiesCount: 0,
+    progressPercentage: 100
+  };
+
+  // Catálogo y Gestión de Clases (CRUD Estudiante)
+  public coursesCatalog: StudentCoursesCatalog = {
+    myActiveCourses: [],
+    availableCourses: []
+  };
+  public coursesLoading = false;
+  public notificationMessage = '';
+  public notificationType: 'success' | 'info' | 'warning' = 'info';
 
   // Control del modal de entrega Drag & Drop
   public showDropZone = false;
@@ -39,6 +58,18 @@ export class StudentDashboardComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadDashboard();
+    this.loadMetrics();
+    this.loadCourses();
+  }
+
+  public switchTab(tab: 'activities' | 'courses'): void {
+    this.activeTab = tab;
+    if (tab === 'courses') {
+      this.loadCourses();
+    } else {
+      this.loadDashboard();
+      this.loadMetrics();
+    }
   }
 
   public loadDashboard(): void {
@@ -53,6 +84,65 @@ export class StudentDashboardComponent implements OnInit {
         this.isLoading = false;
       }
     });
+  }
+
+  public loadMetrics(): void {
+    this.studentService.getMetrics().subscribe({
+      next: (m) => {
+        this.metrics = m;
+      }
+    });
+  }
+
+  public loadCourses(): void {
+    this.coursesLoading = true;
+    this.studentService.getCourses().subscribe({
+      next: (res) => {
+        this.coursesCatalog = res;
+        this.coursesLoading = false;
+      },
+      error: () => {
+        this.coursesLoading = false;
+      }
+    });
+  }
+
+  public enrollInCourse(courseId: number): void {
+    this.studentService.enrollCourse(courseId).subscribe({
+      next: (res) => {
+        this.showToast(res.message, 'success');
+        this.loadCourses();
+        this.loadMetrics();
+      },
+      error: (err) => {
+        this.showToast('Error al inscribir clase: ' + (err.error?.message || err.message), 'warning');
+      }
+    });
+  }
+
+  public withdrawFromCourse(courseId: number, courseName: string): void {
+    if (!confirm(`¿Deseas retirar ${courseName} de tus clases activas? Tu historial y notas no se perderán.`)) {
+      return;
+    }
+
+    this.studentService.withdrawCourse(courseId).subscribe({
+      next: (res) => {
+        this.showToast(res.message, 'info');
+        this.loadCourses();
+        this.loadMetrics();
+      },
+      error: (err) => {
+        this.showToast('Error al retirar la clase: ' + (err.error?.message || err.message), 'warning');
+      }
+    });
+  }
+
+  private showToast(msg: string, type: 'success' | 'info' | 'warning' = 'info'): void {
+    this.notificationMessage = msg;
+    this.notificationType = type;
+    setTimeout(() => {
+      this.notificationMessage = '';
+    }, 4500);
   }
 
   public selectSubject(subjectName: string): void {
@@ -81,7 +171,8 @@ export class StudentDashboardComponent implements OnInit {
 
   public onAssignmentSubmitted(): void {
     this.closeSubmissionModal();
-    this.loadDashboard(); // Recargar para actualizar el estado a "Entregada"
+    this.loadDashboard();
+    this.loadMetrics();
   }
 
   public openMedia(url?: string): void {

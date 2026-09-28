@@ -48,7 +48,8 @@ public class ContentsController : ControllerBase
 
             result.Add(new ContentDto
             {
-                Id = Guid.NewGuid(),
+                Id = t.Id.ToString(),
+                RealId = t.Id,
                 Title = t.Titulo,
                 Description = t.Descripcion ?? string.Empty,
                 Type = "Assignment",
@@ -85,7 +86,8 @@ public class ContentsController : ControllerBase
 
             result.Add(new ContentDto
             {
-                Id = Guid.NewGuid(),
+                Id = $"mat-{m.Id}",
+                RealId = m.Id,
                 Title = m.Titulo,
                 Description = m.Descripcion ?? string.Empty,
                 Type = m.Tipo == "VIDEO" ? "Video" : "Pdf",

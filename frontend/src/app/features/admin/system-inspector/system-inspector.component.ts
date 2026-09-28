@@ -1,7 +1,7 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { SystemFilesService, LogFileInfo } from '../../../core/services/system-files.service';
+import { SystemFilesService, LogFileInfo, ParsedLogEntry } from '../../../core/services/system-files.service';
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
@@ -12,22 +12,27 @@ import { AuthService } from '../../../core/services/auth.service';
   styleUrls: ['./system-inspector.component.css']
 })
 export class SystemInspectorComponent implements OnInit {
-  public activeTab = signal<'htaccess' | 'logs'>('htaccess');
+  public activeTab = signal<'htaccess' | 'logs'>('logs');
+  public logViewMode = signal<'friendly' | 'raw'>('friendly');
   public logFiles = signal<LogFileInfo[]>([]);
-  public selectedLogName = signal<string>('');
+  public selectedLogName = signal<string>('access.log');
   
   public currentFileName = signal<string>('.htaccess');
   public currentContent = signal<string>('');
   public fileSize = signal<number>(0);
   public lastModified = signal<string>('');
   
+  // Para el módulo de logs amigable
+  public parsedLogs = signal<ParsedLogEntry[]>([]);
+  public selectedSeverity = signal<string>('ALL');
+  public selectedDate = signal<string>('');
+  public searchUser = signal<string>('');
+  public expandedLogId = signal<string | null>(null);
+
   public isLoading = signal<boolean>(false);
   public errorMessage = signal<string>('');
   public successMessage = signal<string>('');
   public filterQuery = signal<string>('');
-  public autoRefresh = signal<boolean>(false);
-
-  private autoRefreshTimer: any = null;
 
   constructor(
     private systemFilesService: SystemFilesService,
@@ -35,7 +40,6 @@ export class SystemInspectorComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.loadHtaccess();
     this.loadLogsList();
   }
 
@@ -60,6 +64,21 @@ export class SystemInspectorComponent implements OnInit {
       } else {
         this.loadLogsList();
       }
+    }
+  }
+
+  public setViewMode(mode: 'friendly' | 'raw'): void {
+    this.logViewMode.set(mode);
+    if (mode === 'friendly') {
+      this.loadParsedLogs();
+    }
+  }
+
+  public toggleAccordion(id: string): void {
+    if (this.expandedLogId() === id) {
+      this.expandedLogId.set(null);
+    } else {
+      this.expandedLogId.set(id);
     }
   }
 
@@ -91,28 +110,57 @@ export class SystemInspectorComponent implements OnInit {
     this.systemFilesService.getLogsList().subscribe({
       next: (res) => {
         this.logFiles.set(res.files || []);
-        // Si estamos en la pestaña logs y no hay seleccionado, cargar el primero
-        if (this.activeTab() === 'logs' && !this.selectedLogName() && res.files?.length > 0) {
-          this.loadLog(res.files[0].name);
+        if (res.files && res.files.length > 0) {
+          const target = res.files.some(f => f.name === 'access.log') ? 'access.log' : res.files[0].name;
+          this.loadLog(target);
         }
       },
       error: (err) => {
         if (err.status === 403) {
-          this.errorMessage.set('Acceso restringido: No tienes permisos para consultar los registros del sistema.');
+          this.errorMessage.set('Acceso restringido: No tienes permisos para consultar los registros del servidor.');
         }
       }
     });
   }
 
   public loadLog(fileName: string): void {
+    this.selectedLogName.set(fileName);
+    this.currentFileName.set(fileName);
+
+    if (this.logViewMode() === 'friendly') {
+      this.loadParsedLogs();
+    } else {
+      this.loadRawLog(fileName);
+    }
+  }
+
+  public loadParsedLogs(): void {
+    const fileName = this.selectedLogName() || 'access.log';
     this.isLoading.set(true);
     this.errorMessage.set('');
-    this.successMessage.set('');
-    this.selectedLogName.set(fileName);
 
+    this.systemFilesService.getParsedLogs(
+      fileName,
+      this.selectedSeverity(),
+      this.searchUser(),
+      this.selectedDate()
+    ).subscribe({
+      next: (entries) => {
+        this.parsedLogs.set(entries);
+        this.isLoading.set(false);
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        this.errorMessage.set('Error al parsear el archivo de log: ' + (err.error?.message || err.message));
+      }
+    });
+  }
+
+  public loadRawLog(fileName: string): void {
+    this.isLoading.set(true);
+    this.errorMessage.set('');
     this.systemFilesService.getLogContent(fileName).subscribe({
       next: (res) => {
-        this.currentFileName.set(res.fileName);
         this.currentContent.set(res.content);
         this.fileSize.set(res.size);
         this.lastModified.set(res.lastModified);
@@ -120,11 +168,7 @@ export class SystemInspectorComponent implements OnInit {
       },
       error: (err) => {
         this.isLoading.set(false);
-        if (err.status === 403) {
-          this.errorMessage.set('Acceso denegado (403): Se requiere rol de administrador (.admin).');
-        } else {
-          this.errorMessage.set(`Error al leer archivo '${fileName}': ` + (err.error?.message || err.message));
-        }
+        this.errorMessage.set(`Error al leer archivo '${fileName}': ` + (err.error?.message || err.message));
       }
     });
   }
@@ -133,9 +177,10 @@ export class SystemInspectorComponent implements OnInit {
     if (this.activeTab() === 'htaccess') {
       this.loadHtaccess();
     } else {
-      this.loadLogsList();
-      if (this.selectedLogName()) {
-        this.loadLog(this.selectedLogName());
+      if (this.logViewMode() === 'friendly') {
+        this.loadParsedLogs();
+      } else {
+        this.loadRawLog(this.selectedLogName());
       }
     }
   }
@@ -151,8 +196,7 @@ export class SystemInspectorComponent implements OnInit {
     this.systemFilesService.clearLog(fileName).subscribe({
       next: (res) => {
         this.successMessage.set(res.message);
-        this.loadLog(fileName);
-        this.loadLogsList();
+        this.refreshCurrent();
         setTimeout(() => this.successMessage.set(''), 4000);
       },
       error: (err) => {
@@ -162,7 +206,11 @@ export class SystemInspectorComponent implements OnInit {
   }
 
   public copyToClipboard(): void {
-    navigator.clipboard.writeText(this.currentContent()).then(() => {
+    const textToCopy = this.logViewMode() === 'raw' 
+      ? this.currentContent() 
+      : JSON.stringify(this.parsedLogs(), null, 2);
+
+    navigator.clipboard.writeText(textToCopy).then(() => {
       this.successMessage.set('Contenido copiado al portapapeles');
       setTimeout(() => this.successMessage.set(''), 3000);
     });
@@ -197,9 +245,6 @@ export class SystemInspectorComponent implements OnInit {
     }
     if (l.includes('INFO') || l.includes('HTTP 200')) {
       return 'line-info';
-    }
-    if (l.includes('DEBUG')) {
-      return 'line-debug';
     }
     return 'line-default';
   }

@@ -89,7 +89,8 @@ public class StudentController : ControllerBase
 
             result.Add(new ContentDto
             {
-                Id = Guid.NewGuid(),
+                Id = t.Id.ToString(),
+                RealId = t.Id,
                 Title = t.Titulo,
                 Description = t.Descripcion ?? string.Empty,
                 Type = "Assignment",
@@ -102,15 +103,18 @@ public class StudentController : ControllerBase
                 HasSubmitted = myEntrega != null,
                 MySubmission = myEntrega == null ? null : new StudentSubmissionDto
                 {
-                    Id = Guid.NewGuid(),
-                    AssignmentId = Guid.Empty,
+                    SubmissionId = myEntrega.Id,
+                    Id = myEntrega.Id.ToString(),
+                    AssignmentId = t.Id.ToString(),
                     StudentId = student.Usuario.Username,
                     StudentName = studentFullName,
+                    StudentAvatarUrl = student.Usuario.AvatarUrl,
                     FileUrl = myArchivo?.RutaArchivo ?? string.Empty,
                     OriginalFileName = myArchivo?.NombreOriginal ?? "archivo",
                     SubmittedAt = myEntrega.FechaEntrega,
                     Feedback = myEntrega.Retroalimentacion,
-                    Grade = myEntrega.Calificacion
+                    Grade = myEntrega.Calificacion,
+                    Status = myEntrega.Estado
                 }
             });
         }
@@ -123,7 +127,8 @@ public class StudentController : ControllerBase
 
             result.Add(new ContentDto
             {
-                Id = Guid.NewGuid(),
+                Id = $"mat-{m.Id}",
+                RealId = m.Id,
                 Title = m.Titulo,
                 Description = m.Descripcion ?? string.Empty,
                 Type = m.Tipo == "VIDEO" ? "Video" : "Pdf",
@@ -176,9 +181,23 @@ public class StudentController : ControllerBase
             return BadRequest(new { message = error });
         }
 
-        // Buscar la tarea activa
-        var tarea = await _context.Tareas.FirstOrDefaultAsync(t => t.Activo)
-                    ?? await _context.Tareas.OrderByDescending(t => t.Id).FirstOrDefaultAsync();
+        // Buscar la tarea por ID específico
+        Tarea? tarea = null;
+        if (!string.IsNullOrWhiteSpace(request.AssignmentId))
+        {
+            var cleanId = request.AssignmentId.Replace("task-", "").Trim();
+            if (int.TryParse(cleanId, out var parsedTaskId))
+            {
+                tarea = await _context.Tareas.FirstOrDefaultAsync(t => t.Id == parsedTaskId);
+            }
+        }
+
+        // Fallback si no fue encontrada por ID
+        if (tarea == null)
+        {
+            tarea = await _context.Tareas.FirstOrDefaultAsync(t => t.Activo)
+                        ?? await _context.Tareas.OrderByDescending(t => t.Id).FirstOrDefaultAsync();
+        }
 
         if (tarea == null)
         {
@@ -226,14 +245,218 @@ public class StudentController : ControllerBase
             Message = "¡Felicidades! Tu tarea ha sido entregada con éxito. 🎉⭐",
             Submission = new StudentSubmissionDto
             {
-                Id = Guid.NewGuid(),
-                AssignmentId = Guid.Empty,
+                SubmissionId = entrega.Id,
+                Id = entrega.Id.ToString(),
+                AssignmentId = tarea.Id.ToString(),
                 StudentId = student.Usuario.Username,
                 StudentName = studentFullName,
+                StudentAvatarUrl = student.Usuario.AvatarUrl,
                 FileUrl = fileUrl,
                 OriginalFileName = originalName,
-                SubmittedAt = entrega.FechaEntrega
+                SubmittedAt = entrega.FechaEntrega,
+                Status = entrega.Estado
             }
         });
+    }
+
+    /// <summary>
+    /// Retorna métricas clave para el estudiante: Clases inscritas, promedio acumulado,
+    /// actividades pendientes y porcentaje de progreso.
+    /// GET: /api/student/metrics
+    /// </summary>
+    [HttpGet("metrics")]
+    [ProducesResponseType(typeof(StudentMetricsDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStudentMetrics()
+    {
+        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        var student = await _context.Alumnos
+            .Include(a => a.Inscripciones)
+            .FirstOrDefaultAsync(a => a.Usuario.Username.ToLower() == username.ToLower());
+
+        if (student == null) return NotFound("Estudiante no encontrado.");
+
+        var activeEnrolledCourseIds = student.Inscripciones
+            .Where(i => i.Estado == "ACTIVA")
+            .Select(i => i.CursoId)
+            .ToList();
+
+        var enrolledCoursesCount = activeEnrolledCourseIds.Count;
+
+        // Tareas en sus cursos activos o de su grado
+        var relevantTasks = await _context.Tareas
+            .Include(t => t.Entregas.Where(e => e.AlumnoId == student.UsuarioId))
+            .Where(t => t.Activo && (activeEnrolledCourseIds.Contains(t.CursoId) || t.Curso.GradoId == student.GradoId))
+            .ToListAsync();
+
+        var totalActivities = relevantTasks.Count;
+        var submittedTasks = relevantTasks.Count(t => t.Entregas.Any());
+        var pendingActivities = totalActivities - submittedTasks;
+
+        // Promedio acumulado de entregas calificadas (escala 5.0 estándar)
+        var gradedSubmissions = await _context.Entregas
+            .Where(e => e.AlumnoId == student.UsuarioId && e.Calificacion.HasValue)
+            .Select(e => e.Calificacion!.Value)
+            .ToListAsync();
+
+        decimal gpa = 5.0m;
+        if (gradedSubmissions.Any())
+        {
+            var rawAvg = gradedSubmissions.Average();
+            // Si la nota fue calificada sobre 100, normalizar a escala 5.0 si aplica
+            gpa = rawAvg > 5.0m ? Math.Round(rawAvg / 20.0m, 1) : Math.Round(rawAvg, 1);
+        }
+
+        decimal progress = totalActivities > 0
+            ? Math.Round((decimal)submittedTasks / totalActivities * 100m, 1)
+            : 100m;
+
+        return Ok(new StudentMetricsDto
+        {
+            EnrolledCoursesCount = enrolledCoursesCount,
+            CumulativeGpa = gpa,
+            PendingActivitiesCount = pendingActivities < 0 ? 0 : pendingActivities,
+            ProgressPercentage = progress
+        });
+    }
+
+    /// <summary>
+    /// Consulta el catálogo de clases disponibles y las clases activas del estudiante.
+    /// GET: /api/student/courses
+    /// </summary>
+    [HttpGet("courses")]
+    [ProducesResponseType(typeof(StudentCoursesCatalogDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStudentCourses()
+    {
+        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        var student = await _context.Alumnos
+            .Include(a => a.Inscripciones)
+            .FirstOrDefaultAsync(a => a.Usuario.Username.ToLower() == username.ToLower());
+
+        if (student == null) return NotFound("Estudiante no encontrado.");
+
+        var allCourses = await _context.Cursos
+            .Include(c => c.Grado)
+            .Include(c => c.Docente)
+            .Where(c => c.Activo && c.GradoId == student.GradoId)
+            .ToListAsync();
+
+        var enrollmentsMap = student.Inscripciones
+            .ToDictionary(i => i.CursoId, i => i);
+
+        var myActiveList = new List<StudentCourseItemDto>();
+        var availableList = new List<StudentCourseItemDto>();
+
+        foreach (var c in allCourses)
+        {
+            var teacherName = !string.IsNullOrWhiteSpace(c.Docente.FullName) ? c.Docente.FullName : c.Docente.Username;
+            var isEnrolled = enrollmentsMap.TryGetValue(c.Id, out var enrollment);
+            var isActivelyEnrolled = isEnrolled && enrollment!.Estado == "ACTIVA";
+
+            var dto = new StudentCourseItemDto
+            {
+                Id = c.Id,
+                Nombre = c.Nombre,
+                Grado = c.Grado.Nombre,
+                Grupo = c.Grupo,
+                DocenteNombre = teacherName,
+                Descripcion = c.Descripcion,
+                IsEnrolled = isActivelyEnrolled,
+                EnrollmentStatus = isEnrolled ? enrollment!.Estado : "NO_INSCRITO",
+                FechaInscripcion = isEnrolled ? enrollment!.FechaRegistro : null
+            };
+
+            if (isActivelyEnrolled)
+            {
+                myActiveList.Add(dto);
+            }
+            else
+            {
+                availableList.Add(dto);
+            }
+        }
+
+        return Ok(new StudentCoursesCatalogDto
+        {
+            MyActiveCourses = myActiveList,
+            AvailableCourses = availableList
+        });
+    }
+
+    /// <summary>
+    /// Inscribe al estudiante en una nueva clase.
+    /// POST: /api/student/courses/{courseId}/enroll
+    /// </summary>
+    [HttpPost("courses/{courseId:int}/enroll")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> EnrollInCourse(int courseId)
+    {
+        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        var student = await _context.Alumnos
+            .Include(a => a.Inscripciones)
+            .FirstOrDefaultAsync(a => a.Usuario.Username.ToLower() == username.ToLower());
+
+        if (student == null) return NotFound("Estudiante no encontrado.");
+
+        var course = await _context.Cursos.FirstOrDefaultAsync(c => c.Id == courseId && c.Activo);
+        if (course == null) return NotFound(new { message = "La clase no existe o está inactiva." });
+
+        var existingEnrollment = student.Inscripciones.FirstOrDefault(i => i.CursoId == courseId);
+        if (existingEnrollment != null)
+        {
+            existingEnrollment.Estado = "ACTIVA";
+            existingEnrollment.FechaRegistro = DateTime.UtcNow;
+        }
+        else
+        {
+            var newEnrollment = new Inscripcion
+            {
+                CursoId = courseId,
+                AlumnoId = student.UsuarioId,
+                FechaRegistro = DateTime.UtcNow,
+                Estado = "ACTIVA"
+            };
+            _context.Inscripciones.Add(newEnrollment);
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = $"¡Te has inscrito exitosamente a {course.Nombre}! 🎒✨" });
+    }
+
+    /// <summary>
+    /// Desactiva / da de baja una clase de la lista activa del estudiante (Soft Delete).
+    /// POST: /api/student/courses/{courseId}/withdraw
+    /// </summary>
+    [HttpPost("courses/{courseId:int}/withdraw")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> WithdrawFromCourse(int courseId)
+    {
+        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        var student = await _context.Alumnos
+            .Include(a => a.Inscripciones)
+            .FirstOrDefaultAsync(a => a.Usuario.Username.ToLower() == username.ToLower());
+
+        if (student == null) return NotFound("Estudiante no encontrado.");
+
+        var enrollment = student.Inscripciones.FirstOrDefault(i => i.CursoId == courseId && i.Estado == "ACTIVA");
+        if (enrollment == null)
+        {
+            return NotFound(new { message = "No tienes una inscripción activa en esta clase." });
+        }
+
+        // Desactivar lógicamente para preservar historial
+        enrollment.Estado = "INACTIVA";
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Has retirado la clase de tu lista activa exitosamente." });
     }
 }

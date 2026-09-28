@@ -67,6 +67,10 @@ public class LMSDbContext : DbContext
             entity.Ignore(u => u.FullName);
             entity.Property(u => u.Activo).HasColumnName("activo").HasColumnType("tinyint(1)").HasDefaultValue(true);
             entity.Property(u => u.FechaCreacion).HasColumnName("fecha_creacion").HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(u => u.DataPolicyAccepted).HasColumnName("data_policy_accepted").HasColumnType("tinyint(1)").HasDefaultValue(false);
+            entity.Property(u => u.DataPolicyAcceptedAt).HasColumnName("data_policy_accepted_at");
+            entity.Property(u => u.AccessFailedCount).HasColumnName("access_failed_count").HasDefaultValue(0);
+            entity.Property(u => u.LockoutEnd).HasColumnName("lockout_end");
 
             entity.HasIndex(u => u.Username)
                   .IsUnique()

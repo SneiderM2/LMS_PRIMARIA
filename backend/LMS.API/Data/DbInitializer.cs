@@ -102,6 +102,34 @@ public static class DbInitializer
                 await alterCmd.ExecuteNonQueryAsync();
             }
 
+            if (!existingColumns.Contains("data_policy_accepted"))
+            {
+                using var alterCmd = conn.CreateCommand();
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN data_policy_accepted TINYINT(1) NOT NULL DEFAULT 0;";
+                await alterCmd.ExecuteNonQueryAsync();
+            }
+
+            if (!existingColumns.Contains("data_policy_accepted_at"))
+            {
+                using var alterCmd = conn.CreateCommand();
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN data_policy_accepted_at DATETIME NULL;";
+                await alterCmd.ExecuteNonQueryAsync();
+            }
+
+            if (!existingColumns.Contains("access_failed_count"))
+            {
+                using var alterCmd = conn.CreateCommand();
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN access_failed_count INT NOT NULL DEFAULT 0;";
+                await alterCmd.ExecuteNonQueryAsync();
+            }
+
+            if (!existingColumns.Contains("lockout_end"))
+            {
+                using var alterCmd = conn.CreateCommand();
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN lockout_end DATETIME NULL;";
+                await alterCmd.ExecuteNonQueryAsync();
+            }
+
             // Si la tabla 'perfiles' aún existe físicamente en MySQL, migrar los datos a 'usuarios'
             using (var tableCmd = conn.CreateCommand())
             {

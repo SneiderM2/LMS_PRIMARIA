@@ -17,7 +17,7 @@ export class AuthService {
   public isAuthenticated = computed(() => !!this.currentUser());
   public userRole = computed(() => this.currentUser()?.role || null);
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router) { }
 
   public login(credentials: LoginRequest): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.API_URL}/login`, credentials).pipe(
@@ -35,6 +35,33 @@ export class AuthService {
         this.saveAuthData(response.token, response.user);
         this.currentUser.set(response.user);
         this.redirectByRole(response.user.role);
+      })
+    );
+  }
+
+  public loginWithGoogle(idToken: string, honeypotTrap?: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.API_URL}/google-login`, { idToken, honeypotTrap }).pipe(
+      tap(response => {
+        this.saveAuthData(response.token, response.user);
+        this.currentUser.set(response.user);
+        this.redirectByRole(response.user.role);
+      })
+    );
+  }
+
+  public googleLogin(idToken: string): Observable<LoginResponse> {
+    return this.loginWithGoogle(idToken);
+  }
+
+  public acceptDataPolicy(): Observable<any> {
+    return this.http.post<any>(`${this.API_URL}/accept-data-policy`, { accepted: true }).pipe(
+      tap(() => {
+        const user = this.currentUser();
+        if (user) {
+          const updated = { ...user, dataPolicyAccepted: true };
+          this.currentUser.set(updated);
+          localStorage.setItem(this.USER_KEY, JSON.stringify(updated));
+        }
       })
     );
   }

@@ -15,6 +15,12 @@ public class Usuario
     public bool Activo { get; set; } = true;
     public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
 
+    // Sprint 4: Política de tratamiento de datos y protección contra fuerza bruta
+    public bool DataPolicyAccepted { get; set; } = false;
+    public DateTime? DataPolicyAcceptedAt { get; set; }
+    public int AccessFailedCount { get; set; } = 0;
+    public DateTime? LockoutEnd { get; set; }
+
     // Propiedad calculada
     public string FullName => $"{Nombre} {Apellido}".Trim();
 

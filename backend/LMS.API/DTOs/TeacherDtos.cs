@@ -73,3 +73,19 @@ public class CreateCourseDto
 
     public string? Descripcion { get; set; }
 }
+
+public class UpdateCourseDto
+{
+    [Required]
+    [MaxLength(100)]
+    public string Nombre { get; set; } = string.Empty;
+
+    [Required]
+    public string Grado { get; set; } = "1°";
+
+    [Required]
+    [MaxLength(10)]
+    public string Grupo { get; set; } = "A";
+
+    public string? Descripcion { get; set; }
+}

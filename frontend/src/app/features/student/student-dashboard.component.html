@@ -1,170 +1,350 @@
 <div class="student-page">
   
   <!-- Barra Superior Escolar -->
-  <header class="student-nav">
+  <header class="student-nav glass-panel">
     <div class="brand">
-      <span class="brand-mascot">🎒</span>
-      <span class="brand-title">Mi Escuela Mágica</span>
+      <div class="brand-mascot-box">🎒</div>
+      <div class="brand-text">
+        <span class="brand-title">Mi Escuela Mágica</span>
+        <span class="brand-subtitle">Campus Escolar Interactivo</span>
+      </div>
     </div>
 
     <div class="student-badge-group">
-      <img [src]="authService.currentUser()?.avatarUrl" alt="Mi Avatar" class="kid-nav-avatar" />
+      <img [src]="authService.currentUser()?.avatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=student'" alt="Mi Avatar" class="kid-nav-avatar" />
       <div class="kid-nav-info">
         <span class="kid-name">{{ authService.currentUser()?.fullName }}</span>
-        <span class="kid-grade">⭐ {{ authService.currentUser()?.gradeLevel || '2° Primaria' }}</span>
+        <span class="kid-grade">⭐ {{ authService.currentUser()?.gradeLevel || 'Primaria' }}</span>
       </div>
-      <button class="btn btn-secondary btn-sm btn-logout" (click)="logout()">
+      <button class="btn btn-secondary btn-sm btn-logout" (click)="logout()" title="Cerrar sesión">
         🚪 Salir
       </button>
     </div>
   </header>
 
+  <!-- Pestañas de Navegación del Estudiante -->
+  <nav class="student-tabs-bar">
+    <div class="tabs-container">
+      <button 
+        class="student-tab-btn" 
+        [class.active]="activeTab === 'activities'"
+        (click)="switchTab('activities')">
+        🎯 Mis Tareas y Recursos
+        <span class="tab-chip-counter" *ngIf="metrics.pendingActivitiesCount > 0">
+          {{ metrics.pendingActivitiesCount }} pendientes
+        </span>
+      </button>
+      <button 
+        class="student-tab-btn" 
+        [class.active]="activeTab === 'courses'"
+        (click)="switchTab('courses')">
+        🎒 Mis Clases y Matrícula
+        <span *ngIf="coursesCatalog.availableCourses.length > 0" class="tab-chip">
+          {{ coursesCatalog.availableCourses.length }} nuevas
+        </span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Notificación Toast -->
+  <div *ngIf="notificationMessage" class="student-toast animate-fade-in" [ngClass]="'toast-' + notificationType">
+    <span class="toast-icon">{{ notificationType === 'success' ? '🎉' : notificationType === 'info' ? 'ℹ️' : '⚠️' }}</span>
+    <span class="toast-text">{{ notificationMessage }}</span>
+  </div>
+
   <main class="student-container">
     
     <!-- Hero Banner de Bienvenida -->
-    <section class="welcome-hero">
+    <section class="welcome-hero glass-panel">
       <div class="welcome-text">
-        <span class="welcome-tag">✨ ¡Bienvenido de nuevo!</span>
+        <div class="welcome-tag">
+          <span>✨ ¡Bienvenido(a) a tu espacio de aprendizaje!</span>
+        </div>
         <h1>¡Hola, {{ authService.currentUser()?.fullName }}! 🚀</h1>
-        <p>¿Qué aventura emocionante descubriremos hoy en clases?</p>
+        <p>¿Qué aventura emocionante y divertida descubriremos hoy en tus materias?</p>
       </div>
       <div class="welcome-badge-icon bounce-animation">
         <span>🏆</span>
       </div>
     </section>
 
-    <!-- Selector de Materias Favoritas (Tarjetas Temáticas) -->
-    <section class="subjects-section">
-      <h2 class="section-title">📚 Mis Materias</h2>
-      <div class="subjects-grid">
-        <button
-          *ngFor="let sub of subjects"
-          type="button"
-          class="subject-card"
-          [class.active]="selectedSubject === sub.name"
-          (click)="selectSubject(sub.name)"
-        >
-          <span class="subject-icon">{{ sub.icon }}</span>
-          <span class="subject-name">{{ sub.name }}</span>
-        </button>
+    <!-- 4 Métricas Clave del Estudiante (KPI Lúdicos) -->
+    <section class="student-metrics-grid">
+      <!-- Clases Inscritas -->
+      <div class="metric-card metric-courses glass-panel">
+        <div class="metric-icon-box icon-courses">📚</div>
+        <div class="metric-details">
+          <span class="metric-value">{{ metrics.enrolledCoursesCount }}</span>
+          <span class="metric-label">Clases Inscritas</span>
+          <span class="metric-sub">Materias de tu grado</span>
+        </div>
+      </div>
+
+      <!-- Promedio Acumulado -->
+      <div class="metric-card metric-gpa glass-panel">
+        <div class="metric-icon-box icon-gpa">⭐</div>
+        <div class="metric-details">
+          <span class="metric-value">{{ metrics.cumulativeGpa }} <small>/ 5.0</small></span>
+          <span class="metric-label">Promedio de Notas</span>
+          <span class="metric-sub">¡Excelente rendimiento! 🌟</span>
+        </div>
+      </div>
+
+      <!-- Actividades Pendientes -->
+      <div class="metric-card metric-pending glass-panel" [class.has-pending]="metrics.pendingActivitiesCount > 0">
+        <div class="metric-icon-box icon-pending">⏰</div>
+        <div class="metric-details">
+          <span class="metric-value">{{ metrics.pendingActivitiesCount }}</span>
+          <span class="metric-label">Tareas Pendientes</span>
+          <span class="metric-sub" *ngIf="metrics.pendingActivitiesCount === 0">¡Todo al día! 🎉</span>
+          <span class="metric-sub text-alert" *ngIf="metrics.pendingActivitiesCount > 0">¡Aún estás a tiempo!</span>
+        </div>
+      </div>
+
+      <!-- Progreso General -->
+      <div class="metric-card metric-progress glass-panel">
+        <div class="metric-icon-box icon-progress">🎯</div>
+        <div class="metric-details">
+          <span class="metric-value">{{ metrics.progressPercentage }}%</span>
+          <span class="metric-label">Progreso de Tareas</span>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" [style.width.%]="metrics.progressPercentage"></div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Lista de Actividades y Tareas -->
-    <section class="activities-section">
-      <div class="activities-header">
-        <h2 class="section-title">
-          🎯 Mis Tareas y Recursos
-          <span class="badge-count" *ngIf="!isLoading">({{ filteredContents.length }})</span>
-        </h2>
-      </div>
+    <!-- ========================================================= -->
+    <!-- SECCIÓN 1: MIS TAREAS Y RECURSOS                          -->
+    <!-- ========================================================= -->
+    <div *ngIf="activeTab === 'activities'" class="animate-fade-in">
+      
+      <!-- Selector Temático de Materias -->
+      <section class="subjects-section glass-panel">
+        <div class="section-title-row">
+          <h2 class="section-title">📚 Filtrar por Materia</h2>
+          <span class="section-subtitle">Elige una materia para ver tus trabajos</span>
+        </div>
+        <div class="subjects-grid">
+          <button
+            *ngFor="let sub of subjects"
+            type="button"
+            class="subject-card"
+            [class.active]="selectedSubject === sub.name"
+            (click)="selectSubject(sub.name)">
+            <span class="subject-icon">{{ sub.icon }}</span>
+            <span class="subject-name">{{ sub.name }}</span>
+          </button>
+        </div>
+      </section>
 
-      <!-- Spinner de Carga -->
-      <div *ngIf="isLoading" class="student-loading">
-        <span class="loading-icon">🌟</span>
-        <p>Buscando tus tareas mágicas...</p>
-      </div>
+      <!-- Lista de Actividades y Tareas -->
+      <section class="activities-section">
+        <div class="activities-header">
+          <h2 class="section-title">
+            🎯 Trabajos y Recursos Asignados
+            <span class="badge-count" *ngIf="!isLoading">({{ filteredContents.length }})</span>
+          </h2>
+        </div>
 
-      <!-- Tarjetas de Actividades -->
-      <div *ngIf="!isLoading" class="activities-grid">
-        <div *ngFor="let item of filteredContents" class="card-fun activity-card">
-          
-          <!-- Encabezado de la Tarjeta -->
-          <div class="card-header-bar">
-            <span class="subject-pill">{{ item.subject }}</span>
+        <!-- Spinner de Carga -->
+        <div *ngIf="isLoading" class="student-loading glass-panel">
+          <span class="loading-icon bounce-animation">🌟</span>
+          <p>Cargando tus tareas mágicas de primaria...</p>
+        </div>
 
-            <!-- Insignia del tipo de contenido -->
-            <span class="type-badge" [ngSwitch]="item.type">
-              <span *ngSwitchCase="'Assignment'" class="type-assignment">📝 Tarea</span>
-              <span *ngSwitchCase="'Video'" class="type-video">🎥 Video</span>
-              <span *ngSwitchCase="'Pdf'" class="type-pdf">📄 Guía de Lectura</span>
-            </span>
-          </div>
+        <!-- Tarjetas de Actividades -->
+        <div *ngIf="!isLoading && filteredContents.length > 0" class="activities-grid">
+          <div *ngFor="let item of filteredContents" class="activity-card glass-panel">
+            
+            <!-- Encabezado de la Tarjeta -->
+            <div class="card-header-bar">
+              <span class="subject-pill">{{ item.subject }}</span>
 
-          <!-- Contenido Central -->
-          <div class="activity-body">
-            <h3 class="activity-title">{{ item.title }}</h3>
-            <p class="activity-desc">{{ item.description }}</p>
-
-            <!-- Fecha de Entrega Amigable para Niños -->
-            <div *ngIf="item.dueDate" class="due-box">
-              <span class="due-icon">⏰</span>
-              <span class="due-text">
-                Entregar antes de: <strong>{{ item.dueDate | date:'EEEE, d \'de\' MMMM' }}</strong>
+              <span class="type-badge" [ngSwitch]="item.type">
+                <span *ngSwitchCase="'Assignment'" class="type-assignment">📝 Tarea</span>
+                <span *ngSwitchCase="'Video'" class="type-video">🎥 Video</span>
+                <span *ngSwitchCase="'Pdf'" class="type-pdf">📄 Guía de Lectura</span>
+                <span *ngSwitchDefault class="type-pdf">📄 Contenido</span>
               </span>
             </div>
 
-            <!-- Estado de Entrega -->
-            <div *ngIf="item.type === 'Assignment'" class="submission-status">
-              <div *ngIf="item.hasSubmitted" class="status-box delivered">
-                <span class="status-icon">🎉</span>
-                <div>
-                  <strong>¡Tarea entregada!</strong>
-                  <div class="file-tag">📎 {{ item.mySubmission?.originalFileName }}</div>
+            <!-- Cuerpo de la Tarjeta -->
+            <div class="activity-body">
+              <h3 class="activity-title">{{ item.title }}</h3>
+              <p class="activity-desc">{{ item.description }}</p>
+
+              <!-- Fecha de Entrega -->
+              <div *ngIf="item.dueDate" class="due-box">
+                <span class="due-icon">⏰</span>
+                <span class="due-text">
+                  Fecha límite: <strong>{{ item.dueDate | date:'EEEE, d \'de\' MMMM' }}</strong>
+                </span>
+              </div>
+
+              <!-- Estado de Entrega para Tareas -->
+              <div *ngIf="item.type === 'Assignment'" class="submission-status">
+                <!-- Ya entregada -->
+                <div *ngIf="item.hasSubmitted" class="status-box delivered">
+                  <div class="status-box-header">
+                    <span class="status-icon">🎉</span>
+                    <div class="status-text">
+                      <strong>¡Tarea Entregada!</strong>
+                      <span class="delivered-date" *ngIf="item.mySubmission?.submittedAt">
+                        {{ item.mySubmission?.submittedAt | date:'dd/MM/yyyy, hh:mm a' }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Calificación del Maestro si ya fue calificada -->
+                  <div *ngIf="item.mySubmission?.grade !== null && item.mySubmission?.grade !== undefined" class="grade-display-box">
+                    <span class="grade-star">⭐</span>
+                    <span class="grade-score">Calificación: <strong>{{ item.mySubmission?.grade }}</strong></span>
+                  </div>
+
+                  <!-- Retroalimentación / Comentario del Maestro -->
+                  <div *ngIf="item.mySubmission?.feedback" class="teacher-feedback-bubble">
+                    <span class="feedback-title">💬 Mensaje de tu Profe:</span>
+                    <p class="feedback-comment">"{{ item.mySubmission?.feedback }}"</p>
+                  </div>
+                </div>
+
+                <!-- Aún pendiente -->
+                <div *ngIf="!item.hasSubmitted" class="status-box pending">
+                  <span class="status-icon">⏳</span>
+                  <div class="status-text">
+                    <strong>Pendiente por Entregar</strong>
+                    <span>¡Sube tu archivo para ganar puntos!</span>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div *ngIf="!item.hasSubmitted" class="status-box pending">
-                <span class="status-icon">⏳</span>
-                <span>Pendiente por entregar</span>
-              </div>
+            <!-- Botones de Acción -->
+            <div class="card-actions">
+              <button 
+                *ngIf="item.type === 'Assignment'"
+                class="btn btn-primary btn-block"
+                (click)="openSubmissionModal(item)">
+                {{ item.hasSubmitted ? '🔄 Reenviar o Modificar Archivo' : '🚀 Entregar Tarea' }}
+              </button>
+
+              <button 
+                *ngIf="item.type === 'Video' || item.type === 'Pdf'"
+                class="btn btn-secondary btn-block"
+                (click)="openMedia(item.fileUrl)">
+                {{ item.type === 'Video' ? '▶️ Reproducir Video' : '📖 Abrir Documento' }}
+              </button>
             </div>
           </div>
+        </div>
 
-          <!-- Acciones según el tipo de actividad -->
-          <div class="activity-footer">
-            
-            <!-- Si es Tarea: Botón Drag & Drop -->
-            <button
-              *ngIf="item.type === 'Assignment'"
-              class="btn btn-primary btn-submit-action"
-              (click)="openSubmissionModal(item)"
-            >
-              <span *ngIf="!item.hasSubmitted">🚀 ¡Subir mi Tarea!</span>
-              <span *ngIf="item.hasSubmitted">🔄 Cambiar mi Tarea</span>
-            </button>
+        <div *ngIf="!isLoading && filteredContents.length === 0" class="no-activities glass-panel">
+          <span class="empty-emoji bounce-animation">🌈</span>
+          <h3>¡Todo al día por aquí!</h3>
+          <p>No tienes tareas pendientes ni actividades para esta materia. ¡Gran trabajo!</p>
+        </div>
+      </section>
+    </div>
 
-            <!-- Si es Video: Abrir Video -->
-            <button
-              *ngIf="item.type === 'Video'"
-              class="btn btn-success btn-media"
-              (click)="openMedia(item.fileUrl)"
-            >
-              ▶️ ¡Ver Video Ahora!
-            </button>
-
-            <!-- Si es PDF: Descargar Cartilla -->
-            <button
-              *ngIf="item.type === 'Pdf'"
-              class="btn btn-secondary btn-media"
-              (click)="openMedia(item.fileUrl)"
-            >
-              📥 Ver Cartilla PDF
-            </button>
-
+    <!-- ========================================================= -->
+    <!-- SECCIÓN 2: GESTIÓN CRUD DE CLASES (CATÁLOGO Y RETIRO)     -->
+    <!-- ========================================================= -->
+    <div *ngIf="activeTab === 'courses'" class="courses-management-section animate-fade-in">
+      
+      <!-- Mis Clases Activas -->
+      <section class="my-courses-block glass-panel">
+        <div class="section-header-row">
+          <div class="title-wrap">
+            <h2>🎒 Mis Clases Activas ({{ coursesCatalog.myActiveCourses.length }})</h2>
+            <p>Materias en las que estás participando este año escolar</p>
           </div>
-
         </div>
 
-        <!-- Mensaje si no hay actividades -->
-        <div *ngIf="filteredContents.length === 0" class="no-tasks card-fun">
-          <span class="no-tasks-emoji">🎈</span>
-          <h3>¡Yupi! No tienes tareas en esta materia</h3>
-          <p>Disfruta jugando o revisa las otras materias escolares.</p>
+        <div *ngIf="coursesCatalog.myActiveCourses.length === 0" class="empty-courses-hint">
+          <p>Aún no tienes clases activas. ¡Revisa las materias disponibles abajo e inscríbete a una!</p>
         </div>
-      </div>
 
-    </section>
+        <div class="courses-cards-grid" *ngIf="coursesCatalog.myActiveCourses.length > 0">
+          <div *ngFor="let course of coursesCatalog.myActiveCourses" class="course-item-card active-course glass-panel">
+            <div class="course-card-top">
+              <span class="grade-badge">{{ course.grado }} • Grupo {{ course.grupo }}</span>
+              <span class="status-badge-active">🟢 Inscrito</span>
+            </div>
+            <h3 class="course-title">{{ course.nombre }}</h3>
+            <p class="course-teacher">👨‍🏫 Docente: <strong>{{ course.docenteNombre }}</strong></p>
+            <p class="course-desc" *ngIf="course.descripcion">{{ course.descripcion }}</p>
+            
+            <div class="course-card-footer">
+              <button 
+                class="btn btn-danger-outline btn-sm btn-block"
+                (click)="withdrawFromCourse(course.id, course.nombre)">
+                ❌ Retirar Materia
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Catálogo de Clases Disponibles -->
+      <section class="available-courses-block glass-panel">
+        <div class="section-header-row">
+          <div class="title-wrap">
+            <h2>🌟 Materias Disponibles para tu Grado ({{ coursesCatalog.availableCourses.length }})</h2>
+            <p>Nuevas clases a las que te puedes unir con un solo clic</p>
+          </div>
+        </div>
+
+        <div *ngIf="coursesCatalog.availableCourses.length === 0" class="empty-courses-hint">
+          <p>🎉 ¡Felicitaciones! Ya estás inscrito en todas las materias disponibles para tu grado.</p>
+        </div>
+
+        <div class="courses-cards-grid" *ngIf="coursesCatalog.availableCourses.length > 0">
+          <div *ngFor="let course of coursesCatalog.availableCourses" class="course-item-card available-course glass-panel">
+            <div class="course-card-top">
+              <span class="grade-badge">{{ course.grado }} • Grupo {{ course.grupo }}</span>
+              <span class="badge-available">✨ Disponible</span>
+            </div>
+            <h3 class="course-title">{{ course.nombre }}</h3>
+            <p class="course-teacher">👨‍🏫 Docente: <strong>{{ course.docenteNombre }}</strong></p>
+            <p class="course-desc" *ngIf="course.descripcion">{{ course.descripcion }}</p>
+
+            <div class="course-card-footer">
+              <button 
+                class="btn btn-primary btn-sm btn-block"
+                (click)="enrollInCourse(course.id)">
+                ➕ Inscribirme a esta Clase
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
 
   </main>
 
-  <!-- MODAL DE ENTREGA DRAG & DROP -->
-  <app-file-drop-zone
-    *ngIf="showDropZone && activeAssignmentId"
-    [assignmentId]="activeAssignmentId"
-    [assignmentTitle]="activeAssignmentTitle"
-    (submitted)="onAssignmentSubmitted()"
-    (cancelled)="closeSubmissionModal()"
-  ></app-file-drop-zone>
+  <!-- Modal para arrastrar y soltar la tarea -->
+  <div *ngIf="showDropZone" class="modal-overlay" (click)="closeSubmissionModal()">
+    <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>🎒 Entregar Tarea Escolar</h2>
+        <button class="btn-close" (click)="closeSubmissionModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="drop-zone-task-info">
+          <span>Entregando trabajo para:</span>
+          <h3>{{ activeAssignmentTitle }}</h3>
+        </div>
+
+        <app-file-drop-zone
+          *ngIf="activeAssignmentId"
+          [assignmentId]="activeAssignmentId"
+          [assignmentTitle]="activeAssignmentTitle"
+          (submissionComplete)="onAssignmentSubmitted()"
+        ></app-file-drop-zone>
+      </div>
+    </div>
+  </div>
 
 </div>

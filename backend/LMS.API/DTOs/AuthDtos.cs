@@ -9,6 +9,29 @@ public class LoginRequestDto
 
     [Required(ErrorMessage = "La contraseña es requerida")]
     public string Password { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Honeypot: Campo señuelo que los bots autocompletan. Debe llegar siempre vacío.
+    /// </summary>
+    public string? HoneypotTrap { get; set; }
+
+    /// <summary>
+    /// Token emitido por el widget de verificación CAPTCHA.
+    /// </summary>
+    public string? CaptchaToken { get; set; }
+}
+
+public class AcceptDataPolicyDto
+{
+    public bool Accepted { get; set; }
+}
+
+public class GoogleLoginDto
+{
+    [Required]
+    public string IdToken { get; set; } = string.Empty;
+
+    public string? HoneypotTrap { get; set; }
 }
 
 public class RegisterRequestDto
@@ -35,6 +58,8 @@ public class RegisterRequestDto
     /// Grado para estudiantes (ej. "1°", "2°", "3°", "4°", "5°" o "2° Primaria")
     /// </summary>
     public string? Grade { get; set; }
+
+    public string? HoneypotTrap { get; set; }
 }
 
 public class LoginResponseDto
@@ -42,6 +67,7 @@ public class LoginResponseDto
     public string Token { get; set; } = string.Empty;
     public DateTime Expiration { get; set; }
     public UserDto User { get; set; } = new();
+    public bool RequiresPolicyAcceptance { get; set; } = false;
 }
 
 public class UserDto
@@ -53,4 +79,5 @@ public class UserDto
     public string? GradeLevel { get; set; }
     public DateTime? LastLoginDate { get; set; }
     public string AvatarUrl { get; set; } = string.Empty;
+    public bool DataPolicyAccepted { get; set; } = false;
 }

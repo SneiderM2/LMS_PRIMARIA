@@ -4,7 +4,8 @@ namespace LMS.API.DTOs;
 
 public class ContentDto
 {
-    public Guid Id { get; set; }
+    public string Id { get; set; } = string.Empty;
+    public int RealId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty; // "Video", "Pdf", "Assignment"
@@ -47,13 +48,16 @@ public class CreateContentDto
 
 public class StudentSubmissionDto
 {
-    public Guid Id { get; set; }
-    public Guid AssignmentId { get; set; }
+    public int SubmissionId { get; set; }
+    public string Id { get; set; } = string.Empty;
+    public string AssignmentId { get; set; } = string.Empty;
     public string StudentId { get; set; } = string.Empty;
     public string StudentName { get; set; } = string.Empty;
+    public string? StudentAvatarUrl { get; set; }
     public string FileUrl { get; set; } = string.Empty;
     public string OriginalFileName { get; set; } = string.Empty;
     public DateTime SubmittedAt { get; set; }
     public string? Feedback { get; set; }
     public decimal? Grade { get; set; }
+    public string Status { get; set; } = "ENVIADA";
 }

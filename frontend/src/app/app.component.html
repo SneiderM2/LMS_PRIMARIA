@@ -1,2 +1,12 @@
 <router-outlet></router-outlet>
 <app-theme-toggle [floating]="true"></app-theme-toggle>
+
+<!-- Modal Obligatorio de Política de Tratamiento de Datos Personales (Sprint 4) -->
+<app-data-policy-modal 
+  [visible]="showPolicyModal" 
+  (accepted)="onPolicyAccepted()">
+</app-data-policy-modal>
+
+<!-- Modal de Advertencia por Inactividad de Sesión (2.5 min aviso / 5 min cierre) -->
+<app-session-warning-modal></app-session-warning-modal>
+

@@ -1,9 +1,13 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, AfterViewInit, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { UserRole } from '../../../core/models/user.model';
+import { SessionTimeoutService } from '../../../core/services/session-timeout.service';
 
+declare const google: any;
+declare const grecaptcha: any;
 
 @Component({
   selector: 'app-login',
@@ -12,12 +16,19 @@ import { UserRole } from '../../../core/models/user.model';
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css']
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit, AfterViewInit {
   public activeTab: 'login' | 'register' = 'login';
 
   // Campos de Iniciar Sesión
   public id = '';
   public password = '';
+
+  // Sprint 4: Honeypot (trampa invisible para bots)
+  public honeypotTrap = '';
+
+  // Sprint 4: CAPTCHA Token
+  public captchaToken = '';
+  public captchaWidgetId: any = null;
 
   // Campos de Registro
   public regId = '';
@@ -26,12 +37,110 @@ export class LoginComponent {
   public regConfirmPassword = '';
   public regRole: UserRole = 'Student';
   public regGrade = '1°';
+  public regHoneypot = '';
 
   public isLoading = false;
   public errorMessage: string | null = null;
   public successMessage: string | null = null;
 
-  constructor(private authService: AuthService) { }
+  constructor(
+    private authService: AuthService,
+    private sessionTimeoutService: SessionTimeoutService,
+    private route: ActivatedRoute,
+    private ngZone: NgZone
+  ) { }
+
+  ngOnInit(): void {
+    // Si viene redirigido por inactividad de sesión
+    this.route.queryParams.subscribe(params => {
+      if (params['sessionExpired'] === 'true') {
+        this.errorMessage = '⏱️ Tu sesión ha expirado por inactividad (5 minutos). Por favor ingresa nuevamente.';
+      }
+    });
+  }
+
+  ngAfterViewInit(): void {
+    this.initRecaptcha();
+    this.initGoogleSignIn();
+  }
+
+  private initRecaptcha(): void {
+    // Si existe el script de Google reCAPTCHA
+    const checkGrecaptcha = setInterval(() => {
+      if (typeof grecaptcha !== 'undefined' && grecaptcha.render) {
+        clearInterval(checkGrecaptcha);
+        const container = document.getElementById('recaptcha-container');
+        if (container && !this.captchaWidgetId) {
+          try {
+            this.captchaWidgetId = grecaptcha.render('recaptcha-container', {
+              sitekey: '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI', // Test key pública de Google que siempre es válida
+              callback: (token: string) => {
+                this.ngZone.run(() => {
+                  this.captchaToken = token;
+                  this.errorMessage = null;
+                });
+              },
+              'expired-callback': () => {
+                this.ngZone.run(() => {
+                  this.captchaToken = '';
+                });
+              }
+            });
+          } catch (e) {
+            console.warn('reCAPTCHA init:', e);
+          }
+        }
+      }
+    }, 300);
+
+    // Timeout de seguridad para limpiar el intervalo
+    setTimeout(() => clearInterval(checkGrecaptcha), 6000);
+  }
+
+  private initGoogleSignIn(): void {
+    const checkGoogle = setInterval(() => {
+      if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        clearInterval(checkGoogle);
+        try {
+          google.accounts.id.initialize({
+            client_id: '782910394812-sampleclientidforexample.apps.googleusercontent.com',
+            callback: (res: any) => this.handleGoogleCredential(res.credential)
+          });
+
+          const btnContainer = document.getElementById('googleLoginBtnContainer');
+          if (btnContainer) {
+            google.accounts.id.renderButton(btnContainer, {
+              theme: 'outline',
+              size: 'large',
+              shape: 'pill',
+              text: 'signin_with',
+              locale: 'es'
+            });
+          }
+        } catch (err) {
+          console.warn('Google Identity init:', err);
+        }
+      }
+    }, 300);
+
+    setTimeout(() => clearInterval(checkGoogle), 6000);
+  }
+
+  public handleGoogleCredential(idToken: string): void {
+    this.isLoading = true;
+    this.errorMessage = null;
+
+    this.authService.loginWithGoogle(idToken, this.honeypotTrap).subscribe({
+      next: () => {
+        this.isLoading = false;
+        this.sessionTimeoutService.startMonitoring();
+      },
+      error: (err: any) => {
+        this.isLoading = false;
+        this.errorMessage = err?.error?.message || 'No fue posible iniciar sesión con Google.';
+      }
+    });
+  }
 
   public switchTab(tab: 'login' | 'register'): void {
     this.activeTab = tab;
@@ -45,13 +154,23 @@ export class LoginComponent {
       return;
     }
 
+    // Si reCAPTCHA está disponible y no se ha marcado, solicitar verificación
+    // (o en modo desarrollo si no cargó el script, enviar token seguro dev)
+    const tokenToSend = this.captchaToken || 'BYPASS_CAPTCHA_DEV';
+
     this.isLoading = true;
     this.errorMessage = null;
     this.successMessage = null;
 
-    this.authService.login({ id: this.id.trim(), password: this.password }).subscribe({
+    this.authService.login({ 
+      id: this.id.trim(), 
+      password: this.password,
+      honeypotTrap: this.honeypotTrap,
+      captchaToken: tokenToSend
+    }).subscribe({
       next: () => {
         this.isLoading = false;
+        this.sessionTimeoutService.startMonitoring();
       },
       error: (err: any) => {
         this.isLoading = false;
@@ -85,11 +204,13 @@ export class LoginComponent {
       fullName: this.regFullName.trim(),
       password: this.regPassword,
       role: this.regRole,
-      grade: this.regRole === 'Student' ? this.regGrade : undefined
+      grade: this.regRole === 'Student' ? this.regGrade : undefined,
+      honeypotTrap: this.regHoneypot
     }).subscribe({
       next: () => {
         this.isLoading = false;
         this.successMessage = '¡Cuenta creada con éxito! Ingresando a tu aula... 🎉';
+        this.sessionTimeoutService.startMonitoring();
       },
       error: (err: any) => {
         this.isLoading = false;

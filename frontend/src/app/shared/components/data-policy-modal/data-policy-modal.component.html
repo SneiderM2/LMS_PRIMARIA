@@ -1,0 +1,72 @@
+<div class="policy-backdrop" *ngIf="visible">
+  <div class="policy-card animate-pop">
+    <div class="policy-header">
+      <div class="policy-badge">
+        <span class="policy-icon">📜</span>
+      </div>
+      <h2 class="policy-title">Política de Tratamiento de Datos Personales</h2>
+      <p class="policy-subtitle">Aviso de Privacidad y Consentimiento Informado Escolar</p>
+    </div>
+
+    <div class="policy-body">
+      <p class="intro-text">
+        En cumplimiento con la normativa legal de <strong>Protección de Datos Personales (Habeas Data)</strong>, 
+        el Colegio de Primaria y la plataforma LMS Scikids garantizan el cuidado, seguridad y reserva de tu información:
+      </p>
+
+      <div class="policy-clauses">
+        <div class="clause-item">
+          <span class="clause-icon">🎯</span>
+          <div class="clause-text">
+            <strong>1. Finalidad Académica Exclusiva:</strong>
+            <p>Tus datos (nombres, grado escolar, asistencias, calificaciones y entregas de tareas) solo se utilizarán con fines estrictamente formativos y pedagógicos.</p>
+          </div>
+        </div>
+
+        <div class="clause-item">
+          <span class="clause-icon">🛡️</span>
+          <div class="clause-text">
+            <strong>2. Protección Integral a Menores:</strong>
+            <p>Se adoptan estándares reforzados de confidencialidad para salvaguardar la privacidad de niños, niñas y adolescentes en el entorno escolar virtual.</p>
+          </div>
+        </div>
+
+        <div class="clause-item">
+          <span class="clause-icon">🚫</span>
+          <div class="clause-text">
+            <strong>3. Prohibición de Cesión a Terceros:</strong>
+            <p>Ningún dato personal o escolar será comercializado, cedido ni expuesto a personas o empresas externas sin previa autorización.</p>
+          </div>
+        </div>
+
+        <div class="clause-item">
+          <span class="clause-icon">📝</span>
+          <div class="clause-text">
+            <strong>4. Derechos ARCO:</strong>
+            <p>Los padres de familia o acudientes pueden ejercer en cualquier momento sus derechos de Acceso, Rectificación, Cancelación y Oposición escribiendo a la secretaría académica.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="consent-box">
+        <label class="consent-checkbox-label">
+          <input type="checkbox" [(ngModel)]="consentGiven" [disabled]="isSubmitting" />
+          <span class="consent-text">
+            He leído y autorizo de manera voluntaria, previa y explícita el tratamiento de mis datos personales conforme a esta política escolar.
+          </span>
+        </label>
+      </div>
+    </div>
+
+    <div class="policy-footer">
+      <button 
+        type="button" 
+        class="btn-accept" 
+        [disabled]="!consentGiven || isSubmitting" 
+        (click)="onAccept()">
+        <span *ngIf="!isSubmitting">✅ Aceptar y Continuar a mi Aula</span>
+        <span *ngIf="isSubmitting">⏳ Guardando consentimiento...</span>
+      </button>
+    </div>
+  </div>
+</div>

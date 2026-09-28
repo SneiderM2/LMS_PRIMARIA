@@ -1,69 +1,700 @@
 <div class="admin-page">
-  <header class="admin-nav">
+  <!-- Barra de Navegación Directiva -->
+  <header class="admin-nav glass-panel">
     <div class="nav-brand">
-      <span class="brand-icon">🏫</span>
-      <span class="brand-title">LMS Primaria • Panel Directivo</span>
-      <span class="admin-tag">Administración</span>
+      <div class="brand-badge-icon">🏫</div>
+      <div class="brand-titles">
+        <span class="brand-title">LMS Primaria</span>
+        <span class="admin-tag">Panel Directivo Institucional</span>
+      </div>
     </div>
 
     <div class="user-pill">
-      <span class="user-greeting">Hola, <strong>{{ authService.currentUser()?.fullName }}</strong></span>
-      <button class="btn btn-secondary btn-sm" (click)="logout()">🚪 Salir</button>
+      <div class="user-meta">
+        <span class="user-name">{{ authService.currentUser()?.fullName || 'Administrador' }}</span>
+        <span class="user-role-badge">🛡️ Super Administrador</span>
+      </div>
+      <button class="btn btn-secondary btn-sm" (click)="logout()" title="Cerrar sesión">
+        🚪 Salir
+      </button>
     </div>
   </header>
 
-  <main class="admin-container">
-    <div class="admin-banner card-fun">
-      <div class="banner-content">
-        <h1>Control y Supervisión General 🎓</h1>
-        <p>Visión global del desempeño escolar, asistencia diaria y gestión del cuerpo docente.</p>
-      </div>
-      <button class="btn btn-primary" (click)="goToTeacherView()">
-        🚦 Abrir Semáforo de Asistencia
+  <!-- Pestañas de Navegación del Panel Directivo -->
+  <nav class="admin-tabs-nav">
+    <div class="tabs-container">
+      <button 
+        class="admin-tab-btn" 
+        [class.active]="activeSection === 'overview'"
+        (click)="setSection('overview')">
+        👥 Directorio de Usuarios
+        <span class="tab-badge">{{ users.length }}</span>
+      </button>
+      <button 
+        class="admin-tab-btn" 
+        [class.active]="activeSection === 'courses'"
+        (click)="setSection('courses')">
+        📚 Materias y Cursos
+        <span class="tab-badge">{{ courses.length }}</span>
+      </button>
+      <button 
+        class="admin-tab-btn" 
+        [class.active]="activeSection === 'inspector'"
+        (click)="setSection('inspector')">
+        🛡️ Auditoría & Logs
       </button>
     </div>
+  </nav>
 
-    <div class="metrics-row">
-      <div class="metric-box box-total">
-        <span class="box-icon">🎒</span>
-        <span class="box-val">{{ metrics.totalStudents }}</span>
-        <span class="box-label">Estudiantes Matriculados</span>
-      </div>
+  <!-- Notificación Toast Flotante -->
+  <div *ngIf="toastMessage" class="admin-toast animate-fade-in" [ngClass]="'toast-' + toastType">
+    <span class="toast-icon">{{ toastType === 'success' ? '✅' : toastType === 'info' ? 'ℹ️' : '⚠️' }}</span>
+    <span class="toast-text">{{ toastMessage }}</span>
+  </div>
 
-      <div class="metric-box box-green">
-        <span class="box-icon">🟢</span>
-        <span class="box-val">{{ metrics.greenCount }}</span>
-        <span class="box-label">Presentes Hoy</span>
-      </div>
+  <main class="admin-container">
 
-      <div class="metric-box box-yellow">
-        <span class="box-icon">🟡</span>
-        <span class="box-val">{{ metrics.yellowCount }}</span>
-        <span class="box-label">Ausencia Moderada (2-4 días)</span>
-      </div>
+    <!-- ========================================================= -->
+    <!-- SECCIÓN 1: GESTIÓN DE USUARIOS Y MÉTRICAS GLOBALES        -->
+    <!-- ========================================================= -->
+    <div *ngIf="activeSection === 'overview'" class="animate-fade-in">
+      
+      <!-- Hero Banner -->
+      <section class="admin-banner glass-panel">
+        <div class="banner-content">
+          <div class="status-pill-live">
+            <span class="live-dot"></span>
+            <span>Sistema Operativo • MySQL 8.0 & .NET Kestrel</span>
+          </div>
+          <h1>Control Global Institucional 🎓</h1>
+          <p>Supervisa cuentas de docentes, estudiantes y administradores con suspensión lógica sin pérdida de historial.</p>
+        </div>
+        <div class="banner-btns">
+          <div class="report-btn-group">
+            <button type="button" class="btn-report btn-report-csv" (click)="exportAdminReport('csv')" title="Descargar directorio de usuarios en formato Excel / CSV">
+              <span>📊 Reporte .CSV</span>
+            </button>
+            <button type="button" class="btn-report btn-report-pdf" (click)="exportAdminReport('pdf')" title="Descargar directorio de usuarios en formato PDF">
+              <span>📄 Reporte .PDF</span>
+            </button>
+          </div>
+          <button class="btn btn-primary" (click)="openCreateUserModal()">
+            ➕ Registrar Usuario
+          </button>
+          <button class="btn btn-secondary" (click)="goToTeacherView()">
+            🚦 Abrir Semáforo
+          </button>
+        </div>
+      </section>
 
-      <div class="metric-box box-red">
-        <span class="box-icon">🔴</span>
-        <span class="box-val">{{ metrics.redCount }}</span>
-        <span class="box-label">Riesgo Crítico (5+ días)</span>
-      </div>
+      <!-- 4 Métricas Clave con Gradientes y Micro-animaciones -->
+      <section class="metrics-row">
+        <!-- Usuarios Activos -->
+        <div class="metric-box box-total glass-panel">
+          <div class="metric-top">
+            <span class="box-icon">👥</span>
+            <span class="metric-trend">Activos</span>
+          </div>
+          <span class="box-val">{{ metrics.totalActiveUsers }}</span>
+          <span class="box-label">Usuarios en Plataforma</span>
+          <div class="metric-subdetail">
+            <span>👨‍🏫 <strong>{{ metrics.activeTeachersCount }}</strong> Docentes</span>
+            <span>🎒 <strong>{{ metrics.activeStudentsCount }}</strong> Alumnos</span>
+          </div>
+        </div>
+
+        <!-- Estado General del Sistema -->
+        <div class="metric-box box-green glass-panel">
+          <div class="metric-top">
+            <span class="box-icon">🖥️</span>
+            <span class="metric-trend trend-green">En Línea</span>
+          </div>
+          <span class="box-val status-val" [class.text-danger]="metrics.systemStatus.includes('Degradado')">
+            {{ metrics.systemStatus }}
+          </span>
+          <span class="box-label">Servicios Principales</span>
+          <div class="metric-subdetail">
+            <span>Latencia: Óptima</span>
+            <span>API REST: 200 OK</span>
+          </div>
+        </div>
+
+        <!-- Errores Recientes (24h) -->
+        <div class="metric-box box-red glass-panel">
+          <div class="metric-top">
+            <span class="box-icon">⚠️</span>
+            <span class="metric-trend" [class.trend-red]="metrics.recentErrorsCount > 0" [class.trend-green]="metrics.recentErrorsCount === 0">
+              {{ metrics.recentErrorsCount === 0 ? 'Estable' : 'Alerta' }}
+            </span>
+          </div>
+          <span class="box-val">{{ metrics.recentErrorsCount }}</span>
+          <span class="box-label">Incidencias (Últimas 24h)</span>
+          <div class="metric-subdetail">
+            <span *ngIf="metrics.recentErrorsCount === 0">Sin fallos críticos registrados</span>
+            <span *ngIf="metrics.recentErrorsCount > 0">Ver detalles en error.log</span>
+          </div>
+        </div>
+
+        <!-- Cursos Activos -->
+        <div class="metric-box box-yellow glass-panel">
+          <div class="metric-top">
+            <span class="box-icon">📚</span>
+            <span class="metric-trend trend-yellow">1° a 6°</span>
+          </div>
+          <span class="box-val">{{ metrics.totalCoursesCount }}</span>
+          <span class="box-label">Materias Habilitadas</span>
+          <div class="metric-subdetail">
+            <span>Matrículas activas</span>
+            <span>Contenido didáctico</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- CRUD Directorio de Usuarios -->
+      <section class="crud-users-card glass-panel">
+        <div class="users-header-row">
+          <div class="title-block">
+            <h2>Directorio de Cuentas y Accesos</h2>
+            <p>Alta, edición y suspensión lógica con preservación total de notas y entregas.</p>
+          </div>
+
+          <div class="users-toolbar">
+            <!-- Filtro de Rol -->
+            <div class="role-chips">
+              <button 
+                class="chip-btn" 
+                [class.selected]="roleFilter === 'ALL'" 
+                (click)="filterByRole('ALL')">
+                Todos ({{ users.length }})
+              </button>
+              <button 
+                class="chip-btn" 
+                [class.selected]="roleFilter === 'Teacher'" 
+                (click)="filterByRole('Teacher')">
+                👨‍🏫 Docentes
+              </button>
+              <button 
+                class="chip-btn" 
+                [class.selected]="roleFilter === 'Student'" 
+                (click)="filterByRole('Student')">
+                🎒 Alumnos
+              </button>
+            </div>
+
+            <!-- Filtro de Estado -->
+            <div class="status-chips">
+              <button 
+                class="chip-btn" 
+                [class.selected]="userStatusFilter === 'ALL'" 
+                (click)="filterByUserStatus('ALL')">
+                Todos
+              </button>
+              <button 
+                class="chip-btn" 
+                [class.selected]="userStatusFilter === 'ACTIVE'" 
+                (click)="filterByUserStatus('ACTIVE')">
+                🟢 Activos
+              </button>
+              <button 
+                class="chip-btn" 
+                [class.selected]="userStatusFilter === 'SUSPENDED'" 
+                (click)="filterByUserStatus('SUSPENDED')">
+                🔴 Suspendidos
+              </button>
+            </div>
+
+            <!-- Búsqueda -->
+            <div class="search-box">
+              <input 
+                type="text" 
+                [(ngModel)]="userSearchQuery" 
+                (keyup.enter)="onSearch()"
+                placeholder="Buscar por nombre, carnet..." 
+                class="form-input search-input" />
+              <button class="btn btn-secondary btn-sm" (click)="onSearch()">🔍 Buscar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Indicador de Carga -->
+        <div *ngIf="isLoadingUsers" class="users-loader">
+          <div class="spinner"></div>
+          <p>Consultando base de datos MySQL...</p>
+        </div>
+
+        <!-- Tabla CRUD Usuarios -->
+        <div *ngIf="!isLoadingUsers && filteredUsers.length > 0" class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Carnet / Documento</th>
+                <th>Rol</th>
+                <th>Grado Escolar</th>
+                <th>Estado</th>
+                <th>Fecha de Alta</th>
+                <th style="text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let user of filteredUsers" [class.user-inactive]="!user.activo">
+                <td>
+                  <div class="user-cell">
+                    <img [src]="user.avatarUrl" alt="Avatar" class="avatar-sm" />
+                    <div>
+                      <strong>{{ user.fullName }}</strong>
+                      <span class="user-subid">ID: {{ user.id }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td><code class="doc-code">{{ user.username }}</code></td>
+                <td>
+                  <span class="badge-role-pill" [ngClass]="'role-' + user.role.toLowerCase()">
+                    {{ user.role === 'Student' ? '🎒 Alumno' : (user.role === 'Teacher' ? '👨‍🏫 Docente' : '🛡️ Admin') }}
+                  </span>
+                </td>
+                <td>{{ user.gradeLevel || '—' }}</td>
+                <td>
+                  <span class="status-badge" [class.badge-active]="user.activo" [class.badge-suspended]="!user.activo">
+                    {{ user.activo ? '🟢 Activo' : '🔴 Suspendido' }}
+                  </span>
+                </td>
+                <td>{{ user.fechaCreacion | date:'dd/MM/yyyy' }}</td>
+                <td style="text-align: right;">
+                  <div class="user-actions">
+                    <button class="btn-action btn-action-primary" (click)="openEditUserModal(user)" title="Editar información básica">
+                      ✏️ Editar
+                    </button>
+                    <!-- Toggle Suspensión Lógica -->
+                    <button 
+                      class="btn-action" 
+                      [class.btn-action-danger]="user.activo"
+                      [class.btn-action-warning]="!user.activo"
+                      (click)="toggleUserStatus(user)"
+                      [title]="user.activo ? 'Suspender acceso temporalmente' : 'Reactivar acceso'">
+                      {{ user.activo ? '🚫 Suspender' : '✅ Habilitar' }}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div *ngIf="!isLoadingUsers && filteredUsers.length === 0" class="empty-state">
+          <span class="empty-icon">🔍</span>
+          <h3>Sin resultados</h3>
+          <p>No se encontraron cuentas con los filtros seleccionados.</p>
+        </div>
+      </section>
     </div>
 
-    <div class="quick-admin-grid">
-      <div class="card-fun quick-card">
-        <h3>👥 Gestión de Docentes y Alumnos</h3>
-        <p>Alta de matrículas escolares, asignación de cursos de 1° a 6° de primaria y credenciales.</p>
-        <button class="btn btn-secondary btn-sm" (click)="goToTeacherView()">Ver Estado de Aulas</button>
-      </div>
+    <!-- ========================================================= -->
+    <!-- SECCIÓN 2: GESTIÓN INSTITUCIONAL DE CURSOS Y MATERIAS     -->
+    <!-- ========================================================= -->
+    <div *ngIf="activeSection === 'courses'" class="animate-fade-in">
+      <section class="admin-banner glass-panel">
+        <div class="banner-content">
+          <div class="status-pill-live">
+            <span class="live-dot dot-yellow"></span>
+            <span>Módulo Institucional de Asignaturas</span>
+          </div>
+          <h1>Gestión de Materias y Docentes Responsables 📚</h1>
+          <p>Crea cursos para cada grado (1° a 6° de primaria), asigna al profesor titular y supervisa el aforo de estudiantes.</p>
+        </div>
+        <div class="banner-btns">
+          <div class="report-btn-group">
+            <button type="button" class="btn-report btn-report-csv" (click)="exportAdminReport('csv')" title="Descargar materias en formato Excel / CSV">
+              <span>📊 Reporte .CSV</span>
+            </button>
+            <button type="button" class="btn-report btn-report-pdf" (click)="exportAdminReport('pdf')" title="Descargar materias en formato PDF">
+              <span>📄 Reporte .PDF</span>
+            </button>
+          </div>
+          <button class="btn btn-primary" (click)="openCreateCourseModal()">
+            ➕ Nueva Materia
+          </button>
+        </div>
+      </section>
 
-      <div class="card-fun quick-card">
-        <h3>📊 Reporte de Asistencia Semáforo</h3>
-        <p>Descarga informes consolidados de asistencia para comités de convivencia y padres de familia.</p>
-        <button class="btn btn-primary btn-sm" (click)="goToTeacherView()">Consultar Semáforo</button>
-      </div>
+      <!-- Catálogo de Cursos Admin -->
+      <section class="crud-users-card glass-panel">
+        <div class="users-header-row">
+          <div class="title-block">
+            <h2>Materias Registradas en la Institución ({{ filteredCourses.length }})</h2>
+            <p>Edita asignaciones de docentes y controla la disponibilidad en el portal.</p>
+          </div>
+
+          <div class="users-toolbar">
+            <!-- Filtro de Grado -->
+            <div class="role-chips">
+              <button 
+                class="chip-btn" 
+                [class.selected]="courseGradeFilter === 'ALL'" 
+                (click)="courseGradeFilter = 'ALL'; applyCourseFilters()">
+                Todos los Grados
+              </button>
+              <button 
+                *ngFor="let g of ['1°', '2°', '3°', '4°', '5°', '6°']"
+                class="chip-btn" 
+                [class.selected]="courseGradeFilter === g" 
+                (click)="courseGradeFilter = g; applyCourseFilters()">
+                {{ g }}
+              </button>
+            </div>
+
+            <!-- Búsqueda de cursos -->
+            <div class="search-box">
+              <input 
+                type="text" 
+                [(ngModel)]="courseSearchQuery" 
+                (input)="applyCourseFilters()"
+                placeholder="Buscar materia o docente..." 
+                class="form-input search-input" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Spinner -->
+        <div *ngIf="isLoadingCourses" class="users-loader">
+          <div class="spinner"></div>
+          <p>Cargando materias institucionales...</p>
+        </div>
+
+        <!-- Tabla Cursos -->
+        <div *ngIf="!isLoadingCourses && filteredCourses.length > 0" class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Materia</th>
+                <th>Grado / Grupo</th>
+                <th>Docente Asignado</th>
+                <th>Estudiantes Matriculados</th>
+                <th>Estado</th>
+                <th style="text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let c of filteredCourses" [class.user-inactive]="!c.activo">
+                <td>
+                  <strong>{{ c.nombre }}</strong>
+                  <p *ngIf="c.descripcion" class="row-subtext">{{ c.descripcion }}</p>
+                </td>
+                <td>
+                  <span class="course-pill">{{ c.grado }} • Grupo {{ c.grupo }}</span>
+                </td>
+                <td>
+                  <div class="teacher-cell">
+                    <span>👨‍🏫 {{ c.docenteNombre }}</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="students-badge">
+                    🎒 <strong>{{ c.totalStudents }}</strong> alumnos
+                  </span>
+                </td>
+                <td>
+                  <span class="status-badge" [class.badge-active]="c.activo" [class.badge-suspended]="!c.activo">
+                    {{ c.activo ? '🟢 Habilitada' : '📦 Suspendida' }}
+                  </span>
+                </td>
+                <td style="text-align: right;">
+                  <div class="user-actions">
+                    <button class="btn-action btn-action-primary" (click)="openEditCourseModal(c)" title="Editar materia">
+                      ✏️ Editar
+                    </button>
+                    <button 
+                      class="btn-action"
+                      [class.btn-action-danger]="c.activo"
+                      [class.btn-action-warning]="!c.activo"
+                      (click)="toggleCourseStatus(c)">
+                      {{ c.activo ? '📦 Suspender' : '✅ Habilitar' }}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div *ngIf="!isLoadingCourses && filteredCourses.length === 0" class="empty-state">
+          <span class="empty-icon">📘</span>
+          <h3>Sin materias encontradas</h3>
+          <p>No se encontraron cursos que coincidan con la búsqueda.</p>
+        </div>
+      </section>
     </div>
 
-    <!-- Módulo Seguro de Auditoría de Logs y .htaccess (Exclusivo .admin / Administrador) -->
-    <app-system-inspector></app-system-inspector>
+    <!-- ========================================================= -->
+    <!-- SECCIÓN 3: AUDITORÍA Y LOGS AMIGABLES                      -->
+    <!-- ========================================================= -->
+    <div *ngIf="activeSection === 'inspector'" class="animate-fade-in">
+      <section class="admin-banner glass-panel" style="margin-bottom: 1.5rem;">
+        <div class="banner-content">
+          <div class="status-pill-live">
+            <span class="live-dot"></span>
+            <span>Auditoría de Seguridad y Monitoreo Kestrel</span>
+          </div>
+          <h1>Auditoría y Diagnóstico de Infraestructura 🛡️</h1>
+          <p>Consulta registros de eventos, actividad técnica y exporta diagnósticos del estado del sistema.</p>
+        </div>
+        <div class="banner-btns">
+          <div class="report-btn-group">
+            <button type="button" class="btn-report btn-report-csv" (click)="exportAdminReport('csv')" title="Descargar auditoría en formato Excel / CSV">
+              <span>📊 Reporte .CSV</span>
+            </button>
+            <button type="button" class="btn-report btn-report-pdf" (click)="exportAdminReport('pdf')" title="Descargar auditoría en formato PDF">
+              <span>📄 Reporte .PDF</span>
+            </button>
+          </div>
+        </div>
+      </section>
+      <app-system-inspector></app-system-inspector>
+    </div>
+
   </main>
+
+  <!-- ========================================================= -->
+  <!-- MODAL 1: CREAR USUARIO                                    -->
+  <!-- ========================================================= -->
+  <div *ngIf="showCreateUserModal" class="modal-overlay" (click)="closeCreateUserModal()">
+    <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>👤 Registrar Nuevo Usuario</h2>
+        <button class="btn-close" (click)="closeCreateUserModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form (ngSubmit)="saveNewUser()">
+          <div *ngIf="createUserError" class="alert alert-danger" style="margin-bottom: 1.25rem;">
+            ⚠️ {{ createUserError }}
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Rol Institucional *</label>
+              <select [(ngModel)]="newUser.role" name="role" class="form-select">
+                <option value="Student">🎒 Alumno / Estudiante</option>
+                <option value="Teacher">👨‍🏫 Docente / Profesor</option>
+                <option value="Admin">🛡️ Administrador</option>
+              </select>
+            </div>
+
+            <div class="form-group col" *ngIf="newUser.role === 'Student'">
+              <label>Grado Escolar Asignado</label>
+              <select [(ngModel)]="newUser.gradeLevel" name="grade" class="form-select">
+                <option value="1°">1° Primaria</option>
+                <option value="2°">2° Primaria</option>
+                <option value="3°">3° Primaria</option>
+                <option value="4°">4° Primaria</option>
+                <option value="5°">5° Primaria</option>
+                <option value="6°">6° Primaria</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Documento de Identidad / Carnet Escolar *</label>
+            <input type="text" [(ngModel)]="newUser.username" name="username" class="form-input" required placeholder="Ej. DOC-102 o EST-205" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Nombre *</label>
+              <input type="text" [(ngModel)]="newUser.nombre" name="nombre" class="form-input" required placeholder="Ej. Ana" />
+            </div>
+            <div class="form-group col">
+              <label>Apellido *</label>
+              <input type="text" [(ngModel)]="newUser.apellido" name="apellido" class="form-input" required placeholder="Ej. Gómez" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Contraseña de Acceso Inicial</label>
+            <input type="password" [(ngModel)]="newUser.password" name="password" class="form-input" placeholder="Por defecto: 123456" />
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" (click)="closeCreateUserModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="isCreatingUser">
+              {{ isCreatingUser ? 'Registrando...' : 'Crear Usuario' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL 2: EDITAR USUARIO                                   -->
+  <!-- ========================================================= -->
+  <div *ngIf="showEditUserModal" class="modal-overlay" (click)="closeEditUserModal()">
+    <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>✏️ Editar Usuario: {{ selectedUserToEdit?.fullName }}</h2>
+        <button class="btn-close" (click)="closeEditUserModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form (ngSubmit)="saveEditUser()">
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Nombre *</label>
+              <input type="text" [(ngModel)]="editUserForm.nombre" name="eNombre" class="form-input" required />
+            </div>
+            <div class="form-group col">
+              <label>Apellido *</label>
+              <input type="text" [(ngModel)]="editUserForm.apellido" name="eApellido" class="form-input" required />
+            </div>
+          </div>
+
+          <div class="form-group" *ngIf="selectedUserToEdit?.role === 'Student'">
+            <label>Grado Escolar</label>
+            <select [(ngModel)]="editUserForm.gradeLevel" name="eGrade" class="form-select">
+              <option value="1°">1° Primaria</option>
+              <option value="2°">2° Primaria</option>
+              <option value="3°">3° Primaria</option>
+              <option value="4°">4° Primaria</option>
+              <option value="5°">5° Primaria</option>
+              <option value="6°">6° Primaria</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Restablecer Contraseña (Dejar en blanco si no se cambia)</label>
+            <input type="password" [(ngModel)]="editUserForm.password" name="ePass" class="form-input" placeholder="Nueva contraseña segura..." />
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" (click)="closeEditUserModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="isEditingUser">
+              {{ isEditingUser ? 'Guardando...' : 'Actualizar Datos' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL 3: CREAR CURSO (ADMIN)                              -->
+  <!-- ========================================================= -->
+  <div *ngIf="showCreateCourseModal" class="modal-overlay" (click)="closeCreateCourseModal()">
+    <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>📘 Registrar Nueva Materia Institucional</h2>
+        <button class="btn-close" (click)="closeCreateCourseModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form (ngSubmit)="saveNewCourse()">
+          <div *ngIf="createCourseError" class="alert alert-danger" style="margin-bottom: 1.25rem;">
+            ⚠️ {{ createCourseError }}
+          </div>
+
+          <div class="form-group">
+            <label>Nombre de la Materia *</label>
+            <input type="text" [(ngModel)]="newCourse.nombre" name="acNombre" class="form-input" required placeholder="Ej. Ciencias Naturales" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Grado Escolar *</label>
+              <select [(ngModel)]="newCourse.grado" name="acGrado" class="form-select">
+                <option value="1°">1° Primaria</option>
+                <option value="2°">2° Primaria</option>
+                <option value="3°">3° Primaria</option>
+                <option value="4°">4° Primaria</option>
+                <option value="5°">5° Primaria</option>
+                <option value="6°">6° Primaria</option>
+              </select>
+            </div>
+            <div class="form-group col">
+              <label>Grupo / Salón</label>
+              <input type="text" [(ngModel)]="newCourse.grupo" name="acGrupo" class="form-input" placeholder="A" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Docente Responsable *</label>
+            <select [(ngModel)]="newCourse.docenteId" name="acDocente" class="form-select">
+              <option [ngValue]="undefined">-- Seleccionar Docente --</option>
+              <option *ngFor="let t of teachersList" [ngValue]="t.id">
+                👨‍🏫 {{ t.fullName }} ({{ t.username }})
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Descripción del Curso</label>
+            <textarea [(ngModel)]="newCourse.descripcion" name="acDesc" class="form-input" rows="2" placeholder="Objetivos y temática del curso..."></textarea>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" (click)="closeCreateCourseModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="isCreatingCourse">
+              {{ isCreatingCourse ? 'Guardando...' : 'Crear Materia' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL 4: EDITAR CURSO (ADMIN)                              -->
+  <!-- ========================================================= -->
+  <div *ngIf="showEditCourseModal" class="modal-overlay" (click)="closeEditCourseModal()">
+    <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>✏️ Editar Materia: {{ selectedCourseToEdit?.nombre }}</h2>
+        <button class="btn-close" (click)="closeEditCourseModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form (ngSubmit)="saveEditCourse()">
+          <div class="form-group">
+            <label>Nombre de la Materia *</label>
+            <input type="text" [(ngModel)]="editCourseForm.nombre" name="ecNombre" class="form-input" required />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Grado Escolar *</label>
+              <select [(ngModel)]="editCourseForm.grado" name="ecGrado" class="form-select">
+                <option value="1°">1° Primaria</option>
+                <option value="2°">2° Primaria</option>
+                <option value="3°">3° Primaria</option>
+                <option value="4°">4° Primaria</option>
+                <option value="5°">5° Primaria</option>
+                <option value="6°">6° Primaria</option>
+              </select>
+            </div>
+            <div class="form-group col">
+              <label>Grupo</label>
+              <input type="text" [(ngModel)]="editCourseForm.grupo" name="ecGrupo" class="form-input" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Docente Responsable</label>
+            <select [(ngModel)]="editCourseForm.docenteId" name="ecDocente" class="form-select">
+              <option *ngFor="let t of teachersList" [ngValue]="t.id">
+                👨‍🏫 {{ t.fullName }} ({{ t.username }})
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Descripción</label>
+            <textarea [(ngModel)]="editCourseForm.descripcion" name="ecDesc" class="form-input" rows="2"></textarea>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" (click)="closeEditCourseModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" [disabled]="isEditingCourse">
+              {{ isEditingCourse ? 'Guardando...' : 'Guardar Cambios' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
 </div>

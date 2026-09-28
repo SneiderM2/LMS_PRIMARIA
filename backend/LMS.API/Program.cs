@@ -20,6 +20,7 @@ builder.Services.AddDbContext<LMSDbContext>(options =>
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ISemaforoService, SemaforoService>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+builder.Services.AddHttpClient<ICaptchaService, GoogleRecaptchaService>();
 
 // 3. Configuración de Autenticación JWT
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"] ?? "LmsPrimarySchoolSuperSecretKey2026!@#$%^&*()_+";
@@ -56,12 +57,12 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireStudent", policy => policy.RequireRole("Student", "ALUMNO"));
 });
 
-// 5. Configuración de CORS para el Frontend Angular
+// 5. Configuración de CORS para el Frontend Angular (incluye acceso móvil por red local)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngularDev", policy =>
     {
-        policy.WithOrigins("http://localhost:4200", "https://localhost:4200")
+        policy.SetIsOriginAllowed(origin => true) // Permite localhost, 127.0.0.1 y cualquier IP de red local (ej. 192.168.x.x)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

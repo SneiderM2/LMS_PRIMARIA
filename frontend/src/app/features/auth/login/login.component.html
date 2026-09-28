@@ -42,6 +42,12 @@
       <!-- FORMULARIO 1: INICIAR SESIÓN -->
       <form *ngIf="activeTab === 'login'" (ngSubmit)="onLogin()" class="login-form">
 
+        <!-- Campo Honeypot para detectar y neutralizar bots (Invisible para humanos) -->
+        <div class="honeypot-container" aria-hidden="true">
+          <label for="login_user_hp">No llenar este campo:</label>
+          <input id="login_user_hp" type="text" name="honeypotTrap" [(ngModel)]="honeypotTrap" tabindex="-1" autocomplete="off" />
+        </div>
+
         <div class="form-group">
           <label for="studentId">
             <span class="label-icon">🆔</span> Carnet o Documento de Identidad
@@ -62,10 +68,25 @@
           </div>
         </div>
 
+        <!-- Widget de verificación de seguridad CAPTCHA -->
+        <div class="captcha-wrapper">
+          <div id="recaptcha-container" class="recaptcha-box"></div>
+        </div>
+
         <button type="submit" class="btn btn-primary btn-lg btn-block" [disabled]="isLoading">
           <span *ngIf="!isLoading">🚀 ¡Entrar a mi Aula Virtual!</span>
           <span *ngIf="isLoading">⏳ Abriendo las puertas...</span>
         </button>
+
+        <!-- Separador visual -->
+        <div class="divider-text">
+          <span>O continúa con</span>
+        </div>
+
+        <!-- Botón oficial Google Sign-In (OAuth 2.0) -->
+        <div class="google-auth-wrapper">
+          <div id="googleLoginBtnContainer"></div>
+        </div>
 
         <div class="register-prompt">
           <p>¿Aún no tienes cuenta escolar? <a href="javascript:void(0)" (click)="switchTab('register')">Regístrate
@@ -76,6 +97,12 @@
 
       <!-- FORMULARIO 2: CREAR CUENTA / REGISTRO DINÁMICO -->
       <form *ngIf="activeTab === 'register'" (ngSubmit)="onRegister()" class="login-form">
+
+        <!-- Campo Honeypot para registro -->
+        <div class="honeypot-container" aria-hidden="true">
+          <label for="reg_user_hp">No llenar este campo:</label>
+          <input id="reg_user_hp" type="text" name="regHoneypot" [(ngModel)]="regHoneypot" tabindex="-1" autocomplete="off" />
+        </div>
 
         <!-- Selección de Rol / Perfil -->
         <div class="form-group">

@@ -149,34 +149,165 @@ Abre el archivo `standalone-preview.html` directamente en el navegador.
 | `GET` | `/api/student/dashboard` | Materias y tareas asignadas al alumno |
 | `POST` | `/api/student/upload-assignment` | Entrega de tareas mediante subida de archivos |
 
+### Administración y Auditoría (`/api/admin` & `/api/systemfiles`)
+
+| Método | Ruta | Descripción |
+| :--- | :--- | :--- |
+| `GET` | `/api/admin/metrics` | Métricas generales del sistema (usuarios activos, cursos, estado BD) |
+| `GET` | `/api/admin/users` | Listado completo de usuarios con filtros por rol y estado |
+| `POST` | `/api/admin/users` | Registro administrativo directo de nuevos usuarios |
+| `PUT` | `/api/admin/users/{id}/toggle-status` | Suspensión lógica o reactivación de cuentas (Soft Delete) |
+| `GET` | `/api/systemfiles/tree` | Árbol seguro de directorios y archivos de auditoría |
+| `GET` | `/api/systemfiles/content` | Visualización en tiempo real de logs del sistema (`access.log`, `error.log`, `app.log`) |
+
 ---
 
-## 📁 Estructura del Proyecto
+## 📁 Estructura Completa del Proyecto
+
+A continuación se detalla la arquitectura de directorios del monorepo, separada por capas de backend (.NET 10), frontend (Angular 18), persistencia en base de datos y scripts de automatización:
 
 ```
 LMS/
-├── backend/
-│   └── LMS.API/
-│       ├── Controllers/        # AuthController, TeacherController, StudentController, ContentsController
-│       ├── Data/               # LMSDbContext, DbInitializer
-│       ├── DTOs/               # Objetos de transferencia de datos
-│       ├── Entities/           # 12 entidades mapeadas a MySQL
-│       ├── Middleware/         # SecurityHeaders, RequestLogging, GlobalException
-│       ├── Migrations/         # Migración InitialMySqlSchema
-│       ├── Services/           # TokenService, SemaforoService, FileStorageService
-│       ├── wwwroot/uploads/    # Archivos de entregas de tareas
-│       ├── logs/               # Archivos .log generados automáticamente
-│       ├── appsettings.json    # Conexión MySQL + JWT config
-│       └── Program.cs          # Bootstrap de la aplicación + pipeline middleware
-├── frontend/
-│   └── src/app/
-│       ├── core/               # Guards, Interceptors, Services, Models
-│       └── features/           # Auth, Teacher, Student, Admin dashboards
-├── bd.txt                      # Script SQL completo del esquema MySQL
-├── 1_INICIAR_BACKEND.bat       # Lanzador del backend
-├── 2_INICIAR_FRONTEND.bat      # Lanzador del frontend Angular
-└── VER_FRONTEND_INMEDIATO.bat  # Abre el HTML standalone sin Node.js
+│
+├── 📂 backend/                                   # Capa de servicios y lógica de negocio
+│   ├── 📂 LMS.API/                               # Proyecto ASP.NET Core 10 Web API
+│   │   ├── 📂 Controllers/                       # Controladores REST API
+│   │   │   ├── AdminController.cs                # Métricas globales, gestión de usuarios (CRUD/soft delete)
+│   │   │   ├── AuthController.cs                 # Registro con captcha, login JWT, validación de sesión
+│   │   │   ├── ContentsController.cs             # Publicación y descarga de contenidos y recursos
+│   │   │   ├── StudentController.cs              # Dashboard alumno, consulta de tareas y entrega con archivos
+│   │   │   ├── SystemFilesController.cs          # Auditoría e inspección protegida de logs y configuraciones
+│   │   │   └── TeacherController.cs              # Matrícula, gestión de cursos, semáforo y calificaciones
+│   │   │
+│   │   ├── 📂 Data/                              # Acceso a datos con Entity Framework Core
+│   │   │   ├── DbInitializer.cs                  # Seeding automático de roles y grados escolares
+│   │   │   └── LMSDbContext.cs                   # Mapeo Fluent API relacional estricto en snake_case
+│   │   │
+│   │   ├── 📂 DTOs/                              # Contratos de transferencia de datos tipados (Request/Response)
+│   │   │   ├── AdminDtos.cs                      # Métricas de administración y auditoría
+│   │   │   ├── AuthDtos.cs                       # Login, Registro, Captcha y perfil de usuario
+│   │   │   ├── DashboardDtos.cs                  # Respuestas para dashboards de estudiante y profesor
+│   │   │   ├── StudentDtos.cs                    # Entregas de tareas y estado del alumno
+│   │   │   └── TeacherDtos.cs                    # Listado de alumnos, creación de cursos y matrícula
+│   │   │
+│   │   ├── 📂 Entities/                          # Modelos de dominio mapeados a tablas MySQL
+│   │   │   ├── Alumno.cs                         # Entidad de alumnos vinculada a usuario y grado
+│   │   │   ├── ArchivoEntrega.cs                 # Registro de adjuntos subidos en tareas
+│   │   │   ├── Curso.cs                          # Materias/cursos creados por docentes
+│   │   │   ├── Entrega.cs                        # Tareas enviadas por estudiantes y sus notas
+│   │   │   ├── Grado.cs                          # Grados escolares (1° a 5° de primaria)
+│   │   │   ├── Inscripcion.cs                    # Relación alumno-curso (matrícula)
+│   │   │   ├── Material.cs                       # Recursos y guías compartidas por el docente
+│   │   │   ├── Perfil.cs                         # Información biográfica y de perfil
+│   │   │   ├── Rol.cs                            # Roles del sistema (ADMINISTRADOR, DOCENTE, ALUMNO)
+│   │   │   ├── SemaforoStatus.cs                 # Cálculo de alertas académicas (Verde, Amarillo, Rojo)
+│   │   │   ├── Tarea.cs                          # Asignaciones creadas para los cursos
+│   │   │   └── Usuario.cs                        # Credenciales, rol, estado activo y datos principales
+│   │   │
+│   │   ├── 📂 Middleware/                        # Componentes del pipeline HTTP de Kestrel
+│   │   │   ├── GlobalExceptionMiddleware.cs      # Manejo estandarizado de excepciones no controladas en JSON
+│   │   │   ├── RequestLoggingMiddleware.cs       # FileLogger thread-safe con rotación automática de archivos .log
+│   │   │   └── SecurityHeadersMiddleware.cs      # Inyección de cabeceras CSP, HSTS, X-Frame-Options, etc.
+│   │   │
+│   │   ├── 📂 Migrations/                        # Migraciones de EF Core (Pomelo MySQL)
+│   │   │
+│   │   ├── 📂 Services/                          # Servicios de lógica de negocio desacoplados
+│   │   │   ├── ICaptchaService.cs / Captcha...   # Generación y validación de retos matemáticos antibot
+│   │   │   ├── IFileStorageService.cs            # Interfaz de gestión de almacenamiento de archivos
+│   │   │   ├── LocalFileStorageService.cs        # Implementación física para guardar adjuntos en disco
+│   │   │   ├── ISemaforoService.cs               # Interfaz del algoritmo de semáforo escolar
+│   │   │   ├── SemaforoService.cs                # Lógica de cálculo de desempeño por entregas y atrasos
+│   │   │   ├── ITokenService.cs                  # Interfaz para generación de JWT
+│   │   │   └── TokenService.cs                   # Creación de tokens Bearer con claims de rol y usuario
+│   │   │
+│   │   ├── 📂 logs/                              # Logs generados en tiempo de ejecución (access, error, app)
+│   │   ├── 📂 wwwroot/uploads/                   # Directorio estático para adjuntos y entregas de tareas
+│   │   ├── appsettings.json                      # Configuración de cadena de conexión MySQL, JWT y Kestrel
+│   │   ├── LMS.API.csproj                        # Definición del proyecto .NET 10 y dependencias NuGet
+│   │   └── Program.cs                            # Configuración de DI, CORS, autenticación JWT, Swagger/Scalar y pipeline
+│   │
+│   ├── migration_unify_perfiles_usuarios.sql     # Script SQL de migración y compatibilidad de perfiles
+│   └── test_all_endpoints.ps1                    # Script PowerShell de pruebas automatizadas E2E de la API
+│
+├── 📂 frontend/                                  # Aplicación cliente moderna en Angular 18 (Standalone Components)
+│   ├── 📂 src/
+│   │   ├── 📂 app/
+│   │   │   ├── 📂 core/                          # Núcleo de la aplicación (singleton, transversal)
+│   │   │   │   ├── 📂 guards/                    # Guardianes de enrutamiento
+│   │   │   │   │   ├── auth.guard.ts             # Protege rutas que requieren inicio de sesión
+│   │   │   │   │   └── role.guard.ts             # Controla accesos según el rol (ADMIN, DOCENTE, ALUMNO)
+│   │   │   │   ├── 📂 interceptors/              # Interceptores HTTP de Angular
+│   │   │   │   │   └── jwt.interceptor.ts        # Adjunta el Bearer Token automáticamente en cada petición
+│   │   │   │   ├── 📂 models/                    # Definiciones TypeScript de entidades y contratos
+│   │   │   │   │   ├── content.model.ts          # Modelos de tareas, entregas y materiales
+│   │   │   │   │   ├── semaforo.model.ts         # Modelo de estados del semáforo escolar
+│   │   │   │   │   └── user.model.ts             # Modelo de usuario, rol y sesión
+│   │   │   │   └── 📂 services/                  # Servicios HTTP y lógica de estado del frontend
+│   │   │   │       ├── admin.service.ts          # Métricas de administración y gestión de usuarios
+│   │   │   │       ├── api.config.ts             # URLs base y configuración del backend
+│   │   │   │       ├── auth.service.ts           # Login, registro dinámico, estado de sesión y claims
+│   │   │   │       ├── report-export.service.ts  # Exportación de reportes a PDF, Excel y CSV
+│   │   │   │       ├── session-timeout.service.ts# Detección de inactividad con temporizador configurable
+│   │   │   │       ├── student.service.ts        # Peticiones del dashboard de alumno y subida de tareas
+│   │   │   │       ├── system-files.service.ts   # Inspección segura de archivos de log del sistema
+│   │   │   │       ├── teacher.service.ts        # Gestión de alumnos, cursos, matrícula y calificaciones
+│   │   │   │       └── theme.service.ts          # Gestión reactiva de tema claro y oscuro (Dark Mode)
+│   │   │   │
+│   │   │   ├── 📂 features/                      # Vistas y flujos funcionales del sistema
+│   │   │   │   ├── 📂 admin/                     # Módulo de Administración
+│   │   │   │   │   ├── admin-dashboard.component.* # Panel de métricas, altas/bajas de usuarios y auditoría
+│   │   │   │   │   └── 📂 system-inspector/      # Visor protegido de logs y estado del sistema
+│   │   │   │   ├── 📂 auth/                      # Módulo de Autenticación
+│   │   │   │   │   └── 📂 login/                 # Formulario dual de Login y Registro dinámico con Captcha
+│   │   │   │   ├── 📂 student/                   # Módulo del Estudiante
+│   │   │   │   │   ├── student-dashboard.component.* # Vista de cursos, notas y tareas asignadas
+│   │   │   │   │   └── 📂 components/            # Componentes internos del estudiante
+│   │   │   │   │       └── 📂 file-drop-zone/    # Zona interactiva Drag & Drop para subir archivos
+│   │   │   │   └── 📂 teacher/                   # Módulo del Docente
+│   │   │   │       └── teacher-dashboard.component.* # Panel docente (cursos, matrícula, tareas, semáforo)
+│   │   │   │
+│   │   │   ├── 📂 shared/                        # Componentes y utilidades compartidas
+│   │   │   │   └── 📂 components/
+│   │   │   │       ├── 📂 data-policy-modal/     # Modal de política de tratamiento de datos y privacidad
+│   │   │   │       ├── 📂 session-warning-modal/ # Modal de alerta por expiración de sesión
+│   │   │   │       └── 📂 theme-toggle/          # Botón interactivo para alternar modo claro/oscuro
+│   │   │   │
+│   │   │   ├── app.component.*                   # Componente raíz con contenedor principal y modales globales
+│   │   │   ├── app.config.ts                     # Configuración de proveedores (HTTP Client, Router, Interceptors)
+│   │   │   └── app.routes.ts                     # Definición de rutas protegidas y redirecciones
+│   │   │
+│   │   ├── index.html                            # Plantilla HTML base con fuentes tipográficas
+│   │   ├── main.ts                               # Punto de entrada de inicialización de Angular
+│   │   └── styles.css                            # Sistema de diseño con variables CSS, animaciones y temas
+│   │
+│   ├── angular.json                              # Configuración de compilación del CLI de Angular
+│   ├── package.json                              # Dependencias de npm y scripts de ejecución
+│   ├── standalone-preview.html                   # Prototipo HTML visual interactivo ejecutable sin Node.js
+│   └── tsconfig.json                             # Configuración del compilador de TypeScript
+│
+├── 📂 Scripts y Base de Datos (Raíz)
+│   ├── bd.txt                                    # Script DDL SQL canónico completo para MySQL (`lms_scikids`)
+│   ├── MIGRACION_BD.txt                          # Guía paso a paso para la migración de base de datos
+│   ├── 1_INICIAR_BACKEND.bat                     # Script batch para compilar y ejecutar el Web API (.NET 10)
+│   ├── 2_INICIAR_FRONTEND.bat                    # Script batch para compilar y servir la app Angular (`ng serve`)
+│   ├── ABRIR_MYSQL_WORKBENCH.bat                 # Script de acceso rápido a MySQL Workbench
+│   ├── CONSULTAR_TABLAS_MYSQL.bat                # Script rápido para consultar el conteo de tablas desde consola
+│   ├── VER_FRONTEND_INMEDIATO.bat                # Abre directamente el prototipo en el navegador web
+│   └── README.md                                 # Documentación técnica integral del proyecto
 ```
+
+### 🧩 Desglose por Capas y Responsabilidades
+
+| Capa / Módulo | Ubicación Principal | Responsabilidad |
+| :--- | :--- | :--- |
+| **Controladores REST** | `backend/LMS.API/Controllers/` | Exponen los endpoints HTTP clasificados por dominio (`/api/auth`, `/api/teacher`, `/api/student`, `/api/admin`, `/api/contents`, `/api/systemfiles`). |
+| **Acceso a Datos (ORM)** | `backend/LMS.API/Data/` | `LMSDbContext` gestiona el modelo relacional en MySQL y `DbInitializer` ejecuta el seeding de roles y grados al arrancar. |
+| **Lógica de Negocio** | `backend/LMS.API/Services/` | Algoritmo del semáforo escolar, generación y validación de tokens JWT, almacenamiento de archivos físicos y captcha. |
+| **Pipeline & Seguridad** | `backend/LMS.API/Middleware/` | Inyección de cabeceras de seguridad (`SecurityHeaders`), auditoría a archivos rotativos (`RequestLogging` + `FileLogger`) y manejo global de errores (`GlobalException`). |
+| **Núcleo Frontend** | `frontend/src/app/core/` | Guardianes de navegación por rol (`RoleGuard`), interceptor JWT automático, modelos de datos TypeScript y servicios HTTP centralizados. |
+| **Módulos de Rol** | `frontend/src/app/features/` | Vistas específicas para cada tipo de actor del sistema (Administrador, Docente, Estudiante y Autenticación). |
+| **Componentes Compartidos** | `frontend/src/app/shared/` | Componentes reutilizables entre vistas: cambio de tema claro/oscuro, alerta interactiva de timeout de sesión y políticas de privacidad. |
+| **Persistencia Relacional** | `bd.txt` | Esquema estricto de 11 tablas en MySQL 8.0 con codificación `utf8mb4`, claves foráneas e integridad referencial. |
 
 ---
 

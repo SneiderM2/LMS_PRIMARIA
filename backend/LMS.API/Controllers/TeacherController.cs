@@ -497,7 +497,9 @@ public class TeacherController : ControllerBase
             ? currentUser.FullName 
             : currentUser.Username;
 
-        if (dto.Type.Equals("Assignment", StringComparison.OrdinalIgnoreCase) || dto.Type.Equals("Tarea", StringComparison.OrdinalIgnoreCase))
+        if (dto.Type.Equals("Assignment", StringComparison.OrdinalIgnoreCase) || 
+            dto.Type.Equals("Tarea", StringComparison.OrdinalIgnoreCase) ||
+            dto.Type.Equals("Task", StringComparison.OrdinalIgnoreCase))
         {
             var tarea = new Tarea
             {
@@ -514,7 +516,8 @@ public class TeacherController : ControllerBase
 
             var resultDto = new ContentDto
             {
-                Id = Guid.NewGuid(),
+                Id = tarea.Id.ToString(),
+                RealId = tarea.Id,
                 Title = tarea.Titulo,
                 Description = tarea.Descripcion ?? string.Empty,
                 Type = "Assignment",
@@ -551,7 +554,8 @@ public class TeacherController : ControllerBase
 
             var resultDto = new ContentDto
             {
-                Id = Guid.NewGuid(),
+                Id = $"mat-{material.Id}",
+                RealId = material.Id,
                 Title = material.Titulo,
                 Description = material.Descripcion ?? string.Empty,
                 Type = dto.Type,
@@ -584,33 +588,363 @@ public class TeacherController : ControllerBase
     }
 
     /// <summary>
-    /// Consulta las entregas de tareas realizadas por los estudiantes
+    /// Consulta las entregas de tareas realizadas por los estudiantes para una tarea específica o todas
     /// </summary>
     [HttpGet("submissions/{assignmentId}")]
     [ProducesResponseType(typeof(List<StudentSubmissionDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAssignmentSubmissions(string assignmentId)
     {
-        var submissions = await _context.Entregas
+        var query = _context.Entregas
             .Include(e => e.Alumno)
                 .ThenInclude(a => a.Usuario)
             .Include(e => e.Archivos)
+            .Include(e => e.Tarea)
+            .AsQueryable();
+
+        if (int.TryParse(assignmentId, out var taskId) && taskId > 0)
+        {
+            query = query.Where(e => e.TareaId == taskId);
+        }
+
+        var submissions = await query
             .OrderByDescending(e => e.FechaEntrega)
             .Select(e => new StudentSubmissionDto
             {
-                Id = Guid.NewGuid(),
-                AssignmentId = Guid.Empty,
+                SubmissionId = e.Id,
+                Id = e.Id.ToString(),
+                AssignmentId = e.TareaId.ToString(),
                 StudentId = e.Alumno.Usuario.Username,
                 StudentName = !string.IsNullOrWhiteSpace(e.Alumno.Usuario.FullName) 
                     ? e.Alumno.Usuario.FullName 
                     : e.Alumno.Usuario.Username,
+                StudentAvatarUrl = e.Alumno.Usuario.AvatarUrl,
                 FileUrl = e.Archivos.FirstOrDefault() != null ? e.Archivos.First().RutaArchivo : string.Empty,
                 OriginalFileName = e.Archivos.FirstOrDefault() != null ? e.Archivos.First().NombreOriginal : "tarea.pdf",
                 SubmittedAt = e.FechaEntrega,
                 Feedback = e.Retroalimentacion,
-                Grade = e.Calificacion
+                Grade = e.Calificacion,
+                Status = e.Estado
             })
             .ToListAsync();
 
         return Ok(submissions);
+    }
+
+    /// <summary>
+    /// Permite al docente calificar una entrega y dejar retroalimentación al estudiante
+    /// POST: /api/teacher/submissions/{submissionId:int}/grade
+    /// </summary>
+    [HttpPost("submissions/{submissionId:int}/grade")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GradeSubmission(int submissionId, [FromBody] GradeSubmissionDto dto)
+    {
+        var entrega = await _context.Entregas
+            .Include(e => e.Alumno)
+                .ThenInclude(a => a.Usuario)
+            .Include(e => e.Tarea)
+            .FirstOrDefaultAsync(e => e.Id == submissionId);
+
+        if (entrega == null)
+        {
+            return NotFound(new { message = "Entrega no encontrada." });
+        }
+
+        entrega.Calificacion = dto.Grade;
+        entrega.Retroalimentacion = dto.Feedback?.Trim();
+        entrega.FechaCalificacion = DateTime.UtcNow;
+        entrega.Estado = "CALIFICADA";
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = $"¡Entrega calificada exitosamente con {dto.Grade}! ⭐",
+            submissionId = entrega.Id,
+            grade = entrega.Calificacion,
+            feedback = entrega.Retroalimentacion,
+            status = entrega.Estado
+        });
+    }
+
+    /// <summary>
+    /// Permite al docente o admin desmatricular a un estudiante de un curso (Soft Delete / Inactiva)
+    /// POST: /api/teacher/courses/{courseId:int}/unenroll
+    /// </summary>
+    [HttpPost("courses/{courseId:int}/unenroll")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UnenrollStudent(int courseId, [FromBody] EnrollStudentDto dto)
+    {
+        Alumno? alumno = null;
+        if (int.TryParse(dto.StudentId, out var parsedId))
+        {
+            alumno = await _context.Alumnos.FirstOrDefaultAsync(a => a.UsuarioId == parsedId);
+        }
+
+        if (alumno == null)
+        {
+            var cleanId = dto.StudentId.Trim().ToLower();
+            alumno = await _context.Alumnos
+                .Include(a => a.Usuario)
+                .FirstOrDefaultAsync(a => a.Usuario.Username.ToLower() == cleanId);
+        }
+
+        if (alumno == null) return NotFound(new { message = "Estudiante no encontrado." });
+
+        var inscripcion = await _context.Inscripciones
+            .FirstOrDefaultAsync(i => i.CursoId == courseId && i.AlumnoId == alumno.UsuarioId);
+
+        if (inscripcion == null)
+        {
+            return NotFound(new { message = "El estudiante no está matriculado en este curso." });
+        }
+
+        inscripcion.Estado = "INACTIVA";
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Estudiante desmatriculado exitosamente del curso." });
+    }
+
+    /// <summary>
+    /// Permite al docente actualizar datos de un curso
+    /// PUT: /api/teacher/courses/{courseId:int}
+    /// </summary>
+    [HttpPut("courses/{courseId:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateCourse(int courseId, [FromBody] UpdateCourseDto dto)
+    {
+        var curso = await _context.Cursos.FindAsync(courseId);
+        if (curso == null) return NotFound(new { message = "Curso no encontrado." });
+
+        curso.Nombre = dto.Nombre.Trim();
+        curso.Grupo = dto.Grupo.Trim().ToUpperInvariant();
+        curso.Descripcion = dto.Descripcion?.Trim();
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Curso actualizado exitosamente.", curso });
+    }
+
+    /// <summary>
+    /// Retorna métricas clave para el docente: Total estudiantes a cargo, actividades por calificar,
+    /// tareas activas y porcentaje de entregas.
+    /// GET: /api/teacher/academic-metrics
+    /// </summary>
+    [HttpGet("academic-metrics")]
+    [ProducesResponseType(typeof(TeacherMetricsDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTeacherMetrics()
+    {
+        var currentUsername = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUser = await _context.Usuarios
+            .Include(u => u.Rol)
+            .FirstOrDefaultAsync(u => u.Username == currentUsername);
+
+        if (currentUser == null) return Unauthorized();
+
+        var isTeacher = currentUser.Rol.Nombre == "DOCENTE";
+
+        var coursesQuery = _context.Cursos
+            .Include(c => c.Inscripciones.Where(i => i.Estado == "ACTIVA"))
+            .Where(c => c.Activo);
+
+        if (isTeacher)
+        {
+            coursesQuery = coursesQuery.Where(c => c.DocenteId == currentUser.Id);
+        }
+
+        var courses = await coursesQuery.ToListAsync();
+        var courseIds = courses.Select(c => c.Id).ToList();
+
+        // Total estudiantes únicos inscritos en sus cursos
+        var totalStudents = courses
+            .SelectMany(c => c.Inscripciones)
+            .Select(i => i.AlumnoId)
+            .Distinct()
+            .Count();
+
+        // Tareas del docente
+        var tareas = await _context.Tareas
+            .Include(t => t.Entregas)
+            .Where(t => courseIds.Contains(t.CursoId))
+            .ToListAsync();
+
+        var activeTasksCount = tareas.Count(t => t.Activo);
+
+        var allSubmissions = tareas.SelectMany(t => t.Entregas).ToList();
+        var pendingGradingCount = allSubmissions.Count(s => !s.Calificacion.HasValue);
+
+        var totalExpectedSubmissions = courses.Sum(c => c.Inscripciones.Count) * (activeTasksCount > 0 ? activeTasksCount : 1);
+        decimal submissionRate = 0m;
+        if (totalExpectedSubmissions > 0)
+        {
+            submissionRate = Math.Round((decimal)allSubmissions.Count / totalExpectedSubmissions * 100m, 1);
+            if (submissionRate > 100m) submissionRate = 100m;
+        }
+
+        return Ok(new TeacherMetricsDto
+        {
+            TotalStudents = totalStudents,
+            PendingGradingCount = pendingGradingCount,
+            ActiveTasksCount = activeTasksCount,
+            SubmissionRate = submissionRate
+        });
+    }
+
+    /// <summary>
+    /// Consulta el catálogo completo de actividades (tareas y recursos) creadas por el docente con estado y conteo de entregas.
+    /// GET: /api/teacher/activities
+    /// </summary>
+    [HttpGet("activities")]
+    [ProducesResponseType(typeof(List<TeacherActivityDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTeacherActivities()
+    {
+        var currentUsername = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUser = await _context.Usuarios
+            .Include(u => u.Rol)
+            .FirstOrDefaultAsync(u => u.Username == currentUsername);
+
+        if (currentUser == null) return Unauthorized();
+
+        var isTeacher = currentUser.Rol.Nombre == "DOCENTE";
+
+        var coursesQuery = _context.Cursos
+            .Include(c => c.Grado)
+            .Where(c => c.Activo);
+
+        if (isTeacher)
+        {
+            coursesQuery = coursesQuery.Where(c => c.DocenteId == currentUser.Id);
+        }
+
+        var courses = await coursesQuery.ToListAsync();
+        var courseIds = courses.Select(c => c.Id).ToList();
+        var coursesMap = courses.ToDictionary(c => c.Id, c => c);
+
+        var tareas = await _context.Tareas
+            .Include(t => t.Entregas)
+            .Where(t => courseIds.Contains(t.CursoId))
+            .OrderByDescending(t => t.FechaPublicacion)
+            .ToListAsync();
+
+        var materiales = await _context.Materiales
+            .Where(m => courseIds.Contains(m.CursoId))
+            .OrderByDescending(m => m.FechaPublicacion)
+            .ToListAsync();
+
+        var result = new List<TeacherActivityDto>();
+
+        foreach (var t in tareas)
+        {
+            var course = coursesMap.GetValueOrDefault(t.CursoId);
+            result.Add(new TeacherActivityDto
+            {
+                Id = t.Id,
+                Kind = "Tarea",
+                CourseId = t.CursoId,
+                CourseName = course?.Nombre ?? "Curso",
+                GradeName = course?.Grado.Nombre ?? "",
+                Title = t.Titulo,
+                Description = t.Descripcion,
+                CreatedAt = t.FechaPublicacion,
+                DueDate = t.FechaLimite,
+                MaxScore = t.PuntajeMaximo,
+                IsActive = t.Activo,
+                SubmissionsCount = t.Entregas.Count,
+                PendingGradingCount = t.Entregas.Count(e => !e.Calificacion.HasValue)
+            });
+        }
+
+        foreach (var m in materiales)
+        {
+            var course = coursesMap.GetValueOrDefault(m.CursoId);
+            result.Add(new TeacherActivityDto
+            {
+                Id = m.Id,
+                Kind = "Material",
+                CourseId = m.CursoId,
+                CourseName = course?.Nombre ?? "Curso",
+                GradeName = course?.Grado.Nombre ?? "",
+                Title = m.Titulo,
+                Description = m.Descripcion,
+                CreatedAt = m.FechaPublicacion,
+                DueDate = null,
+                MaxScore = null,
+                IsActive = m.Activo,
+                SubmissionsCount = 0,
+                PendingGradingCount = 0,
+                ResourceUrl = m.RecursoUrl,
+                ResourceType = m.Tipo
+            });
+        }
+
+        return Ok(result.OrderByDescending(r => r.CreatedAt).ToList());
+    }
+
+    /// <summary>
+    /// Edita una actividad (tarea o material) existente.
+    /// PUT: /api/teacher/activities/{id}?kind=Tarea
+    /// </summary>
+    [HttpPut("activities/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateActivity(int id, [FromQuery] string kind, [FromBody] UpdateActivityDto dto)
+    {
+        if (string.Equals(kind, "Material", StringComparison.OrdinalIgnoreCase))
+        {
+            var material = await _context.Materiales.FindAsync(id);
+            if (material == null) return NotFound(new { message = "Material no encontrado." });
+
+            material.Titulo = dto.Title.Trim();
+            material.Descripcion = dto.Description?.Trim();
+            if (!string.IsNullOrWhiteSpace(dto.ResourceUrl))
+            {
+                material.RecursoUrl = dto.ResourceUrl;
+            }
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Material actualizado exitosamente." });
+        }
+        else
+        {
+            var tarea = await _context.Tareas.FindAsync(id);
+            if (tarea == null) return NotFound(new { message = "Tarea no encontrada." });
+
+            tarea.Titulo = dto.Title.Trim();
+            tarea.Descripcion = dto.Description?.Trim();
+            if (dto.DueDate.HasValue) tarea.FechaLimite = dto.DueDate.Value;
+            if (dto.MaxScore.HasValue) tarea.PuntajeMaximo = dto.MaxScore.Value;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Tarea actualizada exitosamente." });
+        }
+    }
+
+    /// <summary>
+    /// Activa o desactiva (archiva) una actividad sin eliminarla físicamente (Soft Delete).
+    /// PATCH: /api/teacher/activities/{id}/toggle-status?kind=Tarea
+    /// </summary>
+    [HttpPatch("activities/{id:int}/toggle-status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ToggleActivityStatus(int id, [FromQuery] string kind)
+    {
+        if (string.Equals(kind, "Material", StringComparison.OrdinalIgnoreCase))
+        {
+            var material = await _context.Materiales.FindAsync(id);
+            if (material == null) return NotFound(new { message = "Material no encontrado." });
+
+            material.Activo = !material.Activo;
+            await _context.SaveChangesAsync();
+            return Ok(new { message = material.Activo ? "Material activado." : "Material archivado.", isActive = material.Activo });
+        }
+        else
+        {
+            var tarea = await _context.Tareas.FindAsync(id);
+            if (tarea == null) return NotFound(new { message = "Tarea no encontrada." });
+
+            tarea.Activo = !tarea.Activo;
+            await _context.SaveChangesAsync();
+            return Ok(new { message = tarea.Activo ? "Tarea activada." : "Tarea archivada.", isActive = tarea.Activo });
+        }
     }
 }

@@ -21,6 +21,20 @@ export interface LogsListResponse {
   files: LogFileInfo[];
 }
 
+export interface ParsedLogEntry {
+  id: string;
+  timestamp: string;
+  level: 'INFO' | 'WARNING' | 'ERROR';
+  user: string;
+  message: string;
+  details?: string;
+  clientIp?: string;
+  httpMethod?: string;
+  path?: string;
+  statusCode?: number;
+  elapsedMs?: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -49,6 +63,23 @@ export class SystemFilesService {
   public getLogContent(fileName: string): Observable<SystemFileDto> {
     const params = new HttpParams().set('fileName', fileName);
     return this.http.get<SystemFileDto>(`${this.API_URL}/logs/content`, { params });
+  }
+
+  /**
+   * Lee el log procesado por el parser backend con filtros de nivel, fecha y usuario
+   */
+  public getParsedLogs(
+    fileName: string = 'access.log',
+    level?: string,
+    user?: string,
+    date?: string
+  ): Observable<ParsedLogEntry[]> {
+    let params = new HttpParams().set('fileName', fileName);
+    if (level && level !== 'ALL') params = params.set('level', level);
+    if (user && user.trim()) params = params.set('user', user.trim());
+    if (date && date.trim()) params = params.set('date', date.trim());
+
+    return this.http.get<ParsedLogEntry[]>(`${this.API_URL}/logs/parsed`, { params });
   }
 
   /**

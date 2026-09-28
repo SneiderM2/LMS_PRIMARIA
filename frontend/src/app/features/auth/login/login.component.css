@@ -317,3 +317,63 @@
   font-weight: 700;
   transition: color 0.3s;
 }
+
+/* ===================================================
+   SPRINT 4: SEGURIDAD, HONEYPOT, CAPTCHA & GOOGLE AUTH
+   =================================================== */
+
+/* Honeypot: técnica infalible y accesible para engañar bots */
+.honeypot-container {
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 0;
+  width: 0;
+  z-index: -9999;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Contenedor del widget CAPTCHA */
+.captcha-wrapper {
+  margin: 1.25rem 0 0.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.recaptcha-box {
+  min-height: 78px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Separador "O continúa con" */
+.divider-text {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 1.25rem 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.divider-text::before,
+.divider-text::after {
+  content: '';
+  flex: 1;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.divider-text span {
+  padding: 0 0.75rem;
+}
+
+/* Contenedor Google Sign-In */
+.google-auth-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
