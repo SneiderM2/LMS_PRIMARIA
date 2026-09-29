@@ -9,12 +9,37 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Configuración de MySQL y Entity Framework Core
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "Server=localhost;Port=3306;Database=lms_scikids;Uid=root;Pwd=root;CharSet=utf8mb4;";
+// 1. Configuración de PostgreSQL (Supabase) y Entity Framework Core
+var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? "Host=db.rjvsbjjmlmvcihfgbiaz.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=Sneider0124;SSL Mode=Require;Trust Server Certificate=true;";
+
+// Normalizar formato URI si el usuario configuró formato postgresql://...
+var connectionString = rawConnectionString;
+if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
+    connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
+{
+    var normalizedUri = connectionString.Replace("[Sneider0124]", "Sneider0124");
+    try
+    {
+        var uri = new Uri(normalizedUri);
+        var userInfo = uri.UserInfo.Split(':');
+        var user = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : "postgres";
+        var pass = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+        var host = uri.Host;
+        var port = uri.Port > 0 ? uri.Port : 5432;
+        var db = uri.AbsolutePath.TrimStart('/');
+        if (string.IsNullOrWhiteSpace(db)) db = "postgres";
+
+        connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};SSL Mode=Require;Trust Server Certificate=true;";
+    }
+    catch
+    {
+        connectionString = normalizedUri;
+    }
+}
 
 builder.Services.AddDbContext<LMSDbContext>(options =>
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    options.UseNpgsql(connectionString));
 
 // 2. Inyección de Dependencias de Servicios de Dominio
 builder.Services.AddScoped<ITokenService, TokenService>();
@@ -97,7 +122,7 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<LMSDbContext>();
         await DbInitializer.SeedAsync(context);
-        app.Logger.LogInformation("Base de datos MySQL inicializada con datos de prueba escolares exitosamente.");
+        app.Logger.LogInformation("Base de datos PostgreSQL (Supabase) inicializada con datos de prueba escolares exitosamente.");
     }
     catch (Exception ex)
     {

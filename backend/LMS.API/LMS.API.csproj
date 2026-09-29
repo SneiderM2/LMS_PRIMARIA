@@ -13,12 +13,12 @@
     <PackageReference Include="Google.Apis.Auth" Version="1.76.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
 
-    <!-- Entity Framework Core 9 + Pomelo MySQL 9 (última estable con soporte MySQL) -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+    <!-- Entity Framework Core 10 + Npgsql PostgreSQL 10 -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
 
     <!-- OpenAPI nativo .NET 10 + Scalar UI (reemplaza Swashbuckle 6 incompatible) -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />

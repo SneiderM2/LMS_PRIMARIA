@@ -65,9 +65,9 @@ public class LMSDbContext : DbContext
             entity.Property(u => u.Apellido).HasColumnName("apellido").HasMaxLength(100).IsRequired();
             entity.Property(u => u.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(500);
             entity.Ignore(u => u.FullName);
-            entity.Property(u => u.Activo).HasColumnName("activo").HasColumnType("tinyint(1)").HasDefaultValue(true);
+            entity.Property(u => u.Activo).HasColumnName("activo").HasDefaultValue(true);
             entity.Property(u => u.FechaCreacion).HasColumnName("fecha_creacion").HasDefaultValueSql("CURRENT_TIMESTAMP");
-            entity.Property(u => u.DataPolicyAccepted).HasColumnName("data_policy_accepted").HasColumnType("tinyint(1)").HasDefaultValue(false);
+            entity.Property(u => u.DataPolicyAccepted).HasColumnName("data_policy_accepted").HasDefaultValue(false);
             entity.Property(u => u.DataPolicyAcceptedAt).HasColumnName("data_policy_accepted_at");
             entity.Property(u => u.AccessFailedCount).HasColumnName("access_failed_count").HasDefaultValue(0);
             entity.Property(u => u.LockoutEnd).HasColumnName("lockout_end");
@@ -122,7 +122,7 @@ public class LMSDbContext : DbContext
             entity.Property(c => c.DocenteId).HasColumnName("docente_id").IsRequired();
             entity.Property(c => c.Descripcion).HasColumnName("descripcion").HasColumnType("text");
             entity.Property(c => c.FechaCreacion).HasColumnName("fecha_creacion").HasDefaultValueSql("CURRENT_TIMESTAMP");
-            entity.Property(c => c.Activo).HasColumnName("activo").HasColumnType("tinyint(1)").HasDefaultValue(true);
+            entity.Property(c => c.Activo).HasColumnName("activo").HasDefaultValue(true);
 
             entity.HasIndex(c => new { c.Nombre, c.GradoId, c.Grupo })
                   .IsUnique()
@@ -193,7 +193,7 @@ public class LMSDbContext : DbContext
             entity.Property(t => t.FechaPublicacion).HasColumnName("fecha_publicacion").HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(t => t.FechaLimite).HasColumnName("fecha_limite").IsRequired();
             entity.Property(t => t.PuntajeMaximo).HasColumnName("puntaje_maximo").HasPrecision(5, 2).HasDefaultValue(100.00m);
-            entity.Property(t => t.Activo).HasColumnName("activo").HasColumnType("tinyint(1)").HasDefaultValue(true);
+            entity.Property(t => t.Activo).HasColumnName("activo").HasDefaultValue(true);
 
             entity.HasIndex(t => t.CursoId)
                   .HasDatabaseName("idx_tareas_curso");
@@ -254,7 +254,7 @@ public class LMSDbContext : DbContext
             entity.Property(a => a.NombreArchivo).HasColumnName("nombre_archivo").HasMaxLength(255).IsRequired();
             entity.Property(a => a.RutaArchivo).HasColumnName("ruta_archivo").HasMaxLength(500).IsRequired();
             entity.Property(a => a.TipoMime).HasColumnName("tipo_mime").HasMaxLength(100).IsRequired();
-            entity.Property(a => a.TamanoBytes).HasColumnName("tamano_bytes").HasColumnType("bigint unsigned").IsRequired();
+            entity.Property(a => a.TamanoBytes).HasColumnName("tamano_bytes").IsRequired();
             entity.Property(a => a.FechaSubida).HasColumnName("fecha_subida").HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasIndex(a => a.EntregaId)
@@ -279,7 +279,7 @@ public class LMSDbContext : DbContext
             entity.Property(m => m.Tipo).HasColumnName("tipo").HasMaxLength(20).IsRequired();
             entity.Property(m => m.RecursoUrl).HasColumnName("recurso_url").HasMaxLength(500).IsRequired();
             entity.Property(m => m.FechaPublicacion).HasColumnName("fecha_publicacion").HasDefaultValueSql("CURRENT_TIMESTAMP");
-            entity.Property(m => m.Activo).HasColumnName("activo").HasColumnType("tinyint(1)").HasDefaultValue(true);
+            entity.Property(m => m.Activo).HasColumnName("activo").HasDefaultValue(true);
 
             entity.HasIndex(m => m.CursoId)
                   .HasDatabaseName("idx_materiales_curso");

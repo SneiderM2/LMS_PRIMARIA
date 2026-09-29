@@ -52,8 +52,8 @@ public static class DbInitializer
     }
 
     /// <summary>
-    /// Auto-migración defensiva: comprueba la estructura de MySQL y añade las columnas
-    /// 'nombre', 'apellido' y 'avatar_url' a la tabla 'usuarios' si aún no existen.
+    /// Auto-migración defensiva: comprueba la estructura de PostgreSQL y añade las columnas
+    /// a la tabla 'usuarios' si aún no existen.
     /// </summary>
     private static async Task EnsureColumnsMigratedAsync(LMSDbContext context)
     {
@@ -70,9 +70,9 @@ public static class DbInitializer
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
-                    SELECT COLUMN_NAME 
-                    FROM INFORMATION_SCHEMA.COLUMNS 
-                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios';";
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_schema = 'public' AND table_name = 'usuarios';";
 
                 using var reader = await cmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
@@ -84,59 +84,59 @@ public static class DbInitializer
             if (!existingColumns.Contains("nombre"))
             {
                 using var alterCmd = conn.CreateCommand();
-                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN nombre VARCHAR(100) NOT NULL DEFAULT '' AFTER password_hash;";
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS nombre VARCHAR(100) NOT NULL DEFAULT '';";
                 await alterCmd.ExecuteNonQueryAsync();
             }
 
             if (!existingColumns.Contains("apellido"))
             {
                 using var alterCmd = conn.CreateCommand();
-                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN apellido VARCHAR(100) NOT NULL DEFAULT '' AFTER nombre;";
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS apellido VARCHAR(100) NOT NULL DEFAULT '';";
                 await alterCmd.ExecuteNonQueryAsync();
             }
 
             if (!existingColumns.Contains("avatar_url"))
             {
                 using var alterCmd = conn.CreateCommand();
-                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN avatar_url VARCHAR(500) NULL AFTER apellido;";
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500) NULL;";
                 await alterCmd.ExecuteNonQueryAsync();
             }
 
             if (!existingColumns.Contains("data_policy_accepted"))
             {
                 using var alterCmd = conn.CreateCommand();
-                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN data_policy_accepted TINYINT(1) NOT NULL DEFAULT 0;";
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS data_policy_accepted BOOLEAN NOT NULL DEFAULT FALSE;";
                 await alterCmd.ExecuteNonQueryAsync();
             }
 
             if (!existingColumns.Contains("data_policy_accepted_at"))
             {
                 using var alterCmd = conn.CreateCommand();
-                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN data_policy_accepted_at DATETIME NULL;";
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS data_policy_accepted_at TIMESTAMP WITHOUT TIME ZONE NULL;";
                 await alterCmd.ExecuteNonQueryAsync();
             }
 
             if (!existingColumns.Contains("access_failed_count"))
             {
                 using var alterCmd = conn.CreateCommand();
-                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN access_failed_count INT NOT NULL DEFAULT 0;";
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS access_failed_count INT NOT NULL DEFAULT 0;";
                 await alterCmd.ExecuteNonQueryAsync();
             }
 
             if (!existingColumns.Contains("lockout_end"))
             {
                 using var alterCmd = conn.CreateCommand();
-                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN lockout_end DATETIME NULL;";
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS lockout_end TIMESTAMP WITHOUT TIME ZONE NULL;";
                 await alterCmd.ExecuteNonQueryAsync();
             }
 
-            // Si la tabla 'perfiles' aún existe físicamente en MySQL, migrar los datos a 'usuarios'
+            // Si la tabla 'perfiles' aún existe físicamente, migrar los datos a 'usuarios'
             using (var tableCmd = conn.CreateCommand())
             {
                 tableCmd.CommandText = @"
                     SELECT COUNT(*) 
-                    FROM INFORMATION_SCHEMA.TABLES 
-                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'perfiles';";
+                    FROM information_schema.tables 
+                    WHERE table_schema = 'public' AND table_name = 'perfiles';";
 
                 var count = Convert.ToInt32(await tableCmd.ExecuteScalarAsync());
                 if (count > 0)
@@ -144,9 +144,9 @@ public static class DbInitializer
                     using var migrateCmd = conn.CreateCommand();
                     migrateCmd.CommandText = @"
                         UPDATE usuarios u
-                        INNER JOIN perfiles p ON u.id = p.usuario_id
-                        SET u.nombre = p.nombre, u.apellido = p.apellido, u.avatar_url = p.avatar_url
-                        WHERE (u.nombre = '' OR u.nombre IS NULL);";
+                        SET nombre = p.nombre, apellido = p.apellido, avatar_url = p.avatar_url
+                        FROM perfiles p
+                        WHERE u.id = p.usuario_id AND (u.nombre = '' OR u.nombre IS NULL);";
                     await migrateCmd.ExecuteNonQueryAsync();
                 }
             }
