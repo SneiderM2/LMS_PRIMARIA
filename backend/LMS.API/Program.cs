@@ -11,7 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 1. Configuración de PostgreSQL (Supabase) y Entity Framework Core
 var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "Host=db.rjvsbjjmlmvcihfgbiaz.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=Sneider0124;SSL Mode=Require;Trust Server Certificate=true;";
+    ?? "Host=aws-0-us-east-1.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.rjvsbjjmlmvcihfgbiaz;Password=Sneider0124;SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Maximum Pool Size=10;Connection Idle Lifetime=60;";
 
 // Normalizar formato URI si el usuario configuró formato postgresql://...
 var connectionString = rawConnectionString;
@@ -26,11 +26,20 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
         var user = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : "postgres";
         var pass = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
         var host = uri.Host;
-        var port = uri.Port > 0 ? uri.Port : 5432;
+        // Supabase: usar puerto 6543 (Session Pooler) en lugar de 5432 (Transaction Pooler)
+        // El Transaction Pooler no soporta prepared statements ni transacciones de EF Core
+        var port = uri.Port > 0 ? uri.Port : 6543;
         var db = uri.AbsolutePath.TrimStart('/');
         if (string.IsNullOrWhiteSpace(db)) db = "postgres";
 
-        connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};SSL Mode=Require;Trust Server Certificate=true;";
+        // Formato de usuario para Session Pooler de Supabase: postgres.PROJECT_REF
+        if (!user.Contains('.') && host.Contains("pooler.supabase.com"))
+        {
+            var projectRef = host.Split('.')[0].Replace("aws-0-us-east-1", "").Trim('-');
+            // Mantener user como viene desde el URI (supabase ya lo incluye)
+        }
+
+        connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Maximum Pool Size=10;Connection Idle Lifetime=60;";
     }
     catch
     {
@@ -39,7 +48,11 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
 }
 
 builder.Services.AddDbContext<LMSDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString, npgsqlOptions =>
+    {
+        npgsqlOptions.CommandTimeout(30);
+        npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null);
+    }));
 
 // 2. Inyección de Dependencias de Servicios de Dominio
 builder.Services.AddScoped<ITokenService, TokenService>();
