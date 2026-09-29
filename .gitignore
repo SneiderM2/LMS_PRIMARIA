@@ -20,5 +20,4 @@ logs/
 
 # Node & Frontend
 node_modules/
-dist/
 .angular/

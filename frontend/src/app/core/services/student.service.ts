@@ -27,11 +27,13 @@ export interface StudentCoursesCatalog {
   availableCourses: StudentCourseItem[];
 }
 
+import { environment } from '../../../environments/environment';
+
 @Injectable({
   providedIn: 'root'
 })
 export class StudentService {
-  private readonly API_URL = 'http://localhost:5000/api/student';
+  private readonly API_URL = `${environment.apiUrl}/student`;
 
   constructor(private http: HttpClient) {}
 

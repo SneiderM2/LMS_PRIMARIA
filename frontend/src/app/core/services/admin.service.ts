@@ -70,11 +70,13 @@ export interface UpdateAdminCourseDto {
   descripcion?: string;
 }
 
+import { environment } from '../../../environments/environment';
+
 @Injectable({
   providedIn: 'root'
 })
 export class AdminService {
-  private readonly API_URL = 'http://localhost:5000/api/admin';
+  private readonly API_URL = `${environment.apiUrl}/admin`;
 
   constructor(private http: HttpClient) {}
 

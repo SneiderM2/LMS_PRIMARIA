@@ -38,11 +38,13 @@ export interface UpdateActivityDto {
   resourceUrl?: string;
 }
 
+import { environment } from '../../../environments/environment';
+
 @Injectable({
   providedIn: 'root'
 })
 export class TeacherService {
-  private readonly API_URL = 'http://localhost:5000/api/teacher';
+  private readonly API_URL = `${environment.apiUrl}/teacher`;
 
   constructor(private http: HttpClient) {}
 

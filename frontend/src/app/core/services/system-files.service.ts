@@ -35,11 +35,13 @@ export interface ParsedLogEntry {
   elapsedMs?: number;
 }
 
+import { environment } from '../../../environments/environment';
+
 @Injectable({
   providedIn: 'root'
 })
 export class SystemFilesService {
-  private readonly API_URL = 'http://localhost:5000/api/systemfiles';
+  private readonly API_URL = `${environment.apiUrl}/systemfiles`;
 
   constructor(private http: HttpClient) {}
 

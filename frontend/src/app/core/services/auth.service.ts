@@ -3,12 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { LoginRequest, LoginResponse, RegisterRequest, User, UserRole } from '../models/user.model';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private readonly API_URL = 'http://localhost:5000/api/auth';
+  private readonly apiUrl = environment.apiUrl;
   private readonly TOKEN_KEY = 'lms_auth_token';
   private readonly USER_KEY = 'lms_current_user';
 
@@ -20,7 +21,7 @@ export class AuthService {
   constructor(private http: HttpClient, private router: Router) { }
 
   public login(credentials: LoginRequest): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.API_URL}/login`, credentials).pipe(
+    return this.http.post<LoginResponse>(`${this.apiUrl}/auth/login`, credentials).pipe(
       tap(response => {
         this.saveAuthData(response.token, response.user);
         this.currentUser.set(response.user);
@@ -30,7 +31,7 @@ export class AuthService {
   }
 
   public register(data: RegisterRequest): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.API_URL}/register`, data).pipe(
+    return this.http.post<LoginResponse>(`${this.apiUrl}/auth/register`, data).pipe(
       tap(response => {
         this.saveAuthData(response.token, response.user);
         this.currentUser.set(response.user);
@@ -40,7 +41,7 @@ export class AuthService {
   }
 
   public loginWithGoogle(idToken: string, honeypotTrap?: string): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.API_URL}/google-login`, { idToken, honeypotTrap }).pipe(
+    return this.http.post<LoginResponse>(`${this.apiUrl}/auth/google-login`, { idToken, honeypotTrap }).pipe(
       tap(response => {
         this.saveAuthData(response.token, response.user);
         this.currentUser.set(response.user);
@@ -54,7 +55,7 @@ export class AuthService {
   }
 
   public acceptDataPolicy(): Observable<any> {
-    return this.http.post<any>(`${this.API_URL}/accept-data-policy`, { accepted: true }).pipe(
+    return this.http.post<any>(`${this.apiUrl}/auth/accept-data-policy`, { accepted: true }).pipe(
       tap(() => {
         const user = this.currentUser();
         if (user) {
