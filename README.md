@@ -1,6 +1,6 @@
-# LMS Web - Plataforma Educativa Primaria (MySQL `lms_scikids`) 🎒✨
+# LMS Web v6.0 - Plataforma Educativa Primaria (PostgreSQL Supabase) 🎒✨
 
-Sistema de Gestión de Aprendizaje (LMS) diseñado con arquitectura limpia en **.NET 10 Web API**, frontend moderno en **Angular 18** y persistencia relacional estricta en **MySQL** basada en el esquema definido en `bd.txt`.
+Sistema de Gestión de Aprendizaje (LMS) diseñado con arquitectura limpia en **.NET 10 Web API**, frontend moderno en **Angular 18** y persistencia en **PostgreSQL (Supabase Cloud)** mediante **Npgsql Entity Framework Core**.
 
 ---
 
@@ -9,12 +9,12 @@ Sistema de Gestión de Aprendizaje (LMS) diseñado con arquitectura limpia en **
 | Capa | Tecnología | Versión |
 | :--- | :--- | :---: |
 | **Backend** | ASP.NET Core Web API | .NET 10 |
-| **ORM** | Entity Framework Core + Pomelo MySQL | 9.0.0 |
+| **ORM** | Entity Framework Core + Npgsql PostgreSQL | 10.0.3 / 10.0.12 |
 | **Autenticación** | JWT Bearer | 9.0.0 |
 | **Documentación API** | Scalar (reemplaza Swagger UI) | 2.6.0 |
 | **Hashing** | BCrypt.Net-Next | 4.0.3 |
 | **Frontend** | Angular CLI | 18.x |
-| **Base de datos** | MySQL Server | 8.0 |
+| **Base de datos** | PostgreSQL (Supabase Cloud / Pooler IPv4) | 16.x |
 
 ---
 
@@ -47,23 +47,22 @@ Sistema de Gestión de Aprendizaje (LMS) diseñado con arquitectura limpia en **
 | Programa | Estado | Descripción |
 | :--- | :---: | :--- |
 | **.NET 10 SDK** | ✅ Instalado | v10.0.400 (`C:\Program Files\dotnet\`) |
-| **MySQL Server 8.0** | ✅ Instalado | Servicio Windows: `MySQL80` (Puerto 3306) |
-| **MySQL Workbench 8.0** | ✅ Instalado | Interfaz gráfica para gestionar `lms_scikids` |
+| **Supabase PostgreSQL** | ☁️ Activo | Instancia cloud con Connection Pooler IPv4 |
 | **Node.js v24 & npm 11** | ✅ Instalado | Node v24.20.0 — `node_modules` ya instalados |
 
 ---
 
 ## 🚀 Guía de Ejecución Rápida
 
-### PASO 1 — Verificar contraseña de MySQL
+### PASO 1 — Cadena de Conexión a Supabase (PostgreSQL)
 
-Abre `backend/LMS.API/appsettings.json` y confirma la cadena de conexión:
+Abre `backend/LMS.API/appsettings.json` o `appsettings.Development.json` y confirma la cadena de conexión:
 
 ```json
-"DefaultConnection": "Server=localhost;Port=3306;Database=lms_scikids;Uid=root;Pwd=root;CharSet=utf8mb4;"
+"DefaultConnection": "postgresql://postgres.rjvsbjjmlmvcihfgbiaz:Sneider0124@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
 ```
 
-> Si tu contraseña de MySQL es distinta a `root`, cámbiala en `Pwd=...`.
+> Admite tanto sintaxis de URI Supabase como ADO.NET estándar con SSL Mode requerido.
 
 ---
 
