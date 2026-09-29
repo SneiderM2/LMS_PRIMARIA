@@ -190,6 +190,8 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status423Locked)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     {
         // 1. Verificación Honeypot: si el bot llenó el campo trampa, responder simulado
@@ -209,98 +211,121 @@ public class AuthController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        // 2. Verificación de CAPTCHA
-        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var isCaptchaValid = await _captchaService.VerifyTokenAsync(request.CaptchaToken, clientIp);
-        if (!isCaptchaValid)
+        try
         {
-            return BadRequest(new { message = "Verificación de seguridad (CAPTCHA) obligatoria o inválida." });
-        }
-
-        var cleanUsername = request.Id.Trim();
-        var user = await _context.Usuarios
-            .Include(u => u.Rol)
-            .Include(u => u.Alumno)
-                .ThenInclude(a => a!.Grado)
-            .FirstOrDefaultAsync(u => u.Username.ToLower() == cleanUsername.ToLower() && u.Activo);
-
-        if (user == null)
-        {
-            return Unauthorized(new { message = "Identificación escolar o contraseña incorrecta." });
-        }
-
-        // 3. Verificación de Bloqueo de cuenta (5 intentos fallidos = 10 minutos de bloqueo)
-        if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
-        {
-            var remaining = user.LockoutEnd.Value - DateTime.UtcNow;
-            var remainingMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
-            return StatusCode(StatusCodes.Status423Locked, new
+            // 2. Verificación de CAPTCHA
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var isCaptchaValid = await _captchaService.VerifyTokenAsync(request.CaptchaToken, clientIp);
+            if (!isCaptchaValid)
             {
-                message = $"🔒 Tu cuenta ha sido bloqueada temporalmente por exceso de intentos fallidos. Por favor espera {remainingMinutes} minuto(s) antes de reintentar."
-            });
-        }
+                return BadRequest(new { message = "Verificación de seguridad (CAPTCHA) obligatoria o inválida." });
+            }
 
-        // Comprobar contraseña con BCrypt
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-        {
-            user.AccessFailedCount++;
-            if (user.AccessFailedCount >= 5)
+            var cleanUsername = request.Id.Trim();
+            var user = await _context.Usuarios
+                .Include(u => u.Rol)
+                .Include(u => u.Alumno)
+                    .ThenInclude(a => a!.Grado)
+                .FirstOrDefaultAsync(u => u.Username.ToLower() == cleanUsername.ToLower() && u.Activo);
+
+            if (user == null)
             {
-                user.LockoutEnd = DateTime.UtcNow.AddMinutes(10);
-                await _context.SaveChangesAsync();
+                return Unauthorized(new { message = "Identificación escolar o contraseña incorrecta." });
+            }
+
+            // 3. Verificación de Bloqueo de cuenta (5 intentos fallidos = 10 minutos de bloqueo)
+            if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
+            {
+                var remaining = user.LockoutEnd.Value - DateTime.UtcNow;
+                var remainingMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
                 return StatusCode(StatusCodes.Status423Locked, new
                 {
-                    message = "🔒 Has alcanzado el límite de 5 intentos fallidos. Tu cuenta ha sido bloqueada por 10 minutos por motivos de seguridad escolar."
+                    message = $"🔒 Tu cuenta ha sido bloqueada temporalmente por exceso de intentos fallidos. Por favor espera {remainingMinutes} minuto(s) antes de reintentar."
                 });
             }
 
-            await _context.SaveChangesAsync();
-            var attemptsLeft = 5 - user.AccessFailedCount;
-            return Unauthorized(new
+            // Comprobar contraseña con BCrypt
+            if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
-                message = $"Identificación o contraseña incorrecta. Te quedan {attemptsLeft} intento(s) antes del bloqueo temporal."
+                user.AccessFailedCount++;
+                if (user.AccessFailedCount >= 5)
+                {
+                    user.LockoutEnd = DateTime.UtcNow.AddMinutes(10);
+                    await _context.SaveChangesAsync();
+                    return StatusCode(StatusCodes.Status423Locked, new
+                    {
+                        message = "🔒 Has alcanzado el límite de 5 intentos fallidos. Tu cuenta ha sido bloqueada por 10 minutos por motivos de seguridad escolar."
+                    });
+                }
+
+                await _context.SaveChangesAsync();
+                var attemptsLeft = 5 - user.AccessFailedCount;
+                return Unauthorized(new
+                {
+                    message = $"Identificación o contraseña incorrecta. Te quedan {attemptsLeft} intento(s) antes del bloqueo temporal."
+                });
+            }
+
+            // Restablecer contador de fallos tras login exitoso
+            user.AccessFailedCount = 0;
+            user.LockoutEnd = null;
+            await _context.SaveChangesAsync();
+
+            var fullName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName : user.Username;
+            var gradeName = user.Alumno?.Grado?.Nombre;
+            var avatar = user.AvatarUrl ?? $"https://api.dicebear.com/7.x/bottts/svg?seed={user.Username}";
+
+            var (token, expiration) = _tokenService.GenerateToken(
+                user, 
+                fullName, 
+                user.Rol.Nombre, 
+                gradeName, 
+                avatar);
+
+            var isAdministrator = string.Equals(user.Rol.Nombre, ".admin", StringComparison.OrdinalIgnoreCase) ||
+                                  string.Equals(user.Rol.Nombre, "ADMINISTRADOR", StringComparison.OrdinalIgnoreCase) ||
+                                  string.Equals(user.Rol.Nombre, "Admin", StringComparison.OrdinalIgnoreCase);
+
+            var roleStr = isAdministrator ? "Admin" : user.Rol.Nombre == "DOCENTE" ? "Teacher" : "Student";
+
+            return Ok(new LoginResponseDto
+            {
+                Token = token,
+                Expiration = expiration,
+                RequiresPolicyAcceptance = !user.DataPolicyAccepted,
+                User = new UserDto
+                {
+                    Id = user.Username,
+                    InternalId = user.Id,
+                    FullName = fullName,
+                    Role = roleStr,
+                    GradeLevel = gradeName,
+                    LastLoginDate = DateTime.UtcNow,
+                    AvatarUrl = avatar,
+                    DataPolicyAccepted = user.DataPolicyAccepted
+                }
             });
         }
-
-        // Restablecer contador de fallos tras login exitoso
-        user.AccessFailedCount = 0;
-        user.LockoutEnd = null;
-        await _context.SaveChangesAsync();
-
-        var fullName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName : user.Username;
-        var gradeName = user.Alumno?.Grado?.Nombre;
-        var avatar = user.AvatarUrl ?? $"https://api.dicebear.com/7.x/bottts/svg?seed={user.Username}";
-
-        var (token, expiration) = _tokenService.GenerateToken(
-            user, 
-            fullName, 
-            user.Rol.Nombre, 
-            gradeName, 
-            avatar);
-
-        var isAdministrator = string.Equals(user.Rol.Nombre, ".admin", StringComparison.OrdinalIgnoreCase) ||
-                              string.Equals(user.Rol.Nombre, "ADMINISTRADOR", StringComparison.OrdinalIgnoreCase) ||
-                              string.Equals(user.Rol.Nombre, "Admin", StringComparison.OrdinalIgnoreCase);
-
-        var roleStr = isAdministrator ? "Admin" : user.Rol.Nombre == "DOCENTE" ? "Teacher" : "Student";
-
-        return Ok(new LoginResponseDto
+        catch (InvalidOperationException ex)
         {
-            Token = token,
-            Expiration = expiration,
-            RequiresPolicyAcceptance = !user.DataPolicyAccepted,
-            User = new UserDto
+            // Ocurre cuando EF Core no puede resolver una operación (p.ej. migración pendiente,
+            // tabla no encontrada o múltiples resultados inesperados). El GlobalExceptionMiddleware
+            // lo convertiría en 409 Conflict; lo capturamos aquí para dar un mensaje claro.
+            _logger.LogError(ex, "Error de operación inválida durante el login del usuario {Id}", request.Id);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
             {
-                Id = user.Username,
-                InternalId = user.Id,
-                FullName = fullName,
-                Role = roleStr,
-                GradeLevel = gradeName,
-                LastLoginDate = DateTime.UtcNow,
-                AvatarUrl = avatar,
-                DataPolicyAccepted = user.DataPolicyAccepted
-            }
-        });
+                message = "El servicio de autenticación no está disponible en este momento. Por favor intenta de nuevo en unos segundos.",
+                detail = "Problema de conectividad con la base de datos escolar."
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error inesperado durante el login del usuario {Id}", request.Id);
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                message = "Ocurrió un error inesperado. Por favor intenta de nuevo más tarde."
+            });
+        }
     }
 
     /// <summary>

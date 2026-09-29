@@ -174,7 +174,33 @@ export class LoginComponent implements OnInit, AfterViewInit {
       },
       error: (err: any) => {
         this.isLoading = false;
-        this.errorMessage = err?.error?.message || 'Identificación escolar o contraseña incorrecta. ¡Inténtalo de nuevo!';
+        const status: number = err?.status;
+        const serverMessage: string | undefined = err?.error?.message;
+
+        switch (status) {
+          case 400:
+            this.errorMessage = serverMessage || 'Los datos ingresados no son válidos. Verifica tu carnet y contraseña.';
+            break;
+          case 401:
+            this.errorMessage = serverMessage || 'Identificación escolar o contraseña incorrecta. ¡Inténtalo de nuevo!';
+            break;
+          case 409:
+            // GlobalExceptionMiddleware lanza 409 para InvalidOperationException (error de BD o concurrencia)
+            this.errorMessage = '⚠️ Ocurrió un problema al procesar tu solicitud. Por favor intenta de nuevo en un momento.';
+            console.error('[Login 409]', err?.error);
+            break;
+          case 423:
+            this.errorMessage = serverMessage || '🔒 Tu cuenta ha sido bloqueada temporalmente. Intenta de nuevo en 10 minutos.';
+            break;
+          case 503:
+            this.errorMessage = '🔌 El servicio de autenticación no está disponible en este momento. Intenta de nuevo en unos segundos.';
+            break;
+          case 500:
+            this.errorMessage = '⚠️ Error interno del servidor. Por favor contacta al administrador escolar.';
+            break;
+          default:
+            this.errorMessage = serverMessage || 'No fue posible conectarse al servidor escolar. Verifica tu conexión a internet.';
+        }
       }
     });
   }
