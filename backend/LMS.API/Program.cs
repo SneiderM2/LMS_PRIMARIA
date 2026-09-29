@@ -5,7 +5,7 @@ using LMS.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Scalar.AspNetCore;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -97,18 +97,39 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// 6. OpenAPI nativo .NET 10 con soporte JWT Bearer
-builder.Services.AddOpenApi(options =>
+// 6. Swagger / OpenAPI con soporte JWT Bearer para .NET 8 LTS
+builder.Services.AddSwaggerGen(options =>
 {
-    options.AddDocumentTransformer((document, context, ct) =>
+    options.SwaggerDoc("v1", new OpenApiInfo
     {
-        document.Info = new()
+        Title = "LMS Primaria - API REST",
+        Version = "v1",
+        Description = "Backend para la plataforma educativa LMS de Educación Primaria con Semáforo de Asistencia y Entregas de Tareas."
+    });
+
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Ingrese el token JWT en el formato: Bearer {su_token}"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
         {
-            Title = "LMS Primaria - API REST",
-            Version = "v1",
-            Description = "Backend para la plataforma educativa LMS de Educación Primaria con Semáforo de Asistencia y Entregas de Tareas."
-        };
-        return Task.CompletedTask;
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
     });
 });
 
@@ -143,13 +164,11 @@ app.UseRequestLogging();          // Tercero: registra cada petición en access.
 
 if (app.Environment.IsDevelopment())
 {
-    // Scalar UI: interfaz moderna para explorar la API (reemplaza Swagger UI)
-    // Acceso en: http://localhost:5000/scalar/v1
-    app.MapOpenApi();
-    app.MapScalarApiReference(options =>
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
     {
-        options.Title = "LMS Primaria - API REST";
-        options.WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "LMS Primaria - API REST v1");
+        options.RoutePrefix = "swagger";
     });
 }
 

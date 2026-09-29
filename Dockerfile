@@ -5,12 +5,12 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copiar archivo de proyecto y restaurar dependencias
-COPY ["LMS.API/LMS.API.csproj", "LMS.API/"]
-RUN dotnet restore "LMS.API/LMS.API.csproj"
+COPY ["backend/LMS.API/LMS.API.csproj", "backend/LMS.API/"]
+RUN dotnet restore "backend/LMS.API/LMS.API.csproj"
 
-# Copiar todo el código fuente del backend y compilar en modo Release
+# Copiar todo el código fuente y compilar en modo Release
 COPY . .
-WORKDIR "/src/LMS.API"
+WORKDIR "/src/backend/LMS.API"
 RUN dotnet publish "LMS.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # ==========================================
