@@ -10,10 +10,12 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Configuración de PostgreSQL (Supabase) y Entity Framework Core
-var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+var rawConnectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? builder.Configuration["DATABASE_URL"]
     ?? "Host=aws-0-us-east-1.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.rjvsbjjmlmvcihfgbiaz;Password=Sneider0124;SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Maximum Pool Size=10;Connection Idle Lifetime=60;";
 
-// Normalizar formato URI si el usuario configuró formato postgresql://...
+// Normalizar formato URI si viene en formato postgresql:// o postgres:// (convención Render/Heroku)
 var connectionString = rawConnectionString;
 if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
     connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
@@ -26,17 +28,19 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
         var user = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : "postgres";
         var pass = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
         var host = uri.Host;
-        // Supabase: usar puerto 6543 (Session Pooler) en lugar de 5432 (Transaction Pooler)
-        // El Transaction Pooler no soporta prepared statements ni transacciones de EF Core
         var port = uri.Port > 0 ? uri.Port : 6543;
         var db = uri.AbsolutePath.TrimStart('/');
         if (string.IsNullOrWhiteSpace(db)) db = "postgres";
 
-        // Formato de usuario para Session Pooler de Supabase: postgres.PROJECT_REF
-        if (!user.Contains('.') && host.Contains("pooler.supabase.com"))
+        // Supabase: si se usa el pooler de Supabase, forzar Session Pooler (puerto 6543)
+        // El Transaction Pooler (puerto 5432) NO soporta prepared statements ni transacciones de EF Core
+        if (host.Contains("pooler.supabase.com"))
         {
-            var projectRef = host.Split('.')[0].Replace("aws-0-us-east-1", "").Trim('-');
-            // Mantener user como viene desde el URI (supabase ya lo incluye)
+            port = 6543;
+            if (!user.Contains('.'))
+            {
+                user = $"{user}.rjvsbjjmlmvcihfgbiaz";
+            }
         }
 
         connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Maximum Pool Size=10;Connection Idle Lifetime=60;";
@@ -45,6 +49,11 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
     {
         connectionString = normalizedUri;
     }
+}
+else if (connectionString.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase) && connectionString.Contains("Port=5432"))
+{
+    // Corregir automáticamente si viene en formato clave=valor con puerto 5432
+    connectionString = connectionString.Replace("Port=5432", "Port=6543");
 }
 
 builder.Services.AddDbContext<LMSDbContext>(options =>

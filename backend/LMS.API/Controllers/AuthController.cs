@@ -35,6 +35,43 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Diagnóstico del estado de la base de datos y conectividad
+    /// </summary>
+    [HttpGet("diagnostic")]
+    public async Task<IActionResult> Diagnostic()
+    {
+        try
+        {
+            var canConnect = await _context.Database.CanConnectAsync();
+            var totalUsers = await _context.Usuarios.CountAsync();
+            var roles = await _context.Roles.Select(r => r.Nombre).ToListAsync();
+            var conn = _context.Database.GetDbConnection();
+            var host = conn.DataSource;
+
+            return Ok(new
+            {
+                status = "OK",
+                databaseCanConnect = canConnect,
+                totalUsers = totalUsers,
+                roles = roles,
+                databaseHost = host,
+                timestamp = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                status = "DATABASE_ERROR",
+                errorType = ex.GetType().FullName,
+                errorMessage = ex.Message,
+                innerError = ex.InnerException?.Message,
+                timestamp = DateTime.UtcNow
+            });
+        }
+    }
+
+    /// <summary>
     /// Registro público de usuarios (Estudiante, Docente o Administrador) desde el portal
     /// </summary>
     [HttpPost("register")]
@@ -59,9 +96,11 @@ public class AuthController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var cleanUsername = request.Id.Trim();
-        var existingUser = await _context.Usuarios
-            .AnyAsync(u => u.Username.ToLower() == cleanUsername.ToLower());
+        try
+        {
+            var cleanUsername = request.Id.Trim();
+            var existingUser = await _context.Usuarios
+                .AnyAsync(u => u.Username.ToLower() == cleanUsername.ToLower());
 
         if (existingUser)
         {
@@ -180,6 +219,16 @@ public class AuthController : ControllerBase
             User = userDto,
             RequiresPolicyAcceptance = true
         });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error al registrar usuario {Id}", request.Id);
+        return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+        {
+            message = "No fue posible registrar la cuenta en este momento. Intenta de nuevo en unos segundos.",
+            detail = ex.Message
+        });
+    }
     }
 
     /// <summary>
@@ -323,7 +372,10 @@ public class AuthController : ControllerBase
             _logger.LogError(ex, "Error inesperado durante el login del usuario {Id}", request.Id);
             return StatusCode(StatusCodes.Status500InternalServerError, new
             {
-                message = "Ocurrió un error inesperado. Por favor intenta de nuevo más tarde."
+                message = "Ocurrió un error inesperado al iniciar sesión.",
+                detail = ex.Message,
+                errorType = ex.GetType().Name,
+                innerDetail = ex.InnerException?.Message
             });
         }
     }

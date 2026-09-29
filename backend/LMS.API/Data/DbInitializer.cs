@@ -47,8 +47,110 @@ public static class DbInitializer
             await context.SaveChangesAsync();
         }
 
-        // Se han eliminado por completo las cuentas de prueba predeterminadas (Data Seeding de usuarios).
-        // Los usuarios se crean dinámicamente mediante el endpoint de registro público o la gestión del docente/admin.
+        // 3. Garantizar cuentas del sistema con credenciales conocidas para acceso garantizado
+        var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.Nombre == "ADMINISTRADOR" || r.Nombre == ".admin")
+            ?? await context.Roles.FirstAsync();
+        var teacherRole = await context.Roles.FirstOrDefaultAsync(r => r.Nombre == "DOCENTE") ?? adminRole;
+        var studentRole = await context.Roles.FirstOrDefaultAsync(r => r.Nombre == "ALUMNO") ?? adminRole;
+        var primerGrado = await context.Grados.FirstOrDefaultAsync() 
+            ?? new Grado { Nombre = "1°", Descripcion = "Primer grado de primaria" };
+
+        // 3.1 Usuario Administrador
+        var adminUser = await context.Usuarios.FirstOrDefaultAsync(u => u.Username.ToLower() == "admin");
+        if (adminUser == null)
+        {
+            adminUser = new Usuario
+            {
+                Username = "admin",
+                RolId = adminRole.Id,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                Nombre = "Administrador",
+                Apellido = "General",
+                AvatarUrl = "https://api.dicebear.com/7.x/bottts/svg?seed=admin",
+                Activo = true,
+                DataPolicyAccepted = true,
+                DataPolicyAcceptedAt = DateTime.UtcNow,
+                AccessFailedCount = 0,
+                LockoutEnd = null
+            };
+            context.Usuarios.Add(adminUser);
+        }
+        else
+        {
+            adminUser.Activo = true;
+            adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123");
+            adminUser.LockoutEnd = null;
+            adminUser.AccessFailedCount = 0;
+            adminUser.DataPolicyAccepted = true;
+        }
+
+        // 3.2 Usuario Docente
+        var docenteUser = await context.Usuarios.FirstOrDefaultAsync(u => u.Username.ToLower() == "docente");
+        if (docenteUser == null)
+        {
+            docenteUser = new Usuario
+            {
+                Username = "docente",
+                RolId = teacherRole.Id,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("docente123"),
+                Nombre = "Profesor",
+                Apellido = "Primaria",
+                AvatarUrl = "https://api.dicebear.com/7.x/bottts/svg?seed=docente",
+                Activo = true,
+                DataPolicyAccepted = true,
+                DataPolicyAcceptedAt = DateTime.UtcNow,
+                AccessFailedCount = 0,
+                LockoutEnd = null
+            };
+            context.Usuarios.Add(docenteUser);
+        }
+        else
+        {
+            docenteUser.Activo = true;
+            docenteUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword("docente123");
+            docenteUser.LockoutEnd = null;
+            docenteUser.AccessFailedCount = 0;
+            docenteUser.DataPolicyAccepted = true;
+        }
+
+        // 3.3 Usuario Estudiante
+        var studentUser = await context.Usuarios.Include(u => u.Alumno).FirstOrDefaultAsync(u => u.Username.ToLower() == "estudiante");
+        if (studentUser == null)
+        {
+            studentUser = new Usuario
+            {
+                Username = "estudiante",
+                RolId = studentRole.Id,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("estudiante123"),
+                Nombre = "Estudiante",
+                Apellido = "Primaria",
+                AvatarUrl = "https://api.dicebear.com/7.x/bottts/svg?seed=estudiante",
+                Activo = true,
+                DataPolicyAccepted = true,
+                DataPolicyAcceptedAt = DateTime.UtcNow,
+                AccessFailedCount = 0,
+                LockoutEnd = null
+            };
+            context.Usuarios.Add(studentUser);
+            await context.SaveChangesAsync();
+
+            var alumnoRecord = new Alumno
+            {
+                UsuarioId = studentUser.Id,
+                GradoId = primerGrado.Id
+            };
+            context.Alumnos.Add(alumnoRecord);
+        }
+        else
+        {
+            studentUser.Activo = true;
+            studentUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword("estudiante123");
+            studentUser.LockoutEnd = null;
+            studentUser.AccessFailedCount = 0;
+            studentUser.DataPolicyAccepted = true;
+        }
+
+        await context.SaveChangesAsync();
     }
 
     /// <summary>
