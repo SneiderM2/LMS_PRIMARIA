@@ -65,6 +65,72 @@ public static class DbInitializer
                 await conn.OpenAsync();
             }
 
+            // Asegurar auto-incremento (secuencias) para claves primarias en PostgreSQL
+            var tablesWithAutoIncrement = new[] { "roles", "grados", "usuarios", "cursos", "inscripciones", "tareas", "entregas", "archivos_entrega", "materiales" };
+            foreach (var table in tablesWithAutoIncrement)
+            {
+                try
+                {
+                    using var seqCmd = conn.CreateCommand();
+                    seqCmd.CommandText = $@"
+                        DO $$
+                        BEGIN
+                            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{table}')
+                               AND NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_schema = 'public' AND table_name = '{table}' AND column_name = 'id' 
+                                AND (column_default LIKE 'nextval%' OR is_identity = 'YES')
+                            ) THEN
+                                CREATE SEQUENCE IF NOT EXISTS {table}_id_seq;
+                                PERFORM setval('{table}_id_seq', COALESCE((SELECT MAX(id) FROM {table}), 0) + 1, false);
+                                ALTER TABLE {table} ALTER COLUMN id SET DEFAULT nextval('{table}_id_seq');
+                                ALTER SEQUENCE {table}_id_seq OWNED BY {table}.id;
+                            END IF;
+                        END $$;";
+                    await seqCmd.ExecuteNonQueryAsync();
+                }
+                catch (Exception seqEx)
+                {
+                    Console.WriteLine($"[DbInitializer] Secuencia para '{table}': {seqEx.Message}");
+                }
+            }
+
+            // Asegurar que columnas booleanas que vinieron como smallint de MySQL se conviertan a boolean en PostgreSQL
+            try
+            {
+                using var boolCmd = conn.CreateCommand();
+                boolCmd.CommandText = @"
+                    DO $$
+                    DECLARE
+                        tbl text;
+                    BEGIN
+                        FOR tbl IN SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' LOOP
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_schema = 'public' AND table_name = tbl AND column_name = 'activo' AND data_type IN ('smallint', 'integer')
+                            ) THEN
+                                EXECUTE format('ALTER TABLE %I ALTER COLUMN activo DROP DEFAULT;', tbl);
+                                EXECUTE format('ALTER TABLE %I ALTER COLUMN activo TYPE boolean USING (activo <> 0);', tbl);
+                                EXECUTE format('ALTER TABLE %I ALTER COLUMN activo SET DEFAULT true;', tbl);
+                            END IF;
+
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_schema = 'public' AND table_name = tbl AND column_name = 'data_policy_accepted' AND data_type IN ('smallint', 'integer')
+                            ) THEN
+                                EXECUTE format('ALTER TABLE %I ALTER COLUMN data_policy_accepted DROP DEFAULT;', tbl);
+                                EXECUTE format('ALTER TABLE %I ALTER COLUMN data_policy_accepted TYPE boolean USING (data_policy_accepted <> 0);', tbl);
+                                EXECUTE format('ALTER TABLE %I ALTER COLUMN data_policy_accepted SET DEFAULT false;', tbl);
+                            END IF;
+                        END LOOP;
+                    END $$;";
+                await boolCmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception boolEx)
+            {
+                Console.WriteLine($"[DbInitializer] Conversión booleana: {boolEx.Message}");
+            }
+
             var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             using (var cmd = conn.CreateCommand())
