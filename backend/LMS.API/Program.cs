@@ -28,14 +28,14 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
         var user = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : "postgres";
         var pass = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
         var host = uri.Host;
-        var port = uri.Port > 0 ? uri.Port : 6543;
+        var port = uri.Port > 0 ? uri.Port : 5432;
         var db = uri.AbsolutePath.TrimStart('/');
         if (string.IsNullOrWhiteSpace(db)) db = "postgres";
 
         // Supabase Direct Connection (db.PROJECT_REF.supabase.co) solo expone dirección IPv6.
         // Dado que los contenedores de Render operan en IPv4 puro, la conexión a db.*.supabase.co
-        // falla irremediablemente con: 'Failed to connect to [2600:...]:5432'.
-        // Redirigimos automáticamente al Session Pooler IPv4 de Supabase (puerto 6543):
+        // falla con error de red IPv6.
+        // Redirigimos automáticamente al Session Pooler IPv4 de Supabase (puerto 5432 - Session Mode):
         if (host.EndsWith(".supabase.co", StringComparison.OrdinalIgnoreCase))
         {
             var projectRef = "rjvsbjjmlmvcihfgbiaz";
@@ -49,7 +49,7 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
             }
 
             host = "aws-0-us-east-1.pooler.supabase.com";
-            port = 6543;
+            port = 5432;
             if (!user.Contains('.'))
             {
                 user = $"postgres.{projectRef}";
@@ -57,7 +57,7 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
         }
         else if (host.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase))
         {
-            port = 6543;
+            port = 5432;
             if (!user.Contains('.'))
             {
                 user = $"{user}.rjvsbjjmlmvcihfgbiaz";
@@ -80,16 +80,16 @@ else
         var proj = match.Success ? match.Groups[1].Value : "rjvsbjjmlmvcihfgbiaz";
 
         connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Host=db\.[^;]+\.supabase\.co", "Host=aws-0-us-east-1.pooler.supabase.com", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Port=\d+", "Port=6543", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Port=\d+", "Port=5432", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         if (!connectionString.Contains($"postgres.{proj}", StringComparison.OrdinalIgnoreCase))
         {
             connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Username=postgres\b", $"Username=postgres.{proj}", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         }
     }
-    else if (connectionString.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase) && connectionString.Contains("Port=5432"))
+    else if (connectionString.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase))
     {
-        connectionString = connectionString.Replace("Port=5432", "Port=6543");
+        connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Port=\d+", "Port=5432", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 }
 
