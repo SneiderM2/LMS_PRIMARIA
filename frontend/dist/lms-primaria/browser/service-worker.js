@@ -1,19 +1,26 @@
 // Service Worker para LMS SciKids - Soporte PWA Offline
-const CACHE_NAME = 'scikids-lms-cache-v1';
-const PRECACHE_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-  '/icons/icon-192x192.svg',
-  '/icons/icon-512x512.svg'
-];
+const CACHE_NAME = 'scikids-lms-cache-v2';
+const SCOPE = self.registration ? self.registration.scope : './';
 
 // Instalación: Precarga de assets críticos
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
+    caches.open(CACHE_NAME).then(async (cache) => {
       console.log('[SW] Pre-cacheados los recursos estáticos iniciales');
-      return cache.addAll(PRECACHE_ASSETS);
+      const assetsToCache = [
+        new URL('./', SCOPE).href,
+        new URL('index.html', SCOPE).href,
+        new URL('manifest.webmanifest', SCOPE).href,
+        new URL('assets/icons/icon-192x192.png', SCOPE).href,
+        new URL('assets/icons/icon-512x512.png', SCOPE).href
+      ];
+      for (const asset of assetsToCache) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn('[SW] No se pudo pre-cachear:', asset, err);
+        }
+      }
     })
   );
   self.skipWaiting();
