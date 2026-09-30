@@ -5,6 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { UserRole } from '../../../core/models/user.model';
 import { SessionTimeoutService } from '../../../core/services/session-timeout.service';
+import { environment } from '../../../../environments/environment';
 
 declare const google: any;
 declare const grecaptcha: any;
@@ -29,6 +30,7 @@ export class LoginComponent implements OnInit, AfterViewInit {
   // Sprint 4: CAPTCHA Token
   public captchaToken = '';
   public captchaWidgetId: any = null;
+  public captchaRegWidgetId: any = null;
 
   // Campos de Registro
   public regId = '';
@@ -65,15 +67,19 @@ export class LoginComponent implements OnInit, AfterViewInit {
   }
 
   private initRecaptcha(): void {
-    // Si existe el script de Google reCAPTCHA
+    const siteKey = environment.recaptchaSiteKey || '6LcMQNgtAAAAADA_qovyBzaHt_EDrKEMxTyCeqXo';
+
+    // Esperar a que el SDK de Google reCAPTCHA esté listo
     const checkGrecaptcha = setInterval(() => {
       if (typeof grecaptcha !== 'undefined' && grecaptcha.render) {
         clearInterval(checkGrecaptcha);
-        const container = document.getElementById('recaptcha-container');
-        if (container && !this.captchaWidgetId) {
+
+        // 1. Widget de reCAPTCHA en el formulario de Login
+        const loginContainer = document.getElementById('recaptcha-container');
+        if (loginContainer && this.captchaWidgetId === null) {
           try {
             this.captchaWidgetId = grecaptcha.render('recaptcha-container', {
-              sitekey: '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI', // Test key pública de Google que siempre es válida
+              sitekey: siteKey,
               callback: (token: string) => {
                 this.ngZone.run(() => {
                   this.captchaToken = token;
@@ -87,14 +93,36 @@ export class LoginComponent implements OnInit, AfterViewInit {
               }
             });
           } catch (e) {
-            console.warn('reCAPTCHA init:', e);
+            console.warn('[reCAPTCHA Login] error al inicializar:', e);
+          }
+        }
+
+        // 2. Widget de reCAPTCHA en el formulario de Registro
+        const regContainer = document.getElementById('recaptcha-reg-container');
+        if (regContainer && this.captchaRegWidgetId === null) {
+          try {
+            this.captchaRegWidgetId = grecaptcha.render('recaptcha-reg-container', {
+              sitekey: siteKey,
+              callback: (token: string) => {
+                this.ngZone.run(() => {
+                  this.captchaToken = token;
+                  this.errorMessage = null;
+                });
+              },
+              'expired-callback': () => {
+                this.ngZone.run(() => {
+                  this.captchaToken = '';
+                });
+              }
+            });
+          } catch (e) {
+            console.warn('[reCAPTCHA Registro] error al inicializar:', e);
           }
         }
       }
     }, 300);
 
-    // Timeout de seguridad para limpiar el intervalo
-    setTimeout(() => clearInterval(checkGrecaptcha), 6000);
+    setTimeout(() => clearInterval(checkGrecaptcha), 10000);
   }
 
   private initGoogleSignIn(): void {
@@ -154,9 +182,11 @@ export class LoginComponent implements OnInit, AfterViewInit {
       return;
     }
 
-    // Si reCAPTCHA está disponible y no se ha marcado, solicitar verificación
-    // (o en modo desarrollo si no cargó el script, enviar token seguro dev)
-    const tokenToSend = this.captchaToken || 'BYPASS_CAPTCHA_DEV';
+    // Validación obligatoria de reCAPTCHA
+    if (!this.captchaToken) {
+      this.errorMessage = 'Por favor completa la verificación de seguridad reCAPTCHA ("No soy un robot") 🤖';
+      return;
+    }
 
     this.isLoading = true;
     this.errorMessage = null;
@@ -166,7 +196,7 @@ export class LoginComponent implements OnInit, AfterViewInit {
       id: this.id.trim(), 
       password: this.password,
       honeypotTrap: this.honeypotTrap,
-      captchaToken: tokenToSend
+      captchaToken: this.captchaToken
     }).subscribe({
       next: () => {
         this.isLoading = false;
@@ -177,15 +207,24 @@ export class LoginComponent implements OnInit, AfterViewInit {
         const status: number = err?.status;
         const serverMessage: string | undefined = err?.error?.message;
 
+        // Resetear widget de captcha en caso de fallo para permitir nuevo intento
+        if (typeof grecaptcha !== 'undefined' && this.captchaWidgetId !== null) {
+          try {
+            grecaptcha.reset(this.captchaWidgetId);
+          } catch (e) {
+            console.warn('Error reseteando reCAPTCHA login:', e);
+          }
+        }
+        this.captchaToken = '';
+
         switch (status) {
           case 400:
-            this.errorMessage = serverMessage || 'Los datos ingresados no son válidos. Verifica tu carnet y contraseña.';
+            this.errorMessage = serverMessage || 'Verificación de seguridad reCAPTCHA falló o los datos ingresados no son válidos.';
             break;
           case 401:
             this.errorMessage = serverMessage || 'Identificación escolar o contraseña incorrecta. ¡Inténtalo de nuevo!';
             break;
           case 409:
-            // GlobalExceptionMiddleware lanza 409 para InvalidOperationException (error de BD o concurrencia)
             this.errorMessage = '⚠️ Ocurrió un problema al procesar tu solicitud. Por favor intenta de nuevo en un momento.';
             console.error('[Login 409]', err?.error);
             break;
@@ -221,6 +260,12 @@ export class LoginComponent implements OnInit, AfterViewInit {
       return;
     }
 
+    // Validación obligatoria de reCAPTCHA en Registro
+    if (!this.captchaToken) {
+      this.errorMessage = 'Por favor completa la verificación de seguridad reCAPTCHA ("No soy un robot") 🤖';
+      return;
+    }
+
     this.isLoading = true;
     this.errorMessage = null;
     this.successMessage = null;
@@ -231,7 +276,8 @@ export class LoginComponent implements OnInit, AfterViewInit {
       password: this.regPassword,
       role: this.regRole,
       grade: this.regRole === 'Student' ? this.regGrade : undefined,
-      honeypotTrap: this.regHoneypot
+      honeypotTrap: this.regHoneypot,
+      captchaToken: this.captchaToken
     }).subscribe({
       next: () => {
         this.isLoading = false;
@@ -241,6 +287,16 @@ export class LoginComponent implements OnInit, AfterViewInit {
       error: (err: any) => {
         this.isLoading = false;
         this.errorMessage = err?.error?.message || 'No se pudo crear la cuenta. Verifica los datos e inténtalo nuevamente.';
+        
+        // Resetear widget de captcha en caso de fallo para permitir nuevo intento
+        if (typeof grecaptcha !== 'undefined' && this.captchaRegWidgetId !== null) {
+          try {
+            grecaptcha.reset(this.captchaRegWidgetId);
+          } catch (e) {
+            console.warn('Error reseteando reCAPTCHA registro:', e);
+          }
+        }
+        this.captchaToken = '';
       }
     });
   }

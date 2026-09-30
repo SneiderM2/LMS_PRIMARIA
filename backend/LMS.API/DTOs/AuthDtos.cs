@@ -60,6 +60,7 @@ public class RegisterRequestDto
     public string? Grade { get; set; }
 
     public string? HoneypotTrap { get; set; }
+    public string? CaptchaToken { get; set; }
 }
 
 public class LoginResponseDto

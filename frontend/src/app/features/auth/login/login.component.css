@@ -377,3 +377,18 @@
   margin-bottom: 0.5rem;
 }
 
+/* Widget reCAPTCHA centrado y adaptable */
+.captcha-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 1rem 0;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.recaptcha-box {
+  display: inline-block;
+  min-height: 78px;
+}
+

@@ -25,6 +25,7 @@ export interface RegisterRequest {
   role: UserRole;
   grade?: string;
   honeypotTrap?: string;
+  captchaToken?: string;
 }
 
 export interface LoginResponse {

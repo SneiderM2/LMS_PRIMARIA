@@ -40,7 +40,7 @@
       </div>
 
       <!-- FORMULARIO 1: INICIAR SESIÓN -->
-      <form *ngIf="activeTab === 'login'" (ngSubmit)="onLogin()" class="login-form">
+      <form [hidden]="activeTab !== 'login'" (ngSubmit)="onLogin()" class="login-form">
 
         <!-- Campo Honeypot para detectar y neutralizar bots (Invisible para humanos) -->
         <div class="honeypot-container" aria-hidden="true">
@@ -96,7 +96,7 @@
       </form>
 
       <!-- FORMULARIO 2: CREAR CUENTA / REGISTRO DINÁMICO -->
-      <form *ngIf="activeTab === 'register'" (ngSubmit)="onRegister()" class="login-form">
+      <form [hidden]="activeTab !== 'register'" (ngSubmit)="onRegister()" class="login-form">
 
         <!-- Campo Honeypot para registro -->
         <div class="honeypot-container" aria-hidden="true">
@@ -185,6 +185,11 @@
                 placeholder="Confirma tu clave" required />
             </div>
           </div>
+        </div>
+
+        <!-- Widget de verificación de seguridad CAPTCHA para Registro -->
+        <div class="captcha-wrapper">
+          <div id="recaptcha-reg-container" class="recaptcha-box"></div>
         </div>
 
         <!-- Botón de Registro -->

@@ -135,6 +135,14 @@ public class AuthController : ControllerBase
 
         try
         {
+            // Verificación de seguridad reCAPTCHA
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var isCaptchaValid = await _captchaService.VerifyTokenAsync(request.CaptchaToken, clientIp);
+            if (!isCaptchaValid)
+            {
+                return BadRequest(new { message = "La verificación de reCAPTCHA falló o el token ha expirado. Por favor inténtalo de nuevo." });
+            }
+
             var cleanUsername = request.Id.Trim();
             var existingUser = await _context.Usuarios
                 .AnyAsync(u => u.Username.ToLower() == cleanUsername.ToLower());
@@ -299,12 +307,12 @@ public class AuthController : ControllerBase
 
         try
         {
-            // 2. Verificación de CAPTCHA
+            // 2. Verificación de reCAPTCHA
             var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
             var isCaptchaValid = await _captchaService.VerifyTokenAsync(request.CaptchaToken, clientIp);
             if (!isCaptchaValid)
             {
-                return BadRequest(new { message = "Verificación de seguridad (CAPTCHA) obligatoria o inválida." });
+                return BadRequest(new { message = "La verificación de reCAPTCHA falló o el token ha expirado. Por favor inténtalo de nuevo." });
             }
 
             var cleanUsername = request.Id.Trim();

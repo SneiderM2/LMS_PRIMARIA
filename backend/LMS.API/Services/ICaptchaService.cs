@@ -23,21 +23,28 @@ public class GoogleRecaptchaService : ICaptchaService
 
     public async Task<bool> VerifyTokenAsync(string? token, string? remoteIp)
     {
-        // En entorno local/desarrollo o testing, si se envía el token de desarrollo "BYPASS_CAPTCHA_DEV", se aprueba
-        if (token == "BYPASS_CAPTCHA_DEV" || token == "DEV_TEST_TOKEN")
-        {
-            return true;
-        }
-
-        var secretKey = _configuration["Recaptcha:SecretKey"];
-        // Si no se configuró clave en appsettings, se admite para evitar bloqueo total en local
-        if (string.IsNullOrWhiteSpace(secretKey) || secretKey == "TU_RECAPTCHA_SECRET_KEY")
-        {
-            return true;
-        }
-
         if (string.IsNullOrWhiteSpace(token))
         {
+            _logger.LogWarning("Intento de autenticación sin token de reCAPTCHA.");
+            return false;
+        }
+
+        // Token seguro para pruebas internas de testing/bypass
+        if (token == "BYPASS_CAPTCHA_DEV" || token == "DEV_TEST_TOKEN")
+        {
+            _logger.LogInformation("reCAPTCHA bypass aplicado con token de desarrollo/prueba.");
+            return true;
+        }
+
+        // Obtener la clave secreta desde la variable de entorno Recaptcha__SecretKey, configuración o valor por defecto
+        var secretKey = _configuration["Recaptcha__SecretKey"]
+                     ?? _configuration["Recaptcha:SecretKey"]
+                     ?? Environment.GetEnvironmentVariable("Recaptcha__SecretKey")
+                     ?? "6LcMQNgtAAAAAMLE9kE7JSvxvnZSr8kKsUGtgjOL";
+
+        if (string.IsNullOrWhiteSpace(secretKey) || secretKey == "TU_RECAPTCHA_SECRET_KEY")
+        {
+            _logger.LogError("La clave secreta de reCAPTCHA no está configurada.");
             return false;
         }
 
@@ -53,7 +60,7 @@ public class GoogleRecaptchaService : ICaptchaService
             var response = await _httpClient.PostAsync("https://www.google.com/recaptcha/api/siteverify", content);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("reCAPTCHA validation endpoint returned status: {Status}", response.StatusCode);
+                _logger.LogWarning("Endpoint de reCAPTCHA devolvió código HTTP no exitoso: {Status}", response.StatusCode);
                 return false;
             }
 
@@ -61,15 +68,19 @@ public class GoogleRecaptchaService : ICaptchaService
             using var doc = System.Text.Json.JsonDocument.Parse(json);
             if (doc.RootElement.TryGetProperty("success", out var successProp))
             {
-                return successProp.GetBoolean();
+                var isSuccess = successProp.GetBoolean();
+                if (!isSuccess && doc.RootElement.TryGetProperty("error-codes", out var errorCodes))
+                {
+                    _logger.LogWarning("Validación de reCAPTCHA denegada por Google. Códigos de error: {Errors}", errorCodes.ToString());
+                }
+                return isSuccess;
             }
 
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error verificando token reCAPTCHA");
-            // Permitir en caso de falla de red externa en desarrollo
+            _logger.LogError(ex, "Excepción durante la verificación del token de reCAPTCHA");
             return false;
         }
     }
