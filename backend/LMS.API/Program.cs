@@ -141,12 +141,19 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireStudent", policy => policy.RequireRole("Student", "ALUMNO"));
 });
 
-// 5. Configuración de CORS para el Frontend Angular (incluye acceso móvil por red local)
+// 5. Configuración de CORS para el Frontend Angular en GitHub Pages y desarrollo
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngularDev", policy =>
     {
-        policy.SetIsOriginAllowed(origin => true) // Permite localhost, 127.0.0.1 y cualquier IP de red local (ej. 192.168.x.x)
+        policy.WithOrigins(
+                  "https://sneiderm2.github.io",
+                  "https://sneiderm2.github.io/LMS_PRIMARIA",
+                  "http://localhost:4200",
+                  "http://localhost:5000",
+                  "http://127.0.0.1:4200"
+              )
+              .SetIsOriginAllowed(origin => true) // Admite orígenes adicionales en red local y previews
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

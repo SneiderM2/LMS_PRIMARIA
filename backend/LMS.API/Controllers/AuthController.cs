@@ -72,6 +72,43 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Restablece y garantiza la creación de cuentas de prueba oficiales (admin, docente, estudiante)
+    /// </summary>
+    [HttpPost("seed-users")]
+    public async Task<IActionResult> SeedUsers()
+    {
+        try
+        {
+            await DbInitializer.SeedAsync(_context);
+            var users = await _context.Usuarios
+                .Where(u => u.Username == "admin" || u.Username == "docente" || u.Username == "estudiante")
+                .Select(u => new { u.Id, u.Username, u.FullName, u.Activo })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                message = "Cuentas estándar sembradas y verificadas con éxito.",
+                users = users,
+                credentials = new[]
+                {
+                    new { role = "Administrador", username = "admin", password = "admin123" },
+                    new { role = "Docente", username = "docente", password = "docente123" },
+                    new { role = "Estudiante", username = "estudiante", password = "estudiante123" }
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sembrando usuarios");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = "Error al sembrar usuarios",
+                detail = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
     /// Registro público de usuarios (Estudiante, Docente o Administrador) desde el portal
     /// </summary>
     [HttpPost("register")]

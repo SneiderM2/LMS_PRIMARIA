@@ -7,11 +7,8 @@ public static class DbInitializer
 {
     public static async Task SeedAsync(LMSDbContext context)
     {
-        // Asegurar que la base de datos y tablas estén creadas
-        await context.Database.EnsureCreatedAsync();
-
-        // Asegurar que la tabla usuarios cuente con las nuevas columnas unificadas
-        await EnsureColumnsMigratedAsync(context);
+        // Las tablas y columnas ya fueron migradas en Supabase PostgreSQL.
+        // Omitimos llamadas DDL crudas para evitar conflictos con el Session Pooler.
 
         // 1. Inicializar Roles obligatorios según bd.txt si la tabla está vacía
         if (!await context.Roles.AnyAsync())
