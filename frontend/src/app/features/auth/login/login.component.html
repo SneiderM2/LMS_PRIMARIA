@@ -123,12 +123,6 @@
               <span class="role-title">Docente</span>
               <span class="role-sub">Profesor(a)</span>
             </button>
-
-            <button type="button" class="role-card" [class.selected]="regRole === 'Admin'" (click)="regRole = 'Admin'">
-              <span class="role-emoji">👑</span>
-              <span class="role-title">Admin</span>
-              <span class="role-sub">Dirección</span>
-            </button>
           </div>
         </div>
 
@@ -196,7 +190,7 @@
         <!-- Botón de Registro -->
         <button type="submit" class="btn btn-primary btn-lg btn-block" [disabled]="isLoading">
           <span *ngIf="!isLoading">🎉 ¡Crear mi Cuenta y Entrar!</span>
-          <span *ngIf="isLoading">⏳ Registrando en MySQL...</span>
+          <span *ngIf="isLoading">⏳ Creando tu cuenta escolar...</span>
         </button>
 
         <div class="register-prompt">

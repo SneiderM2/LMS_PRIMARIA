@@ -185,8 +185,8 @@
 /* Selector de Roles */
 .role-selector-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.6rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.8rem;
   margin-top: 0.3rem;
   margin-bottom: 0.5rem;
 }

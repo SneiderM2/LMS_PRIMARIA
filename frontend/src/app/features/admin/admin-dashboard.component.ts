@@ -474,7 +474,7 @@ export class AdminDashboardComponent implements OnInit {
     } else if (this.activeSection === 'inspector') {
       const headers = ['Componente / Parámetro', 'Estado / Valor', 'Descripción Técnica'];
       const rows = [
-        ['Estado General del Servidor', this.metrics.systemStatus, 'Kestrel Web Server (.NET 8) y MySQL 8.0'],
+        ['Estado General del Servidor', this.metrics.systemStatus, 'Kestrel Web Server (.NET 8) y PostgreSQL (Supabase)'],
         ['Total Usuarios Habilitados', this.metrics.totalActiveUsers, 'Cuentas con acceso activo a la plataforma'],
         ['Docentes Registrados', this.metrics.activeTeachersCount, 'Profesores titulares de materias'],
         ['Estudiantes Matriculados', this.metrics.activeStudentsCount, 'Alumnos de 1° a 6° de básica primaria'],
