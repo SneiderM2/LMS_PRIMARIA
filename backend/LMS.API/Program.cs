@@ -32,9 +32,30 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
         var db = uri.AbsolutePath.TrimStart('/');
         if (string.IsNullOrWhiteSpace(db)) db = "postgres";
 
-        // Supabase: si se usa el pooler de Supabase, forzar Session Pooler (puerto 6543)
-        // El Transaction Pooler (puerto 5432) NO soporta prepared statements ni transacciones de EF Core
-        if (host.Contains("pooler.supabase.com"))
+        // Supabase Direct Connection (db.PROJECT_REF.supabase.co) solo expone dirección IPv6.
+        // Dado que los contenedores de Render operan en IPv4 puro, la conexión a db.*.supabase.co
+        // falla irremediablemente con: 'Failed to connect to [2600:...]:5432'.
+        // Redirigimos automáticamente al Session Pooler IPv4 de Supabase (puerto 6543):
+        if (host.EndsWith(".supabase.co", StringComparison.OrdinalIgnoreCase))
+        {
+            var projectRef = "rjvsbjjmlmvcihfgbiaz";
+            if (host.StartsWith("db.", StringComparison.OrdinalIgnoreCase))
+            {
+                var parts = host.Split('.');
+                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
+                {
+                    projectRef = parts[1];
+                }
+            }
+
+            host = "aws-0-us-east-1.pooler.supabase.com";
+            port = 6543;
+            if (!user.Contains('.'))
+            {
+                user = $"postgres.{projectRef}";
+            }
+        }
+        else if (host.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase))
         {
             port = 6543;
             if (!user.Contains('.'))
@@ -50,10 +71,26 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
         connectionString = normalizedUri;
     }
 }
-else if (connectionString.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase) && connectionString.Contains("Port=5432"))
+else
 {
-    // Corregir automáticamente si viene en formato clave=valor con puerto 5432
-    connectionString = connectionString.Replace("Port=5432", "Port=6543");
+    // Normalizar formato clave=valor
+    if (connectionString.Contains(".supabase.co", StringComparison.OrdinalIgnoreCase) && !connectionString.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase))
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(connectionString, @"Host=db\.([^;]+)\.supabase\.co", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var proj = match.Success ? match.Groups[1].Value : "rjvsbjjmlmvcihfgbiaz";
+
+        connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Host=db\.[^;]+\.supabase\.co", "Host=aws-0-us-east-1.pooler.supabase.com", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Port=\d+", "Port=6543", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (!connectionString.Contains($"postgres.{proj}", StringComparison.OrdinalIgnoreCase))
+        {
+            connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Username=postgres\b", $"Username=postgres.{proj}", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+    }
+    else if (connectionString.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase) && connectionString.Contains("Port=5432"))
+    {
+        connectionString = connectionString.Replace("Port=5432", "Port=6543");
+    }
 }
 
 builder.Services.AddDbContext<LMSDbContext>(options =>
