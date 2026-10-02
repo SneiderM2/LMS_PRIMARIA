@@ -212,4 +212,42 @@
       <p>🏫 Colegio Primaria Siglo XXI • LMS Scikids</p>
     </div>
   </div>
+
+  <!-- ===== MODAL: Sesión activa en otro dispositivo ===== -->
+  <div class="session-modal-overlay" *ngIf="showActiveSessionModal" (click)="onCancelForceLogin()">
+    <div class="session-modal-card" (click)="$event.stopPropagation()">
+      <div class="session-modal-icon">📱</div>
+      <h2 class="session-modal-title">Sesión Activa Detectada</h2>
+      <p class="session-modal-desc">
+        Esta cuenta ya tiene una sesión activa en otro dispositivo o navegador.
+      </p>
+      <p class="session-modal-info" *ngIf="activeSessionInfo?.sessionStartedAt">
+        🕐 Sesión iniciada: <strong>{{ activeSessionInfo?.sessionStartedAt | date:'short' }}</strong>
+      </p>
+      <p class="session-modal-question">
+        ¿Deseas cerrar esa sesión y continuar desde aquí?
+      </p>
+      <div class="session-modal-actions">
+        <button
+          id="btn-cancel-force-login"
+          type="button"
+          class="btn-modal-cancel"
+          (click)="onCancelForceLogin()"
+        >
+          ❌ Cancelar
+        </button>
+        <button
+          id="btn-confirm-force-login"
+          type="button"
+          class="btn-modal-confirm"
+          (click)="onConfirmForceLogin()"
+          [disabled]="isLoading"
+        >
+          <span *ngIf="!isLoading">✅ Sí, cerrar sesión anterior</span>
+          <span *ngIf="isLoading">⏳ Iniciando...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
 </div>

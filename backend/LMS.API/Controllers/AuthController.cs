@@ -364,7 +364,21 @@ public class AuthController : ControllerBase
             // Restablecer contador de fallos y emitir nuevo token de sesión única
             user.AccessFailedCount = 0;
             user.LockoutEnd = null;
+
+            // Detección de sesión activa: si ya hay un SessionToken en BD, esta cuenta está siendo usada en otro lugar
+            if (!string.IsNullOrEmpty(user.SessionToken) && !request.ForceLogin)
+            {
+                return StatusCode(StatusCodes.Status409Conflict, new ActiveSessionResponseDto
+                {
+                    Code = "ACTIVE_SESSION",
+                    Message = "Ya existe una sesión activa para esta cuenta en otro dispositivo o navegador.",
+                    DeviceHint = user.Username,
+                    SessionStartedAt = user.LastLoginAt
+                });
+            }
+
             user.SessionToken = Guid.NewGuid().ToString("N");
+            user.LastLoginAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             var fullName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName : user.Username;
@@ -584,7 +598,20 @@ public class AuthController : ControllerBase
         }
 
         // Generar y persistir token de sesión única para prevenir doble sesión
+        // Detección de sesión activa: si ya hay un SessionToken en BD
+        if (!string.IsNullOrEmpty(user.SessionToken) && !dto.ForceLogin)
+        {
+            return StatusCode(StatusCodes.Status409Conflict, new ActiveSessionResponseDto
+            {
+                Code = "ACTIVE_SESSION",
+                Message = "Ya existe una sesión activa para esta cuenta en otro dispositivo o navegador.",
+                DeviceHint = user.Username,
+                SessionStartedAt = user.LastLoginAt
+            });
+        }
+
         user.SessionToken = Guid.NewGuid().ToString("N");
+        user.LastLoginAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
         var (token, expiration) = _tokenService.GenerateToken(
@@ -681,9 +708,43 @@ public class AuthController : ControllerBase
             if (user != null)
             {
                 user.SessionToken = null;
+                user.LastLoginAt = null;
                 await _context.SaveChangesAsync();
             }
         }
         return Ok(new { message = "Sesión cerrada correctamente." });
+    }
+
+    /// <summary>
+    /// Polling ligero: el frontend llama cada 45 segundos para verificar que su sesión
+    /// no haya sido revocada por un login desde otro dispositivo.
+    /// GET: /api/auth/validate-session
+    /// </summary>
+    [Authorize]
+    [HttpGet("validate-session")]
+    public async Task<IActionResult> ValidateSession()
+    {
+        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var tokenSession = User.FindFirst("session_token")?.Value;
+
+        if (string.IsNullOrEmpty(username))
+            return Unauthorized(new { code = "DUPLICATE_SESSION", message = "Sesión inválida." });
+
+        var dbSessionToken = await _context.Usuarios
+            .AsNoTracking()
+            .Where(u => u.Username.ToLower() == username.ToLower())
+            .Select(u => u.SessionToken)
+            .FirstOrDefaultAsync();
+
+        if (string.IsNullOrEmpty(dbSessionToken) || !string.Equals(dbSessionToken, tokenSession, StringComparison.Ordinal))
+        {
+            return Unauthorized(new
+            {
+                code = "DUPLICATE_SESSION",
+                message = "Tu sesión se cerró porque se inició sesión en otro dispositivo."
+            });
+        }
+
+        return Ok(new { valid = true });
     }
 }

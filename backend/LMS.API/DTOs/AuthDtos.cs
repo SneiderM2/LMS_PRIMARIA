@@ -19,6 +19,11 @@ public class LoginRequestDto
     /// Token emitido por el widget de verificación CAPTCHA.
     /// </summary>
     public string? CaptchaToken { get; set; }
+
+    /// <summary>
+    /// Si es true, cierra la sesión activa en otro dispositivo y continúa el login.
+    /// </summary>
+    public bool ForceLogin { get; set; } = false;
 }
 
 public class AcceptDataPolicyDto
@@ -32,6 +37,22 @@ public class GoogleLoginDto
     public string IdToken { get; set; } = string.Empty;
 
     public string? HoneypotTrap { get; set; }
+
+    /// <summary>
+    /// Si es true, cierra la sesión activa en otro dispositivo y continúa el login.
+    /// </summary>
+    public bool ForceLogin { get; set; } = false;
+}
+
+/// <summary>
+/// Respuesta cuando se detecta una sesión activa preexistente (HTTP 409).
+/// </summary>
+public class ActiveSessionResponseDto
+{
+    public string Code { get; set; } = "ACTIVE_SESSION";
+    public string Message { get; set; } = string.Empty;
+    public string? DeviceHint { get; set; }
+    public DateTime? SessionStartedAt { get; set; }
 }
 
 public class RegisterRequestDto

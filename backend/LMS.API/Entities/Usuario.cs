@@ -22,6 +22,7 @@ public class Usuario
     public DateTime? LockoutEnd { get; set; }
     // Control de sesión única / Prevención de doble sesión
     public string? SessionToken { get; set; }
+    public DateTime? LastLoginAt { get; set; }
 
     // Propiedad calculada
     public string FullName => $"{Nombre} {Apellido}".Trim();

@@ -302,6 +302,13 @@ public static class DbInitializer
                 await alterCmd.ExecuteNonQueryAsync();
             }
 
+            if (!existingColumns.Contains("last_login_at"))
+            {
+                using var alterCmd = conn.CreateCommand();
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP WITHOUT TIME ZONE NULL;";
+                await alterCmd.ExecuteNonQueryAsync();
+            }
+
             // Si la tabla 'perfiles' aún existe físicamente, migrar los datos a 'usuarios'
             using (var tableCmd = conn.CreateCommand())
             {

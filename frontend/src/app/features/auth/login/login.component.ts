@@ -45,6 +45,12 @@ export class LoginComponent implements OnInit, AfterViewInit {
   public errorMessage: string | null = null;
   public successMessage: string | null = null;
 
+  // Modal de sesión activa en otro dispositivo
+  public showActiveSessionModal = false;
+  public activeSessionInfo: { message: string; sessionStartedAt?: string; deviceHint?: string } | null = null;
+  private pendingForceLoginType: 'credentials' | 'google' = 'credentials';
+  private pendingGoogleToken: string | null = null;
+
   constructor(
     private authService: AuthService,
     private sessionTimeoutService: SessionTimeoutService,
@@ -170,7 +176,19 @@ export class LoginComponent implements OnInit, AfterViewInit {
       },
       error: (err: any) => {
         this.isLoading = false;
-        this.errorMessage = err?.error?.message || 'No fue posible iniciar sesión con Google.';
+        if (err?.status === 409 && err?.error?.code === 'ACTIVE_SESSION') {
+          // Hay una sesión activa en otro lugar → mostrar modal de confirmación
+          this.pendingForceLoginType = 'google';
+          this.pendingGoogleToken = idToken;
+          this.activeSessionInfo = {
+            message: err.error.message,
+            sessionStartedAt: err.error.sessionStartedAt,
+            deviceHint: err.error.deviceHint
+          };
+          this.showActiveSessionModal = true;
+        } else {
+          this.errorMessage = err?.error?.message || 'No fue posible iniciar sesión con Google.';
+        }
       }
     });
   }
@@ -197,12 +215,20 @@ export class LoginComponent implements OnInit, AfterViewInit {
     this.errorMessage = null;
     this.successMessage = null;
 
-    this.authService.login({ 
-      id: this.id.trim(), 
+    this.doLogin(false);
+  }
+
+  /**
+   * Lógica de login reutilizable. Se llama con forceLogin=false la primera vez
+   * y con forceLogin=true cuando el usuario confirma cerrar la sesión activa.
+   */
+  private doLogin(forceLogin: boolean): void {
+    this.authService.login({
+      id: this.id.trim(),
       password: this.password,
       honeypotTrap: this.honeypotTrap,
       captchaToken: this.captchaToken
-    }).subscribe({
+    }, forceLogin).subscribe({
       next: () => {
         this.isLoading = false;
         this.sessionTimeoutService.startMonitoring();
@@ -211,6 +237,19 @@ export class LoginComponent implements OnInit, AfterViewInit {
         this.isLoading = false;
         const status: number = err?.status;
         const serverMessage: string | undefined = err?.error?.message;
+
+        // 409 ACTIVE_SESSION → mostrar modal de confirmación de cierre de sesión activa
+        if (status === 409 && err?.error?.code === 'ACTIVE_SESSION') {
+          this.pendingForceLoginType = 'credentials';
+          this.pendingGoogleToken = null;
+          this.activeSessionInfo = {
+            message: err.error.message,
+            sessionStartedAt: err.error.sessionStartedAt,
+            deviceHint: err.error.deviceHint
+          };
+          this.showActiveSessionModal = true;
+          return;
+        }
 
         // Resetear widget de captcha en caso de fallo para permitir nuevo intento
         if (typeof grecaptcha !== 'undefined' && this.captchaWidgetId !== null) {
@@ -229,10 +268,6 @@ export class LoginComponent implements OnInit, AfterViewInit {
           case 401:
             this.errorMessage = serverMessage || 'Identificación escolar o contraseña incorrecta. ¡Inténtalo de nuevo!';
             break;
-          case 409:
-            this.errorMessage = '⚠️ Ocurrió un problema al procesar tu solicitud. Por favor intenta de nuevo en un momento.';
-            console.error('[Login 409]', err?.error);
-            break;
           case 423:
             this.errorMessage = serverMessage || '🔒 Tu cuenta ha sido bloqueada temporalmente. Intenta de nuevo en 10 minutos.';
             break;
@@ -247,6 +282,40 @@ export class LoginComponent implements OnInit, AfterViewInit {
         }
       }
     });
+  }
+
+  /**
+   * El usuario confirmó cerrar la sesión activa y continuar el login.
+   */
+  public onConfirmForceLogin(): void {
+    this.showActiveSessionModal = false;
+    this.activeSessionInfo = null;
+    this.isLoading = true;
+    this.errorMessage = null;
+
+    if (this.pendingForceLoginType === 'google' && this.pendingGoogleToken) {
+      this.authService.loginWithGoogle(this.pendingGoogleToken, this.honeypotTrap, true).subscribe({
+        next: () => {
+          this.isLoading = false;
+          this.sessionTimeoutService.startMonitoring();
+        },
+        error: (err: any) => {
+          this.isLoading = false;
+          this.errorMessage = err?.error?.message || 'No fue posible iniciar sesión con Google.';
+        }
+      });
+    } else {
+      this.doLogin(true);
+    }
+  }
+
+  /**
+   * El usuario canceló el modal → no se toma ninguna acción.
+   */
+  public onCancelForceLogin(): void {
+    this.showActiveSessionModal = false;
+    this.activeSessionInfo = null;
+    this.isLoading = false;
   }
 
   public onRegister(): void {

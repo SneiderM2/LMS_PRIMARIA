@@ -1,9 +1,16 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap } from 'rxjs';
+import { Observable, tap, catchError, throwError } from 'rxjs';
 import { LoginRequest, LoginResponse, RegisterRequest, User, UserRole } from '../models/user.model';
 import { environment } from '../../../environments/environment';
+
+export interface ActiveSessionInfo {
+  code: 'ACTIVE_SESSION';
+  message: string;
+  deviceHint?: string;
+  sessionStartedAt?: string;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -20,8 +27,14 @@ export class AuthService {
 
   constructor(private http: HttpClient, private router: Router) { }
 
-  public login(credentials: LoginRequest): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.apiUrl}/auth/login`, credentials).pipe(
+  /**
+   * Intenta iniciar sesión.
+   * @param credentials Datos de login
+   * @param forceLogin Si true, cierra la sesión activa en otro dispositivo
+   */
+  public login(credentials: LoginRequest, forceLogin = false): Observable<LoginResponse> {
+    const body = { ...credentials, forceLogin };
+    return this.http.post<LoginResponse>(`${this.apiUrl}/auth/login`, body).pipe(
       tap(response => {
         this.saveAuthData(response.token, response.user);
         this.currentUser.set(response.user);
@@ -40,8 +53,15 @@ export class AuthService {
     );
   }
 
-  public loginWithGoogle(idToken: string, honeypotTrap?: string): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.apiUrl}/auth/google-login`, { idToken, honeypotTrap }).pipe(
+  /**
+   * Intenta iniciar sesión con Google.
+   * @param idToken Token de identidad de Google
+   * @param honeypotTrap Valor del honeypot (debe estar vacío)
+   * @param forceLogin Si true, cierra la sesión activa en otro dispositivo
+   */
+  public loginWithGoogle(idToken: string, honeypotTrap?: string, forceLogin = false): Observable<LoginResponse> {
+    const body = { idToken, honeypotTrap, forceLogin };
+    return this.http.post<LoginResponse>(`${this.apiUrl}/auth/google-login`, body).pipe(
       tap(response => {
         this.saveAuthData(response.token, response.user);
         this.currentUser.set(response.user);
@@ -67,7 +87,20 @@ export class AuthService {
     );
   }
 
+  /**
+   * Polling ligero: verifica que la sesión actual siga siendo válida en el servidor.
+   * Si retorna 401 con code DUPLICATE_SESSION, el interceptor maneja el logout.
+   */
+  public validateSession(): Observable<{ valid: boolean }> {
+    return this.http.get<{ valid: boolean }>(`${this.apiUrl}/auth/validate-session`);
+  }
+
   public logout(): void {
+    // Intentar notificar al servidor (best-effort, sin bloquear)
+    const token = this.getToken();
+    if (token) {
+      this.http.post(`${this.apiUrl}/auth/logout`, {}).subscribe({ error: () => {} });
+    }
     localStorage.removeItem(this.TOKEN_KEY);
     localStorage.removeItem(this.USER_KEY);
     this.currentUser.set(null);

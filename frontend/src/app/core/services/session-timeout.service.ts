@@ -1,6 +1,6 @@
 import { Injectable, NgZone, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { Subject, Subscription, timer } from 'rxjs';
+import { Subject, Subscription, timer, interval } from 'rxjs';
 import { AuthService } from './auth.service';
 
 @Injectable({
@@ -11,12 +11,16 @@ export class SessionTimeoutService {
   private readonly WARNING_MS = 2.5 * 60 * 1000; // 150 segundos
   private readonly LOGOUT_MS = 5 * 60 * 1000;    // 300 segundos
 
+  // Polling de sesión única: cada 45 segundos verifica que no haya doble sesión
+  private readonly SESSION_POLL_INTERVAL_MS = 45 * 1000;
+
   public sessionWarning$ = new Subject<{ show: boolean; remainingSeconds: number }>();
   public isWarningActive = false;
 
   private warningTimerSub?: Subscription;
   private logoutTimerSub?: Subscription;
   private countdownSub?: Subscription;
+  private sessionPollSub?: Subscription;
 
   private userActivityEvents = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click'];
   private activityListener = () => this.handleUserActivity();
@@ -34,12 +38,14 @@ export class SessionTimeoutService {
     this.isMonitoring = true;
     this.attachActivityListeners();
     this.resetTimers();
+    this.startSessionPolling();
   }
 
   public stopMonitoring(): void {
     this.isMonitoring = false;
     this.detachActivityListeners();
     this.clearTimers();
+    this.sessionPollSub?.unsubscribe();
     this.isWarningActive = false;
     this.sessionWarning$.next({ show: false, remainingSeconds: 0 });
   }
@@ -81,6 +87,28 @@ export class SessionTimeoutService {
       this.logoutTimerSub = timer(this.LOGOUT_MS).subscribe(() => {
         this.ngZone.run(() => {
           this.performAutoLogout();
+        });
+      });
+    });
+  }
+
+  /**
+   * Polling cada 45s: consulta GET /api/auth/validate-session.
+   * Si el servidor responde 401 con code DUPLICATE_SESSION, el jwt.interceptor
+   * ya maneja el logout automático. Este método solo inicia el ciclo.
+   */
+  private startSessionPolling(): void {
+    this.sessionPollSub?.unsubscribe();
+
+    this.ngZone.runOutsideAngular(() => {
+      this.sessionPollSub = interval(this.SESSION_POLL_INTERVAL_MS).subscribe(() => {
+        this.ngZone.run(() => {
+          if (!this.authService.isAuthenticated()) {
+            this.sessionPollSub?.unsubscribe();
+            return;
+          }
+          // La respuesta 401 es manejada por el jwt.interceptor automáticamente
+          this.authService.validateSession().subscribe({ error: () => {} });
         });
       });
     });
