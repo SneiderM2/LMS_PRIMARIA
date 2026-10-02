@@ -1,5 +1,5 @@
 // Service Worker para LMS SciKids - Soporte PWA Offline
-const CACHE_NAME = 'scikids-lms-cache-v2';
+const CACHE_NAME = 'scikids-lms-cache-v3';
 const SCOPE = self.registration ? self.registration.scope : './';
 
 // Instalación: Precarga de assets críticos

@@ -31,7 +31,7 @@ public class SingleSessionMiddleware
             var username = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
             var tokenSession = context.User.FindFirst("session_token")?.Value;
 
-            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(tokenSession))
+            if (!string.IsNullOrEmpty(username))
             {
                 // Consultar el session_token persistido actualmente en la base de datos
                 var currentDbSessionToken = await dbContext.Usuarios
@@ -40,10 +40,11 @@ public class SingleSessionMiddleware
                     .Select(u => u.SessionToken)
                     .FirstOrDefaultAsync();
 
-                // Si en BD ya existe un session_token y es distinto al que porta el JWT entrante
-                if (currentDbSessionToken != null && !string.Equals(currentDbSessionToken, tokenSession, StringComparison.Ordinal))
+                // Si en BD existe un session_token y es distinto al que porta el JWT entrante (o este no tiene session_token)
+                if (!string.IsNullOrEmpty(currentDbSessionToken) && !string.Equals(currentDbSessionToken, tokenSession, StringComparison.Ordinal))
                 {
-                    _logger.LogWarning("Sesión revocada o duplicada para usuario '{Username}'. El session_token del JWT no coincide con el registrado en Supabase.", username);
+                    _logger.LogWarning("Sesión revocada o duplicada para usuario '{Username}'. El session_token del JWT ('{JwtToken}') no coincide con el registrado en Supabase ('{DbToken}').", 
+                        username, tokenSession ?? "NULO", currentDbSessionToken);
 
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                     context.Response.ContentType = "application/json";
