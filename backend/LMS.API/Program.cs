@@ -245,6 +245,7 @@ app.UseRouting();
 app.UseCors("AllowAngularDev");
 
 app.UseAuthentication();
+app.UseSingleSessionValidation();
 app.UseAuthorization();
 
 app.MapControllers();

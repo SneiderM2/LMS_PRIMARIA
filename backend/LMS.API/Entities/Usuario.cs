@@ -20,6 +20,8 @@ public class Usuario
     public DateTime? DataPolicyAcceptedAt { get; set; }
     public int AccessFailedCount { get; set; } = 0;
     public DateTime? LockoutEnd { get; set; }
+    // Control de sesión única / Prevención de doble sesión
+    public string? SessionToken { get; set; }
 
     // Propiedad calculada
     public string FullName => $"{Nombre} {Apellido}".Trim();

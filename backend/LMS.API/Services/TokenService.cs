@@ -63,6 +63,7 @@ public class TokenService : ITokenService
             new("role", standardRole == "Admin" ? ".admin" : standardRole),
             new("grade_level", grade),
             new("avatar_url", avatar),
+            new("session_token", user.SessionToken ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

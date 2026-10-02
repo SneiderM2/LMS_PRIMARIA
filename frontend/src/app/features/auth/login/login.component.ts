@@ -57,6 +57,8 @@ export class LoginComponent implements OnInit, AfterViewInit {
     this.route.queryParams.subscribe(params => {
       if (params['sessionExpired'] === 'true') {
         this.errorMessage = '⏱️ Tu sesión ha expirado por inactividad (5 minutos). Por favor ingresa nuevamente.';
+      } else if (params['duplicateSession'] === 'true') {
+        this.errorMessage = '⚠️ Tu sesión se ha cerrado porque se inició sesión en otro dispositivo.';
       }
     });
   }

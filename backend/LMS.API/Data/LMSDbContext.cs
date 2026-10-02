@@ -71,6 +71,7 @@ public class LMSDbContext : DbContext
             entity.Property(u => u.DataPolicyAcceptedAt).HasColumnName("data_policy_accepted_at");
             entity.Property(u => u.AccessFailedCount).HasColumnName("access_failed_count").HasDefaultValue(0);
             entity.Property(u => u.LockoutEnd).HasColumnName("lockout_end");
+            entity.Property(u => u.SessionToken).HasColumnName("session_token").HasMaxLength(255);
 
             entity.HasIndex(u => u.Username)
                   .IsUnique()

@@ -295,6 +295,13 @@ public static class DbInitializer
                 await alterCmd.ExecuteNonQueryAsync();
             }
 
+            if (!existingColumns.Contains("session_token"))
+            {
+                using var alterCmd = conn.CreateCommand();
+                alterCmd.CommandText = "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS session_token VARCHAR(255) NULL;";
+                await alterCmd.ExecuteNonQueryAsync();
+            }
+
             // Si la tabla 'perfiles' aún existe físicamente, migrar los datos a 'usuarios'
             using (var tableCmd = conn.CreateCommand())
             {

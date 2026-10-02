@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text;
 using LMS.API.Data;
 using LMS.API.DTOs;
 using LMS.API.Entities;
@@ -459,5 +460,200 @@ public class AdminController : ControllerBase
 
         var stateText = curso.Activo ? "activada" : "suspendida";
         return Ok(new { message = $"Materia {curso.Nombre} {stateText}.", activo = curso.Activo });
+    }
+
+    /// <summary>
+    /// Genera y descarga un volcado completo de la base de datos Supabase PostgreSQL
+    /// en formato .sql estructurado (tablas y registros DML) exclusivo para el rol Administrador.
+    /// GET: /api/admin/backup-database
+    /// </summary>
+    [HttpGet("backup-database")]
+    [Produces("application/sql")]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> BackupDatabase()
+    {
+        try
+        {
+            var sqlBuilder = new StringBuilder();
+            var timestamp = DateTime.UtcNow;
+
+            sqlBuilder.AppendLine("-- ====================================================================");
+            sqlBuilder.AppendLine("-- LMS PRIMARIA - RESPALDO / BACKUP DE BASE DE DATOS");
+            sqlBuilder.AppendLine($"-- FECHA DE EXTRACCIÓN (UTC): {timestamp:yyyy-MM-dd HH:mm:ss} UTC");
+            sqlBuilder.AppendLine("-- MOTOR DE BASE DE DATOS: PostgreSQL (Supabase Cloud)");
+            sqlBuilder.AppendLine("-- GENERADO POR: Panel Directivo LMS Primaria");
+            sqlBuilder.AppendLine("-- ====================================================================");
+            sqlBuilder.AppendLine();
+            sqlBuilder.AppendLine("SET statement_timeout = 0;");
+            sqlBuilder.AppendLine("SET lock_timeout = 0;");
+            sqlBuilder.AppendLine("SET client_encoding = 'UTF8';");
+            sqlBuilder.AppendLine("SET standard_conforming_strings = on;");
+            sqlBuilder.AppendLine("SET check_function_bodies = false;");
+            sqlBuilder.AppendLine("SET client_min_messages = warning;");
+            sqlBuilder.AppendLine();
+            sqlBuilder.AppendLine("BEGIN;");
+            sqlBuilder.AppendLine();
+
+            var conn = _context.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            // Orden canónico de tablas del LMS para respetar integridad referencial y Foreign Keys
+            var canonicalOrder = new List<string>
+            {
+                "roles",
+                "grados",
+                "usuarios",
+                "alumnos",
+                "cursos",
+                "inscripciones",
+                "tareas",
+                "entregas",
+                "archivos_entrega",
+                "materiales"
+            };
+
+            // Detectar todas las tablas existentes en el esquema public
+            var existingTables = new List<string>();
+            using (var tablesCmd = conn.CreateCommand())
+            {
+                tablesCmd.CommandText = @"
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                    ORDER BY table_name;";
+
+                using var reader = await tablesCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    existingTables.Add(reader.GetString(0));
+                }
+            }
+
+            // Ordenar: primero las tablas conocidas en orden seguro, luego cualquier tabla adicional
+            var orderedTables = canonicalOrder
+                .Where(t => existingTables.Contains(t, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            foreach (var tbl in existingTables)
+            {
+                if (!orderedTables.Contains(tbl, StringComparer.OrdinalIgnoreCase))
+                {
+                    orderedTables.Add(tbl);
+                }
+            }
+
+            foreach (var tableName in orderedTables)
+            {
+                sqlBuilder.AppendLine($"-- --------------------------------------------------------------------");
+                sqlBuilder.AppendLine($"-- TABLA: \"{tableName}\"");
+                sqlBuilder.AppendLine($"-- --------------------------------------------------------------------");
+
+                // Consultar columnas
+                var columns = new List<string>();
+                using (var colCmd = conn.CreateCommand())
+                {
+                    colCmd.CommandText = @"
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = @tbl
+                        ORDER BY ordinal_position;";
+
+                    var p = colCmd.CreateParameter();
+                    p.ParameterName = "@tbl";
+                    p.Value = tableName;
+                    colCmd.Parameters.Add(p);
+
+                    using var colReader = await colCmd.ExecuteReaderAsync();
+                    while (await colReader.ReadAsync())
+                    {
+                        columns.Add(colReader.GetString(0));
+                    }
+                }
+
+                if (columns.Count == 0) continue;
+
+                // Extraer registros
+                using (var dataCmd = conn.CreateCommand())
+                {
+                    dataCmd.CommandText = $"SELECT * FROM \"{tableName}\";";
+                    using var dataReader = await dataCmd.ExecuteReaderAsync();
+
+                    var columnList = string.Join(", ", columns.Select(c => $"\"{c}\""));
+                    var rowsDumped = 0;
+
+                    while (await dataReader.ReadAsync())
+                    {
+                        var values = new List<string>();
+                        for (int i = 0; i < dataReader.FieldCount; i++)
+                        {
+                            if (dataReader.IsDBNull(i))
+                            {
+                                values.Add("NULL");
+                            }
+                            else
+                            {
+                                var val = dataReader.GetValue(i);
+                                switch (val)
+                                {
+                                    case bool b:
+                                        values.Add(b ? "TRUE" : "FALSE");
+                                        break;
+                                    case int or long or short or byte:
+                                        values.Add(val.ToString()!);
+                                        break;
+                                    case decimal or double or float:
+                                        values.Add(Convert.ToString(val, System.Globalization.CultureInfo.InvariantCulture)!);
+                                        break;
+                                    case DateTime dt:
+                                        values.Add($"'{dt:yyyy-MM-dd HH:mm:ss.ffffff}'");
+                                        break;
+                                    case DateTimeOffset dto:
+                                        values.Add($"'{dto:yyyy-MM-dd HH:mm:ss.ffffffzzz}'");
+                                        break;
+                                    case Guid g:
+                                        values.Add($"'{g}'");
+                                        break;
+                                    default:
+                                        var escaped = val.ToString()?.Replace("'", "''") ?? "";
+                                        values.Add($"'{escaped}'");
+                                        break;
+                                }
+                            }
+                        }
+
+                        sqlBuilder.AppendLine($"INSERT INTO \"{tableName}\" ({columnList}) VALUES ({string.Join(", ", values)}) ON CONFLICT DO NOTHING;");
+                        rowsDumped++;
+                    }
+
+                    sqlBuilder.AppendLine($"-- Registros exportados para \"{tableName}\": {rowsDumped}");
+                    sqlBuilder.AppendLine();
+                }
+            }
+
+            sqlBuilder.AppendLine("COMMIT;");
+            sqlBuilder.AppendLine("-- ====================================================================");
+            sqlBuilder.AppendLine($"-- FIN DEL RESPALDO ({orderedTables.Count} tablas procesadas)");
+            sqlBuilder.AppendLine("-- ====================================================================");
+
+            var sqlBytes = Encoding.UTF8.GetBytes(sqlBuilder.ToString());
+            var fileName = $"backup_lms_supabase_{timestamp:yyyyMMdd_HHmmss}.sql";
+
+            Response.Headers.Append("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+            Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+
+            return File(sqlBytes, "application/sql", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error crítico generando el volcado SQL de la base de datos.");
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                message = "Ocurrió un error al generar la copia de seguridad SQL.",
+                detail = ex.Message
+            });
+        }
     }
 }

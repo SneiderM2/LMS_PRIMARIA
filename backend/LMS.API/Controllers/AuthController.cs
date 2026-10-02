@@ -195,7 +195,8 @@ public class AuthController : ControllerBase
             Activo = true,
             FechaCreacion = DateTime.UtcNow,
             DataPolicyAccepted = false, // Exigir aceptación al registrarse o iniciar
-            AccessFailedCount = 0
+            AccessFailedCount = 0,
+            SessionToken = Guid.NewGuid().ToString("N")
         };
 
         _context.Usuarios.Add(nuevoUsuario);
@@ -360,9 +361,10 @@ public class AuthController : ControllerBase
                 });
             }
 
-            // Restablecer contador de fallos tras login exitoso
+            // Restablecer contador de fallos y emitir nuevo token de sesión única
             user.AccessFailedCount = 0;
             user.LockoutEnd = null;
+            user.SessionToken = Guid.NewGuid().ToString("N");
             await _context.SaveChangesAsync();
 
             var fullName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName : user.Username;
@@ -581,6 +583,10 @@ public class AuthController : ControllerBase
             user.Rol = rolAlumno!;
         }
 
+        // Generar y persistir token de sesión única para prevenir doble sesión
+        user.SessionToken = Guid.NewGuid().ToString("N");
+        await _context.SaveChangesAsync();
+
         var (token, expiration) = _tokenService.GenerateToken(
             user, 
             user.FullName, 
@@ -658,5 +664,26 @@ public class AuthController : ControllerBase
             AvatarUrl = avatar,
             DataPolicyAccepted = user.DataPolicyAccepted
         });
+    }
+
+    /// <summary>
+    /// Cierra la sesión activa del usuario invalidando el session_token registrado en Supabase.
+    /// POST: /api/auth/logout
+    /// </summary>
+    [Authorize]
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!string.IsNullOrEmpty(username))
+        {
+            var user = await _context.Usuarios.FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
+            if (user != null)
+            {
+                user.SessionToken = null;
+                await _context.SaveChangesAsync();
+            }
+        }
+        return Ok(new { message = "Sesión cerrada correctamente." });
     }
 }

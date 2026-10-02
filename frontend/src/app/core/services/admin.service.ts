@@ -120,4 +120,13 @@ export class AdminService {
   public toggleCourseStatus(id: number): Observable<{ message: string; activo: boolean }> {
     return this.http.patch<{ message: string; activo: boolean }>(`${this.API_URL}/courses/${id}/toggle-status`, {});
   }
+
+  /**
+   * Solicita el respaldo SQL completo de la base de datos Supabase como Blob binario.
+   */
+  public downloadDatabaseBackup(): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/backup-database`, {
+      responseType: 'blob'
+    });
+  }
 }

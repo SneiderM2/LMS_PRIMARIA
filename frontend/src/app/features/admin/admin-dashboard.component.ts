@@ -506,6 +506,41 @@ export class AdminDashboardComponent implements OnInit {
     }
   }
 
+  public isDownloadingBackup = false;
+
+  public downloadDatabaseBackup(): void {
+    if (this.isDownloadingBackup) return;
+
+    this.isDownloadingBackup = true;
+    this.showToast('Generando dump SQL de la base de datos Supabase... Por favor espera.', 'info');
+
+    this.adminService.downloadDatabaseBackup().subscribe({
+      next: (blob: Blob) => {
+        this.isDownloadingBackup = false;
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const fileName = `backup_lms_supabase_${timestamp}.sql`;
+
+        // Crear enlace temporal de descarga en el navegador
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+
+        this.showToast('Copia de seguridad SQL descargada exitosamente 💾', 'success');
+      },
+      error: (err) => {
+        this.isDownloadingBackup = false;
+        console.error('Error al descargar copia de seguridad:', err);
+        this.showToast('No fue posible generar el backup de la base de datos. Verifica la conexión con Supabase.', 'warning');
+      }
+    });
+  }
+
   public logout(): void {
     this.authService.logout();
   }

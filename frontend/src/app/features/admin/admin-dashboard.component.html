@@ -81,6 +81,9 @@
           <button class="btn btn-primary" (click)="openCreateUserModal()">
             ➕ Registrar Usuario
           </button>
+          <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar copia de seguridad SQL de Supabase">
+            <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
+          </button>
           <button class="btn btn-secondary" (click)="goToTeacherView()">
             🚦 Abrir Semáforo
           </button>
@@ -447,6 +450,9 @@
               <span>📄 Reporte .PDF</span>
             </button>
           </div>
+          <button type="button" class="btn btn-primary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar copia de seguridad SQL de Supabase">
+            <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
+          </button>
         </div>
       </section>
       <app-system-inspector></app-system-inspector>
