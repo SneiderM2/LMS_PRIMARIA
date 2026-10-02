@@ -362,21 +362,11 @@ public class AuthController : ControllerBase
             }
 
             // Restablecer contador de fallos y emitir nuevo token de sesión única
+            // Al reemplazar el SessionToken, cualquier sesión activa anterior queda
+            // automáticamente inválida: el middleware SingleSession y el polling del
+            // frontend la detectarán y expulsarán en los próximos 45 segundos.
             user.AccessFailedCount = 0;
             user.LockoutEnd = null;
-
-            // Detección de sesión activa: si ya hay un SessionToken en BD, esta cuenta está siendo usada en otro lugar
-            if (!string.IsNullOrEmpty(user.SessionToken) && !request.ForceLogin)
-            {
-                return StatusCode(StatusCodes.Status409Conflict, new ActiveSessionResponseDto
-                {
-                    Code = "ACTIVE_SESSION",
-                    Message = "Ya existe una sesión activa para esta cuenta en otro dispositivo o navegador.",
-                    DeviceHint = user.Username,
-                    SessionStartedAt = user.LastLoginAt
-                });
-            }
-
             user.SessionToken = Guid.NewGuid().ToString("N");
             user.LastLoginAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
@@ -597,19 +587,8 @@ public class AuthController : ControllerBase
             user.Rol = rolAlumno!;
         }
 
-        // Generar y persistir token de sesión única para prevenir doble sesión
-        // Detección de sesión activa: si ya hay un SessionToken en BD
-        if (!string.IsNullOrEmpty(user.SessionToken) && !dto.ForceLogin)
-        {
-            return StatusCode(StatusCodes.Status409Conflict, new ActiveSessionResponseDto
-            {
-                Code = "ACTIVE_SESSION",
-                Message = "Ya existe una sesión activa para esta cuenta en otro dispositivo o navegador.",
-                DeviceHint = user.Username,
-                SessionStartedAt = user.LastLoginAt
-            });
-        }
-
+        // Reemplazar el SessionToken: la sesión anterior queda automáticamente
+        // inválida y será expulsada por el polling del frontend en ~45 segundos.
         user.SessionToken = Guid.NewGuid().ToString("N");
         user.LastLoginAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
