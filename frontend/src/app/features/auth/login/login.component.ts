@@ -132,20 +132,23 @@ export class LoginComponent implements OnInit, AfterViewInit {
       if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
         clearInterval(checkGoogle);
         try {
-          google.accounts.id.initialize({
-            client_id: '782910394812-sampleclientidforexample.apps.googleusercontent.com',
-            callback: (res: any) => this.handleGoogleCredential(res.credential)
-          });
-
-          const btnContainer = document.getElementById('googleLoginBtnContainer');
-          if (btnContainer) {
-            google.accounts.id.renderButton(btnContainer, {
-              theme: 'outline',
-              size: 'large',
-              shape: 'pill',
-              text: 'signin_with',
-              locale: 'es'
+          const clientId = '782910394812-sampleclientidforexample.apps.googleusercontent.com';
+          if (clientId && !clientId.includes('sampleclientidforexample')) {
+            google.accounts.id.initialize({
+              client_id: clientId,
+              callback: (res: any) => this.handleGoogleCredential(res.credential)
             });
+
+            const btnContainer = document.getElementById('googleLoginBtnContainer');
+            if (btnContainer) {
+              google.accounts.id.renderButton(btnContainer, {
+                theme: 'outline',
+                size: 'large',
+                shape: 'pill',
+                text: 'signin_with',
+                locale: 'es'
+              });
+            }
           }
         } catch (err) {
           console.warn('Google Identity init:', err);

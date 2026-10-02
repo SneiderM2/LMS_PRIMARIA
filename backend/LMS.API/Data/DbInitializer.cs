@@ -7,8 +7,8 @@ public static class DbInitializer
 {
     public static async Task SeedAsync(LMSDbContext context)
     {
-        // Las tablas y columnas ya fueron migradas en Supabase PostgreSQL.
-        // Omitimos llamadas DDL crudas para evitar conflictos con el Session Pooler.
+        // 0. Auto-migración defensiva de esquema y columnas antes de cualquier consulta EF
+        await EnsureColumnsMigratedAsync(context);
 
         // 1. Inicializar Roles obligatorios según bd.txt si la tabla está vacía
         if (!await context.Roles.AnyAsync())
