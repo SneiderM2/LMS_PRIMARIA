@@ -456,17 +456,17 @@ export class AdminDashboardComponent implements OnInit {
     this.showToast('Ejecutando script de restauración en Supabase PostgreSQL... Por favor espera.', 'info');
 
     this.adminService.restoreBackup(file).subscribe({
-      next: (res) => {
+      next: (res: { message?: string; fileName?: string; restoredAt?: string }) => {
         this.isRestoringBackup = false;
-        this.showToast('✅ Base de datos restaurada exitosamente.', 'success');
+        this.showToast(res?.message || '✅ Base de datos restaurada exitosamente.', 'success');
         target.value = '';
         setTimeout(() => {
           window.location.reload();
         }, 1500);
       },
-      error: (err) => {
+      error: (err: any) => {
         this.isRestoringBackup = false;
-        alert(`❌ Error al restaurar el backup: ${err?.error?.message || err.message}`);
+        alert(`❌ Error al restaurar el backup: ${err?.error?.message || err?.message || 'Error desconocido'}`);
         target.value = '';
       }
     });
@@ -521,6 +521,71 @@ export class AdminDashboardComponent implements OnInit {
           ]
         });
         this.showToast('Reporte de usuarios en PDF generado exitosamente 📄', 'success');
+      }
+    } else if (this.activeSection === 'courses') {
+      const headers = ['ID', 'Nombre Materia', 'Grado', 'Grupo', 'Docente Titular', 'Total Alumnos', 'Estado'];
+      const rows = this.filteredCourses.map(c => [
+        c.id,
+        c.nombre,
+        c.grado,
+        c.grupo,
+        c.docenteNombre,
+        c.totalStudents,
+        c.activo ? 'Activa' : 'Inactiva'
+      ]);
+
+      if (format === 'csv') {
+        this.reportService.exportToCsv(`reporte_materias_admin_${today}`, headers, rows);
+        this.showToast('Reporte de materias en CSV descargado exitosamente 📊', 'success');
+      } else {
+        this.reportService.exportToPdf({
+          title: 'Reporte Directivo: Directorio de Materias y Asignaturas',
+          subtitle: `Filtro Grado: ${this.courseGradeFilter} • Total Registros: ${this.filteredCourses.length}`,
+          author: authorName,
+          institution: 'LMS Primaria • Panel Institucional Administrativo',
+          headers,
+          rows,
+          filename: `reporte_materias_admin_${today}`,
+          summaryCards: [
+            { label: 'Total Materias', value: this.filteredCourses.length, color: 'blue' },
+            { label: 'Alumnos Activos', value: this.metrics.activeStudentsCount, color: 'green' },
+            { label: 'Docentes Activos', value: this.metrics.activeTeachersCount, color: 'purple' },
+            { label: 'Estado Kestrel', value: this.metrics.systemStatus, color: 'yellow' }
+          ]
+        });
+        this.showToast('Reporte de materias en PDF generado exitosamente 📄', 'success');
+      }
+    } else if (this.activeSection === 'inspector') {
+      const headers = ['Componente / Parámetro', 'Estado / Valor', 'Descripción Técnica'];
+      const rows = [
+        ['Estado General del Servidor', this.metrics.systemStatus, 'Kestrel Web Server (.NET 8) y PostgreSQL (Supabase)'],
+        ['Total Usuarios Habilitados', this.metrics.totalActiveUsers, 'Cuentas con acceso activo a la plataforma'],
+        ['Docentes Registrados', this.metrics.activeTeachersCount, 'Profesores titulares de materias'],
+        ['Estudiantes Matriculados', this.metrics.activeStudentsCount, 'Alumnos de 1° a 6° de básica primaria'],
+        ['Cursos y Materias Creadas', this.metrics.totalCoursesCount, 'Asignaturas operativas en el ciclo lectivo'],
+        ['Alertas y Errores (24h)', this.metrics.recentErrorsCount, 'Registros en log de auditoría']
+      ];
+
+      if (format === 'csv') {
+        this.reportService.exportToCsv(`reporte_auditoria_sistema_${today}`, headers, rows);
+        this.showToast('Reporte de auditoría en CSV descargado exitosamente 📊', 'success');
+      } else {
+        this.reportService.exportToPdf({
+          title: 'Reporte de Auditoría e Infraestructura de Servidor',
+          subtitle: `Generado para auditoría directiva de plataforma LMS Primaria`,
+          author: authorName,
+          institution: 'LMS Primaria • Centro de Auditoría y Seguridad',
+          headers,
+          rows,
+          filename: `reporte_auditoria_sistema_${today}`,
+          summaryCards: [
+            { label: 'Estado', value: this.metrics.systemStatus, color: 'green' },
+            { label: 'Usuarios', value: this.metrics.totalActiveUsers, color: 'blue' },
+            { label: 'Cursos', value: this.metrics.totalCoursesCount, color: 'purple' },
+            { label: 'Alertas 24h', value: this.metrics.recentErrorsCount, color: 'yellow' }
+          ]
+        });
+        this.showToast('Reporte de auditoría en PDF generado exitosamente 📄', 'success');
       }
     }
   }

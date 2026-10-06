@@ -129,4 +129,16 @@ export class AdminService {
       responseType: 'blob'
     });
   }
+
+  /**
+   * Sube un archivo .sql para restaurar la base de datos PostgreSQL en Supabase.
+   */
+  public restoreBackup(file: File): Observable<{ message: string; fileName: string; restoredAt: string }> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    return this.http.post<{ message: string; fileName: string; restoredAt: string }>(
+      `${this.API_URL}/restore-backup`,
+      formData
+    );
+  }
 }

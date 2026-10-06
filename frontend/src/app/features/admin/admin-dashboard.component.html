@@ -1,4 +1,7 @@
 <div class="admin-page">
+  <!-- Selector oculto para restaurar copias de seguridad .sql -->
+  <input #fileInput type="file" accept=".sql" (change)="onFileSelected($event)" style="display: none;" tabindex="-1" aria-hidden="true" />
+
   <!-- Barra de Navegación Directiva -->
   <header class="admin-nav glass-panel">
     <div class="nav-brand">
@@ -83,6 +86,9 @@
           </button>
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar copia de seguridad SQL de Supabase">
             <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
+          </button>
+          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar base de datos desde copia de seguridad .sql">
+            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : '📥 Restaurar Copia (.sql)' }}</span>
           </button>
           <button class="btn btn-secondary" (click)="goToTeacherView()">
             🚦 Abrir Semáforo
@@ -450,8 +456,11 @@
               <span>📄 Reporte .PDF</span>
             </button>
           </div>
-          <button type="button" class="btn btn-primary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar copia de seguridad SQL de Supabase">
+          <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar copia de seguridad SQL de Supabase">
             <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar base de datos desde copia de seguridad .sql">
+            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : '📥 Restaurar Copia (.sql)' }}</span>
           </button>
         </div>
       </section>

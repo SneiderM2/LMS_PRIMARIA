@@ -62,6 +62,77 @@ public static class DbInitializer
             };
             context.Usuarios.Add(adminUser);
         }
+        else
+        {
+            adminUser.Activo = true;
+            adminUser.LockoutEnd = null;
+            adminUser.AccessFailedCount = 0;
+            adminUser.DataPolicyAccepted = true;
+        }
+
+        // 3.2 Usuario Docente
+        var docenteUser = await context.Usuarios.FirstOrDefaultAsync(u => u.Username.ToLower() == "docente");
+        if (docenteUser == null)
+        {
+            docenteUser = new Usuario
+            {
+                Username = "docente",
+                RolId = teacherRole.Id,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("docente123"),
+                Nombre = "Profesor",
+                Apellido = "Primaria",
+                AvatarUrl = "https://api.dicebear.com/7.x/bottts/svg?seed=docente",
+                Activo = true,
+                DataPolicyAccepted = true,
+                DataPolicyAcceptedAt = DateTime.UtcNow,
+                AccessFailedCount = 0,
+                LockoutEnd = null
+            };
+            context.Usuarios.Add(docenteUser);
+        }
+        else
+        {
+            docenteUser.Activo = true;
+            docenteUser.LockoutEnd = null;
+            docenteUser.AccessFailedCount = 0;
+            docenteUser.DataPolicyAccepted = true;
+        }
+
+        // 3.3 Usuario Estudiante
+        var studentUser = await context.Usuarios.Include(u => u.Alumno).FirstOrDefaultAsync(u => u.Username.ToLower() == "estudiante");
+        if (studentUser == null)
+        {
+            studentUser = new Usuario
+            {
+                Username = "estudiante",
+                RolId = studentRole.Id,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("estudiante123"),
+                Nombre = "Estudiante",
+                Apellido = "Primaria",
+                AvatarUrl = "https://api.dicebear.com/7.x/bottts/svg?seed=estudiante",
+                Activo = true,
+                DataPolicyAccepted = true,
+                DataPolicyAcceptedAt = DateTime.UtcNow,
+                AccessFailedCount = 0,
+                LockoutEnd = null
+            };
+            context.Usuarios.Add(studentUser);
+            await context.SaveChangesAsync();
+
+            var alumnoRecord = new Alumno
+            {
+                UsuarioId = studentUser.Id,
+                GradoId = primerGrado.Id
+            };
+            context.Alumnos.Add(alumnoRecord);
+        }
+        else
+        {
+            studentUser.Activo = true;
+            studentUser.LockoutEnd = null;
+            studentUser.AccessFailedCount = 0;
+            studentUser.DataPolicyAccepted = true;
+        }
 
         await context.SaveChangesAsync();
     }
@@ -123,6 +194,37 @@ public static class DbInitializer
                 END LOOP;
             END $$;";
             await boolCmd.ExecuteNonQueryAsync();
+
+            var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'usuarios';";
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync()) existingColumns.Add(reader.GetString(0));
+            }
+
+            var columnDefs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "nombre", "VARCHAR(100) NOT NULL DEFAULT ''" },
+                { "apellido", "VARCHAR(100) NOT NULL DEFAULT ''" },
+                { "avatar_url", "VARCHAR(500) NULL" },
+                { "data_policy_accepted", "BOOLEAN NOT NULL DEFAULT FALSE" },
+                { "data_policy_accepted_at", "TIMESTAMP WITHOUT TIME ZONE NULL" },
+                { "access_failed_count", "INT NOT NULL DEFAULT 0" },
+                { "lockout_end", "TIMESTAMP WITHOUT TIME ZONE NULL" },
+                { "session_token", "VARCHAR(255) NULL" },
+                { "last_login_at", "TIMESTAMP WITHOUT TIME ZONE NULL" }
+            };
+
+            foreach (var col in columnDefs)
+            {
+                if (!existingColumns.Contains(col.Key))
+                {
+                    using var alterCmd = conn.CreateCommand();
+                    alterCmd.CommandText = $"ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS \"{col.Key}\" {col.Value};";
+                    await alterCmd.ExecuteNonQueryAsync();
+                }
+            }
         }
         catch (Exception ex)
         {

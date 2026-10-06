@@ -507,7 +507,7 @@ public class TeacherController : ControllerBase
                 Titulo = dto.Title.Trim(),
                 Descripcion = dto.Description.Trim(),
                 FechaPublicacion = DateTime.UtcNow,
-                FechaLimite = dto.DueDate ?? DateTime.UtcNow.AddDays(7),
+                FechaLimite = dto.DueDate.HasValue ? DateTime.SpecifyKind(dto.DueDate.Value, DateTimeKind.Utc) : DateTime.UtcNow.AddDays(7),
                 PuntajeMaximo = 100.00m,
                 Activo = true
             };
@@ -911,7 +911,7 @@ public class TeacherController : ControllerBase
 
             tarea.Titulo = dto.Title.Trim();
             tarea.Descripcion = dto.Description?.Trim();
-            if (dto.DueDate.HasValue) tarea.FechaLimite = dto.DueDate.Value;
+            if (dto.DueDate.HasValue) tarea.FechaLimite = DateTime.SpecifyKind(dto.DueDate.Value, DateTimeKind.Utc);
             if (dto.MaxScore.HasValue) tarea.PuntajeMaximo = dto.MaxScore.Value;
 
             await _context.SaveChangesAsync();

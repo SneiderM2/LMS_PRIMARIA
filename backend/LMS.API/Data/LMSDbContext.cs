@@ -279,7 +279,7 @@ public class LMSDbContext : DbContext
             entity.Property(m => m.Titulo).HasColumnName("titulo").HasMaxLength(150).IsRequired();
             entity.Property(m => m.Descripcion).HasColumnName("descripcion").HasColumnType("text");
             entity.Property(m => m.Tipo).HasColumnName("tipo").HasMaxLength(20).IsRequired();
-            entity.Property(m => m.RecursoUrl).HasColumnName("recurso_url").HasMaxLength(500).IsRequired();
+            entity.Property(m => m.RecursoUrl).HasColumnName("recurso_url").HasMaxLength(500).IsRequired(false);
             entity.Property(m => m.FechaPublicacion).HasColumnName("fecha_publicacion").HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(m => m.Activo).HasColumnName("activo").HasDefaultValue(true);
 

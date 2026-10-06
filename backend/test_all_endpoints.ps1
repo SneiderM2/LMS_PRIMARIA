@@ -31,7 +31,7 @@ Write-Host "========================================="
 Write-Host "1. Testing ADMIN Registration & Endpoints"
 Write-Host "========================================="
 $adminId = "admin_$suffix"
-$adminBody = '{"id":"' + $adminId + '","fullName":"Administrador Auditor","role":"Admin","password":"Password123"}'
+$adminBody = '{"id":"' + $adminId + '","fullName":"Administrador Auditor","role":"Admin","password":"Password123","captchaToken":"DEV_TEST_TOKEN"}'
 $adminAuth = Call-Api -Method "POST" -Url "http://localhost:5000/api/auth/register" -Body $adminBody
 Write-Host "  -> Admin registered: $($adminAuth.user.fullName) ($($adminAuth.user.id)) [Role: $($adminAuth.user.role)]"
 $adminToken = $adminAuth.token
@@ -58,7 +58,7 @@ Write-Host "`n=========================================="
 Write-Host "2. Testing TEACHER Registration & Endpoints"
 Write-Host "=========================================="
 $teacherId = "prof_$suffix"
-$teacherBody = '{"id":"' + $teacherId + '","fullName":"Profe Laura Hernandez","role":"Teacher","password":"Password123"}'
+$teacherBody = '{"id":"' + $teacherId + '","fullName":"Profe Laura Hernandez","role":"Teacher","password":"Password123","captchaToken":"DEV_TEST_TOKEN"}'
 $teacherAuth = Call-Api -Method "POST" -Url "http://localhost:5000/api/auth/register" -Body $teacherBody
 Write-Host "  -> Teacher registered: $($teacherAuth.user.fullName) ($($teacherAuth.user.id)) [Role: $($teacherAuth.user.role)]"
 $teacherToken = $teacherAuth.token
@@ -86,7 +86,7 @@ Write-Host "`n=========================================="
 Write-Host "3. Testing STUDENT Registration & Endpoints"
 Write-Host "=========================================="
 $studentId = "est_$suffix"
-$studentBody = '{"id":"' + $studentId + '","fullName":"Pepito Perez","role":"Student","grade":"5°","password":"Password123"}'
+$studentBody = '{"id":"' + $studentId + '","fullName":"Pepito Perez","role":"Student","grade":"5°","password":"Password123","captchaToken":"DEV_TEST_TOKEN"}'
 $studentAuth = Call-Api -Method "POST" -Url "http://localhost:5000/api/auth/register" -Body $studentBody
 Write-Host "  -> Student registered: $($studentAuth.user.fullName) ($($studentAuth.user.id)) [Role: $($studentAuth.user.role)]"
 $studentToken = $studentAuth.token

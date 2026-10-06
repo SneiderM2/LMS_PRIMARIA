@@ -7,6 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
+// Compatibilidad universal de DateTime con PostgreSQL en Supabase
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Configuración de PostgreSQL (Supabase) y Entity Framework Core
@@ -64,6 +67,13 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
     catch
     {
         connectionString = normalizedUri;
+    }
+}
+else
+{
+    if (connectionString.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase))
+    {
+        connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Port=\d+", "Port=5432", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 }
 
