@@ -1,6 +1,6 @@
 {
   "configVersion": 1,
-  "timestamp": 1790948251900,
+  "timestamp": 1790978970175,
   "index": "/LMS_PRIMARIA/index.html",
   "assetGroups": [
     {
@@ -16,7 +16,7 @@
         "/LMS_PRIMARIA/chunk-EQDQRRRY.js",
         "/LMS_PRIMARIA/chunk-SWBZ2T66.js",
         "/LMS_PRIMARIA/index.html",
-        "/LMS_PRIMARIA/main-BTUG357Y.js",
+        "/LMS_PRIMARIA/main-5B76RGI3.js",
         "/LMS_PRIMARIA/manifest.webmanifest",
         "/LMS_PRIMARIA/polyfills-FFHMD2TL.js",
         "/LMS_PRIMARIA/service-worker.js",
@@ -60,8 +60,8 @@
     "/LMS_PRIMARIA/icons/icon-192x192.svg": "5fd612153a6a541e5adf96b8e03cfc61333e7922",
     "/LMS_PRIMARIA/icons/icon-512x512.png": "3736d519d25e5731880d6a0de5718faa97a05e3e",
     "/LMS_PRIMARIA/icons/icon-512x512.svg": "b47e773329271f5f4b3765cf6d409110455bad0d",
-    "/LMS_PRIMARIA/index.html": "379521c245242721060d4374cab0f882eb5d965c",
-    "/LMS_PRIMARIA/main-BTUG357Y.js": "d2b587b4fad8b45530c66afd167e34233efccb18",
+    "/LMS_PRIMARIA/index.html": "88043809f647e74ce581ebbd573fbeb60b46d09e",
+    "/LMS_PRIMARIA/main-5B76RGI3.js": "64757fa2b8dd2995880aa8e0057c377dbfd2bd75",
     "/LMS_PRIMARIA/manifest.webmanifest": "904724867c782654bc310102e81d4afad7508d5f",
     "/LMS_PRIMARIA/polyfills-FFHMD2TL.js": "f49b49a155bc7d192db62a4c15d0a612b460a667",
     "/LMS_PRIMARIA/service-worker.js": "770c3bdf255c3d786d29558848a292c9686028a6",

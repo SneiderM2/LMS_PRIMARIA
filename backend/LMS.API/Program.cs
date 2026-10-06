@@ -13,9 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 var rawConnectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? builder.Configuration.GetConnectionString("DefaultConnection") 
     ?? builder.Configuration["DATABASE_URL"]
-    ?? "Host=aws-0-us-east-1.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.rjvsbjjmlmvcihfgbiaz;Password=Sneider0124;SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Maximum Pool Size=10;Connection Idle Lifetime=60;";
+    ?? "Host=aws-0-us-east-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.rjvsbjjmlmvcihfgbiaz;Password=Sneider0124;SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Maximum Pool Size=10;Connection Idle Lifetime=60;";
 
-// Normalizar formato URI si viene en formato postgresql:// o postgres:// (convención Render/Heroku)
 var connectionString = rawConnectionString;
 if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
     connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
@@ -32,10 +31,6 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
         var db = uri.AbsolutePath.TrimStart('/');
         if (string.IsNullOrWhiteSpace(db)) db = "postgres";
 
-        // Supabase Direct Connection (db.PROJECT_REF.supabase.co) solo expone dirección IPv6.
-        // Dado que los contenedores de Render operan en IPv4 puro, la conexión a db.*.supabase.co
-        // falla con error de red IPv6.
-        // Redirigimos automáticamente al Session Pooler IPv4 de Supabase (puerto 5432 - Session Mode):
         if (host.EndsWith(".supabase.co", StringComparison.OrdinalIgnoreCase))
         {
             var projectRef = "rjvsbjjmlmvcihfgbiaz";
@@ -71,27 +66,6 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
         connectionString = normalizedUri;
     }
 }
-else
-{
-    // Normalizar formato clave=valor
-    if (connectionString.Contains(".supabase.co", StringComparison.OrdinalIgnoreCase) && !connectionString.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase))
-    {
-        var match = System.Text.RegularExpressions.Regex.Match(connectionString, @"Host=db\.([^;]+)\.supabase\.co", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        var proj = match.Success ? match.Groups[1].Value : "rjvsbjjmlmvcihfgbiaz";
-
-        connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Host=db\.[^;]+\.supabase\.co", "Host=aws-0-us-east-1.pooler.supabase.com", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Port=\d+", "Port=5432", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-        if (!connectionString.Contains($"postgres.{proj}", StringComparison.OrdinalIgnoreCase))
-        {
-            connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Username=postgres\b", $"Username=postgres.{proj}", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        }
-    }
-    else if (connectionString.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase))
-    {
-        connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Port=\d+", "Port=5432", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-    }
-}
 
 builder.Services.AddDbContext<LMSDbContext>(options =>
     options.UseNpgsql(connectionString, npgsqlOptions =>
@@ -100,13 +74,13 @@ builder.Services.AddDbContext<LMSDbContext>(options =>
         npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null);
     }));
 
-// 2. Inyección de Dependencias de Servicios de Dominio
+// 2. Inyección de Dependencias
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ISemaforoService, SemaforoService>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddHttpClient<ICaptchaService, GoogleRecaptchaService>();
 
-// 3. Configuración de Autenticación JWT
+// 3. Autenticación JWT
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"] ?? "LmsPrimarySchoolSuperSecretKey2026!@#$%^&*()_+";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "LMS.API";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "LMS.Client";
@@ -133,7 +107,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// 4. Configuración de Políticas de Autorización
+// 4. Políticas de Autorización
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin", "ADMINISTRADOR", ".admin", "admin"));
@@ -141,36 +115,36 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireStudent", policy => policy.RequireRole("Student", "ALUMNO"));
 });
 
-// 5. Configuración de CORS para el Frontend Angular en GitHub Pages y desarrollo
+// 5. Configuración de CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngularDev", policy =>
     {
         policy.WithOrigins(
-                  "https://sneiderm2.github.io",
-                  "https://sneiderm2.github.io/LMS_PRIMARIA",
-                  "http://localhost:4200",
-                  "http://localhost:5000",
-                  "http://127.0.0.1:4200"
-              )
-              .SetIsOriginAllowed(origin => true) // Admite orígenes adicionales en red local y previews
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+            "https://sneiderm2.github.io",
+            "https://sneiderm2.github.io/LMS_PRIMARIA",
+            "http://localhost:4200",
+            "http://localhost:5000",
+            "http://127.0.0.1:4200"
+        )
+        .SetIsOriginAllowed(origin => true)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials();
     });
 });
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// 6. Swagger / OpenAPI con soporte JWT Bearer para .NET 8 LTS
+// 6. Swagger / OpenAPI
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "LMS Primaria - API REST",
         Version = "v1",
-        Description = "Backend para la plataforma educativa LMS de Educación Primaria con Semáforo de Asistencia y Entregas de Tareas."
+        Description = "Backend para la plataforma educativa LMS de Educación Primaria."
     });
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -201,7 +175,7 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// 7. Migración e Inicialización de Semillas en la Base de Datos
+// 7. Migración e Inicialización en Supabase
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -209,7 +183,7 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<LMSDbContext>();
         await DbInitializer.SeedAsync(context);
-        app.Logger.LogInformation("Base de datos PostgreSQL (Supabase) inicializada con datos de prueba escolares exitosamente.");
+        app.Logger.LogInformation("Base de datos PostgreSQL (Supabase) inicializada correctamente.");
     }
     catch (Exception ex)
     {
@@ -217,16 +191,16 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// 8. Configurar directorio de logs
+// 8. Logs
 var logsPath = Path.Combine(AppContext.BaseDirectory, "logs");
 Directory.CreateDirectory(logsPath);
 FileLogger.SetLogDirectory(logsPath);
 await FileLogger.InfoAsync("Servidor LMS iniciado", new { environment = app.Environment.EnvironmentName });
 
-// 9. Pipeline HTTP — Middlewares personalizados (orden importa)
-app.UseGlobalExceptionHandler(); // Primero: captura excepciones de todo el pipeline
-app.UseSecurityHeaders();         // Segundo: inyecta cabeceras de seguridad
-app.UseRequestLogging();          // Tercero: registra cada petición en access.log/error.log
+// 9. Middlewares
+app.UseGlobalExceptionHandler();
+app.UseSecurityHeaders();
+app.UseRequestLogging();
 
 if (app.Environment.IsDevelopment())
 {
@@ -239,13 +213,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles(); // Habilitar descargas de archivos en wwwroot/uploads
+app.UseStaticFiles();
 
 app.UseRouting();
 app.UseCors("AllowAngularDev");
 
 app.UseAuthentication();
-app.UseSingleSessionValidation();
+app.UseSingleSessionValidation(); // Middleware de Sesión Única
 app.UseAuthorization();
 
 app.MapControllers();
