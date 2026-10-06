@@ -1,6 +1,16 @@
-# LMS Web v6.0 - Plataforma Educativa Primaria (PostgreSQL Supabase) 🎒✨
+# LMS Primaria — Plataforma Educativa para Básica Primaria 🎒✨
 
-Sistema de Gestión de Aprendizaje (LMS) diseñado con arquitectura limpia en **.NET 10 Web API**, frontend moderno en **Angular 18** y persistencia en **PostgreSQL (Supabase Cloud)** mediante **Npgsql Entity Framework Core**.
+Sistema de Gestión de Aprendizaje (LMS) diseñado con arquitectura limpia en **.NET 10 Web API**, frontend moderno en **Angular 18** y persistencia en **PostgreSQL (Supabase Cloud)** mediante **Npgsql Entity Framework Core**. Desplegado como **PWA** (Progressive Web App) en **GitHub Pages** con backend en **Render**.
+
+---
+
+## 🌐 Despliegue en Producción
+
+| Servicio | URL |
+| :--- | :--- |
+| **Frontend (GitHub Pages)** | `https://sneider m2.github.io/LMS_PRIMARIA/` |
+| **Backend API (Render)** | `https://lms-primaria.onrender.com/api` |
+| **Documentación Scalar** | `https://lms-primaria.onrender.com/scalar/v1` |
 
 ---
 
@@ -10,309 +20,238 @@ Sistema de Gestión de Aprendizaje (LMS) diseñado con arquitectura limpia en **
 | :--- | :--- | :---: |
 | **Backend** | ASP.NET Core Web API | .NET 10 |
 | **ORM** | Entity Framework Core + Npgsql PostgreSQL | 10.0.3 / 10.0.12 |
-| **Autenticación** | JWT Bearer | 9.0.0 |
+| **Autenticación** | JWT Bearer + Google OAuth 2.0 | 9.0.0 |
 | **Documentación API** | Scalar (reemplaza Swagger UI) | 2.6.0 |
 | **Hashing** | BCrypt.Net-Next | 4.0.3 |
-| **Frontend** | Angular CLI | 18.x |
+| **Frontend** | Angular 18 (Standalone Components) | 18.x |
 | **Base de datos** | PostgreSQL (Supabase Cloud / Pooler IPv4) | 16.x |
+| **Hosting Frontend** | GitHub Pages (SPA + PWA) | — |
+| **Hosting Backend** | Render (Docker / Web Service) | — |
+| **Exportación** | jsPDF + html2canvas + PapaParse | — |
 
 ---
 
 ## ✨ Funcionalidades Principales
 
-1. **Migración Estricta a MySQL (`bd.txt`):**
-   - Base de datos: **`lms_scikids`** con codificación `utf8mb4`.
-   - 11 tablas mapeadas en Entity Framework Core con nombres snake_case, llaves foráneas en cascada/restricción e índices únicos:
-     - `roles`, `grados`, `usuarios`, `perfiles`, `alumnos`, `cursos`, `inscripciones`, `tareas`, `entregas`, `archivos_entrega`, `materiales`.
+### 🔐 Autenticación y Registro
+- Login con usuario/contraseña + JWT Bearer automático
+- Registro público con captcha matemático antibot
+- Inicio de sesión con **Google OAuth 2.0** (Google Identity Services)
+- Protección de rutas por rol: `Admin`, `Teacher`, `Student` (`RoleGuard`)
+- Timeout de sesión automático con modal de alerta configurable
 
-2. **Seeding Automático de Catálogos:**
-   - Al iniciar el backend, se crean automáticamente los `roles` (ADMINISTRADOR, DOCENTE, ALUMNO) y los `grados` (1° a 5°) si no existen.
-   - No hay usuarios dummy predeterminados; se crean dinámicamente desde el registro.
+### 🎓 Panel de Estudiante
+- Dashboard con materias inscritas, tareas y calificaciones
+- Entrega de tareas con **Drag & Drop** de archivos
+- Zona de subida con validación de tipo y tamaño
 
-3. **Registro Público Dinámico desde el Login:**
-   - Endpoint: `POST /api/auth/register`.
-   - Interfaz Angular con pestaña **"Crear Cuenta"** — permite elegir perfil (Estudiante 🎒, Docente 👩‍🏫, Administrador 👑) y grado escolar.
+### 👩‍🏫 Panel de Docente
+- Gestión completa de cursos y materias
+- Matrícula de alumnos con 1 clic
+- **Semáforo escolar** de desempeño: 🟢 Verde / 🟡 Amarillo / 🔴 Rojo
+- Publicación de tareas, recursos y materiales educativos
+- Calificación de entregas de estudiantes
+- Exportación de reportes en **PDF** y **CSV**
 
-4. **CRUD Docente — Gestión de Alumnos y Cursos:**
-   - Pestaña **"Gestión de Alumnos y Matrícula"** en el `TeacherDashboardComponent`.
-   - Alta de alumnos, listado con materias inscritas, creación de cursos y matrícula con 1 clic.
+### 🛡️ Panel de Administrador
+- Métricas institucionales en tiempo real (usuarios, docentes, alumnos, cursos)
+- **Directorio completo de usuarios** con filtros por rol, estado y búsqueda
+- **Registro administrativo** de nuevos usuarios (Admin/Docente/Alumno)
+- **Suspensión lógica (Soft Delete)** de cuentas sin pérdida de historial
+- **CRUD de Materias y Cursos** institucional con asignación de docentes
+- **Auditoría e Inspección de Logs** del sistema en tiempo real (`SystemInspector`)
+- **Exportación de reportes** a PDF y CSV desde cualquier sección
+- **💾 Descargar Backup BD** — genera y descarga un dump `.sql` completo de Supabase PostgreSQL
+- **📥 Restaurar Backup BD** — sube un archivo `.sql` y restaura la base de datos desde el panel sin línea de comandos
 
-5. **Semáforo Escolar:**
-   - Calcula el estado de asistencia/entregas por alumno: 🟢 Verde, 🟡 Amarillo, 🔴 Rojo.
+### 🎨 UX y Diseño
+- **Modo Oscuro / Claro** con alternancia reactiva (persistido en localStorage)
+- Animaciones de entrada, micro-animaciones y glassmorphism
+- **PWA instalable** con Service Worker (soporte offline básico)
+- Tipografías Fredoka + Nunito para público infantil
+- Toasts flotantes de notificación para todas las operaciones
+- Modal de política de tratamiento de datos personales
 
 ---
 
-## 🖥️ Requisitos del Entorno
+## 🖥️ Requisitos del Entorno (Desarrollo Local)
 
 | Programa | Estado | Descripción |
 | :--- | :---: | :--- |
-| **.NET 10 SDK** | ✅ Instalado | v10.0.400 (`C:\Program Files\dotnet\`) |
+| **.NET 10 SDK** | ✅ Requerido | v10.0.400 |
 | **Supabase PostgreSQL** | ☁️ Activo | Instancia cloud con Connection Pooler IPv4 |
-| **Node.js v24 & npm 11** | ✅ Instalado | Node v24.20.0 — `node_modules` ya instalados |
+| **Node.js v24 & npm 11** | ✅ Requerido | Para compilar y servir el frontend Angular |
 
 ---
 
-## 🚀 Guía de Ejecución Rápida
+## 🚀 Guía de Ejecución Local
 
 ### PASO 1 — Cadena de Conexión a Supabase (PostgreSQL)
 
-Abre `backend/LMS.API/appsettings.json` o `appsettings.Development.json` y confirma la cadena de conexión:
+Abre `backend/LMS.API/appsettings.json` y confirma:
 
 ```json
-"DefaultConnection": "postgresql://postgres.rjvsbjjmlmvcihfgbiaz:Sneider0124@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
+"DefaultConnection": "Host=...supabase.com;Port=5432;Database=postgres;Username=postgres...;Password=..."
 ```
 
-> Admite tanto sintaxis de URI Supabase como ADO.NET estándar con SSL Mode requerido.
+### PASO 2 — Iniciar el Backend (.NET 10)
 
----
-
-### PASO 2 — Crear la base de datos `lms_scikids`
-
-Tienes dos opciones equivalentes:
-
-#### Opción A — MySQL Workbench (recomendada):
-1. Abre **MySQL Workbench** y conecta con tu usuario `root`.
-2. Abre una nueva pestaña de Query (`Ctrl + T`).
-3. Copia y pega **todo el contenido** del archivo `bd.txt`.
-4. Ejecuta con **`Ctrl + Shift + Enter`** (ejecuta todo el script).
-
-#### Opción B — Dejar que EF Core lo cree automáticamente:
-El backend llama a `EnsureCreatedAsync()` al arrancar y crea la BD y las tablas si no existen. Solo inicia el backend directamente en el PASO 3.
-
----
-
-### PASO 3 — Iniciar el Backend (.NET 10)
-
-Haz doble clic en:
-```
-1_INICIAR_BACKEND.bat
+```bash
+cd backend/LMS.API
+dotnet run
 ```
 
-Disponible en:
 - **API REST:** `http://localhost:5000`
-- **Scalar API Docs:** `http://localhost:5000/scalar/v1`
+- **Scalar Docs:** `http://localhost:5000/scalar/v1`
 
-> Scalar es la interfaz interactiva moderna que reemplaza a Swagger UI. Permite probar todos los endpoints con autenticación JWT.
+### PASO 3 — Iniciar el Frontend (Angular 18)
 
----
-
-### PASO 4 — Iniciar el Frontend (Angular 18)
-
-#### Opción Angular CLI (recomendada):
-Haz doble clic en:
+```bash
+cd frontend
+npm install
+npm run dev
 ```
-2_INICIAR_FRONTEND.bat
-```
+
 Se servirá en: `http://localhost:4200`
 
-> Los `node_modules` ya están instalados. El arranque es inmediato.
+### PASO 4 — Build para producción (GitHub Pages)
 
-#### Opción Inmediata (sin servidor de desarrollo):
-Haz doble clic en:
+```bash
+cd frontend
+npm run build -- --base-href "/LMS_PRIMARIA/"
+# Copiar dist/lms-primaria/browser/* a la raíz del repo
+git push origin main
 ```
-VER_FRONTEND_INMEDIATO.bat
-```
-Abre el archivo `standalone-preview.html` directamente en el navegador.
 
 ---
 
 ## 🧪 Endpoints Principales de la API
 
-> Explora y prueba todos los endpoints de forma interactiva en: **`http://localhost:5000/scalar/v1`**
-
-### Autenticación y Registro (`/api/auth`)
+### Autenticación (`/api/auth`)
 
 | Método | Ruta | Descripción |
 | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | Crea un nuevo usuario (Rol, Nombre, Contraseña, Grado) |
-| `POST` | `/api/auth/login` | Autentica y emite JWT Bearer token |
-| `GET` | `/api/auth/me` | Retorna los datos del usuario en sesión |
+| `POST` | `/api/auth/register` | Registro con captcha matemático |
+| `POST` | `/api/auth/login` | Login → emite JWT Bearer |
+| `POST` | `/api/auth/google-login` | Login con Google OAuth 2.0 |
+| `GET` | `/api/auth/me` | Perfil del usuario en sesión |
 
-### Gestión Docente (`/api/teacher`)
-
-| Método | Ruta | Descripción |
-| :--- | :--- | :--- |
-| `GET` | `/api/teacher/students` | Lista alumnos con sus materias inscritas |
-| `POST` | `/api/teacher/students` | Crea un nuevo alumno |
-| `GET` | `/api/teacher/courses` | Lista materias del docente con conteo de inscritos |
-| `POST` | `/api/teacher/courses` | Crea una nueva materia/curso |
-| `POST` | `/api/teacher/courses/{courseId}/enroll` | Matricula un alumno en un curso |
-| `GET` | `/api/teacher/students-status` | Semáforo escolar (Verde / Amarillo / Rojo) |
-| `GET` | `/api/teacher/metrics` | Métricas cuantitativas de asistencia |
-| `POST` | `/api/teacher/contents` | Publica tareas entregables o recursos educativos |
-
-### Estudiantes (`/api/student`)
+### Administración (`/api/admin`)
 
 | Método | Ruta | Descripción |
 | :--- | :--- | :--- |
-| `GET` | `/api/student/dashboard` | Materias y tareas asignadas al alumno |
-| `POST` | `/api/student/upload-assignment` | Entrega de tareas mediante subida de archivos |
+| `GET` | `/api/admin/metrics` | Métricas globales del sistema |
+| `GET` | `/api/admin/users` | Listado con filtros de rol y estado |
+| `POST` | `/api/admin/users` | Crear usuario administrativamente |
+| `PUT` | `/api/admin/users/{id}` | Editar datos de usuario |
+| `PUT` | `/api/admin/users/{id}/toggle-status` | Suspender / reactivar cuenta |
+| `GET` | `/api/admin/courses` | Listado de todos los cursos |
+| `POST` | `/api/admin/courses` | Crear curso institucional |
+| `PUT` | `/api/admin/courses/{id}` | Editar curso |
+| `PUT` | `/api/admin/courses/{id}/toggle-status` | Activar / desactivar curso |
+| `GET` | `/api/admin/download-backup` | 💾 Genera y descarga dump `.sql` de Supabase |
+| `POST` | `/api/admin/restore-backup` | 📥 Restaura la BD desde un archivo `.sql` |
 
-### Administración y Auditoría (`/api/admin` & `/api/systemfiles`)
+### Docente (`/api/teacher`)
 
 | Método | Ruta | Descripción |
 | :--- | :--- | :--- |
-| `GET` | `/api/admin/metrics` | Métricas generales del sistema (usuarios activos, cursos, estado BD) |
-| `GET` | `/api/admin/users` | Listado completo de usuarios con filtros por rol y estado |
-| `POST` | `/api/admin/users` | Registro administrativo directo de nuevos usuarios |
-| `PUT` | `/api/admin/users/{id}/toggle-status` | Suspensión lógica o reactivación de cuentas (Soft Delete) |
-| `GET` | `/api/systemfiles/tree` | Árbol seguro de directorios y archivos de auditoría |
-| `GET` | `/api/systemfiles/content` | Visualización en tiempo real de logs del sistema (`access.log`, `error.log`, `app.log`) |
+| `GET` | `/api/teacher/students` | Lista alumnos con materias |
+| `POST` | `/api/teacher/students` | Crear nuevo alumno |
+| `GET` | `/api/teacher/courses` | Materias del docente |
+| `POST` | `/api/teacher/courses` | Crear materia |
+| `POST` | `/api/teacher/courses/{id}/enroll` | Matricular alumno |
+| `GET` | `/api/teacher/students-status` | Semáforo escolar |
+| `GET` | `/api/teacher/metrics` | Métricas cuantitativas |
+| `POST` | `/api/teacher/contents` | Publicar tarea o material |
+
+### Estudiante (`/api/student`)
+
+| Método | Ruta | Descripción |
+| :--- | :--- | :--- |
+| `GET` | `/api/student/dashboard` | Materias, tareas y notas |
+| `POST` | `/api/student/upload-assignment` | Entregar tarea con archivos |
+
+### Auditoría (`/api/systemfiles`)
+
+| Método | Ruta | Descripción |
+| :--- | :--- | :--- |
+| `GET` | `/api/systemfiles/tree` | Árbol de archivos de log |
+| `GET` | `/api/systemfiles/content` | Contenido en vivo de logs |
 
 ---
 
-## 📁 Estructura Completa del Proyecto
-
-A continuación se detalla la arquitectura de directorios del monorepo, separada por capas de backend (.NET 10), frontend (Angular 18), persistencia en base de datos y scripts de automatización:
+## 📁 Estructura del Proyecto
 
 ```
 LMS/
 │
-├── 📂 backend/                                   # Capa de servicios y lógica de negocio
-│   ├── 📂 LMS.API/                               # Proyecto ASP.NET Core 10 Web API
-│   │   ├── 📂 Controllers/                       # Controladores REST API
-│   │   │   ├── AdminController.cs                # Métricas globales, gestión de usuarios (CRUD/soft delete)
-│   │   │   ├── AuthController.cs                 # Registro con captcha, login JWT, validación de sesión
-│   │   │   ├── ContentsController.cs             # Publicación y descarga de contenidos y recursos
-│   │   │   ├── StudentController.cs              # Dashboard alumno, consulta de tareas y entrega con archivos
-│   │   │   ├── SystemFilesController.cs          # Auditoría e inspección protegida de logs y configuraciones
-│   │   │   └── TeacherController.cs              # Matrícula, gestión de cursos, semáforo y calificaciones
-│   │   │
-│   │   ├── 📂 Data/                              # Acceso a datos con Entity Framework Core
-│   │   │   ├── DbInitializer.cs                  # Seeding automático de roles y grados escolares
-│   │   │   └── LMSDbContext.cs                   # Mapeo Fluent API relacional estricto en snake_case
-│   │   │
-│   │   ├── 📂 DTOs/                              # Contratos de transferencia de datos tipados (Request/Response)
-│   │   │   ├── AdminDtos.cs                      # Métricas de administración y auditoría
-│   │   │   ├── AuthDtos.cs                       # Login, Registro, Captcha y perfil de usuario
-│   │   │   ├── DashboardDtos.cs                  # Respuestas para dashboards de estudiante y profesor
-│   │   │   ├── StudentDtos.cs                    # Entregas de tareas y estado del alumno
-│   │   │   └── TeacherDtos.cs                    # Listado de alumnos, creación de cursos y matrícula
-│   │   │
-│   │   ├── 📂 Entities/                          # Modelos de dominio mapeados a tablas MySQL
-│   │   │   ├── Alumno.cs                         # Entidad de alumnos vinculada a usuario y grado
-│   │   │   ├── ArchivoEntrega.cs                 # Registro de adjuntos subidos en tareas
-│   │   │   ├── Curso.cs                          # Materias/cursos creados por docentes
-│   │   │   ├── Entrega.cs                        # Tareas enviadas por estudiantes y sus notas
-│   │   │   ├── Grado.cs                          # Grados escolares (1° a 5° de primaria)
-│   │   │   ├── Inscripcion.cs                    # Relación alumno-curso (matrícula)
-│   │   │   ├── Material.cs                       # Recursos y guías compartidas por el docente
-│   │   │   ├── Perfil.cs                         # Información biográfica y de perfil
-│   │   │   ├── Rol.cs                            # Roles del sistema (ADMINISTRADOR, DOCENTE, ALUMNO)
-│   │   │   ├── SemaforoStatus.cs                 # Cálculo de alertas académicas (Verde, Amarillo, Rojo)
-│   │   │   ├── Tarea.cs                          # Asignaciones creadas para los cursos
-│   │   │   └── Usuario.cs                        # Credenciales, rol, estado activo y datos principales
-│   │   │
-│   │   ├── 📂 Middleware/                        # Componentes del pipeline HTTP de Kestrel
-│   │   │   ├── GlobalExceptionMiddleware.cs      # Manejo estandarizado de excepciones no controladas en JSON
-│   │   │   ├── RequestLoggingMiddleware.cs       # FileLogger thread-safe con rotación automática de archivos .log
-│   │   │   └── SecurityHeadersMiddleware.cs      # Inyección de cabeceras CSP, HSTS, X-Frame-Options, etc.
-│   │   │
-│   │   ├── 📂 Migrations/                        # Migraciones de EF Core (Pomelo MySQL)
-│   │   │
-│   │   ├── 📂 Services/                          # Servicios de lógica de negocio desacoplados
-│   │   │   ├── ICaptchaService.cs / Captcha...   # Generación y validación de retos matemáticos antibot
-│   │   │   ├── IFileStorageService.cs            # Interfaz de gestión de almacenamiento de archivos
-│   │   │   ├── LocalFileStorageService.cs        # Implementación física para guardar adjuntos en disco
-│   │   │   ├── ISemaforoService.cs               # Interfaz del algoritmo de semáforo escolar
-│   │   │   ├── SemaforoService.cs                # Lógica de cálculo de desempeño por entregas y atrasos
-│   │   │   ├── ITokenService.cs                  # Interfaz para generación de JWT
-│   │   │   └── TokenService.cs                   # Creación de tokens Bearer con claims de rol y usuario
-│   │   │
-│   │   ├── 📂 logs/                              # Logs generados en tiempo de ejecución (access, error, app)
-│   │   ├── 📂 wwwroot/uploads/                   # Directorio estático para adjuntos y entregas de tareas
-│   │   ├── appsettings.json                      # Configuración de cadena de conexión MySQL, JWT y Kestrel
-│   │   ├── LMS.API.csproj                        # Definición del proyecto .NET 10 y dependencias NuGet
-│   │   └── Program.cs                            # Configuración de DI, CORS, autenticación JWT, Swagger/Scalar y pipeline
-│   │
-│   ├── migration_unify_perfiles_usuarios.sql     # Script SQL de migración y compatibilidad de perfiles
-│   └── test_all_endpoints.ps1                    # Script PowerShell de pruebas automatizadas E2E de la API
+├── 📂 backend/
+│   └── 📂 LMS.API/
+│       ├── 📂 Controllers/
+│       │   ├── AdminController.cs         # Métricas, CRUD usuarios/cursos, backup y restore BD
+│       │   ├── AuthController.cs          # Registro, login JWT, Google OAuth
+│       │   ├── ContentsController.cs      # Publicación y descarga de contenidos
+│       │   ├── StudentController.cs       # Dashboard alumno y entrega de tareas
+│       │   ├── SystemFilesController.cs   # Auditoría de logs del sistema
+│       │   └── TeacherController.cs       # Cursos, matrícula, semáforo, calificaciones
+│       ├── 📂 Data/
+│       │   ├── DbInitializer.cs           # Seeding de roles y grados
+│       │   └── LMSDbContext.cs            # Modelo relacional Fluent API
+│       ├── 📂 DTOs/                       # Contratos tipados Request/Response
+│       ├── 📂 Entities/                   # Modelos de dominio (Usuario, Curso, Tarea…)
+│       ├── 📂 Middleware/
+│       │   ├── GlobalExceptionMiddleware.cs
+│       │   ├── RequestLoggingMiddleware.cs
+│       │   └── SecurityHeadersMiddleware.cs
+│       ├── 📂 Services/
+│       │   ├── AdminService.cs            # Lógica de backup/restore, gestión de usuarios y cursos
+│       │   ├── SemaforoService.cs         # Algoritmo semáforo escolar
+│       │   ├── TokenService.cs            # Generación JWT
+│       │   └── LocalFileStorageService.cs # Almacenamiento de adjuntos
+│       └── Program.cs                     # DI, CORS, JWT, Scalar, pipeline
 │
-├── 📂 frontend/                                  # Aplicación cliente moderna en Angular 18 (Standalone Components)
+├── 📂 frontend/
 │   ├── 📂 src/
 │   │   ├── 📂 app/
-│   │   │   ├── 📂 core/                          # Núcleo de la aplicación (singleton, transversal)
-│   │   │   │   ├── 📂 guards/                    # Guardianes de enrutamiento
-│   │   │   │   │   ├── auth.guard.ts             # Protege rutas que requieren inicio de sesión
-│   │   │   │   │   └── role.guard.ts             # Controla accesos según el rol (ADMIN, DOCENTE, ALUMNO)
-│   │   │   │   ├── 📂 interceptors/              # Interceptores HTTP de Angular
-│   │   │   │   │   └── jwt.interceptor.ts        # Adjunta el Bearer Token automáticamente en cada petición
-│   │   │   │   ├── 📂 models/                    # Definiciones TypeScript de entidades y contratos
-│   │   │   │   │   ├── content.model.ts          # Modelos de tareas, entregas y materiales
-│   │   │   │   │   ├── semaforo.model.ts         # Modelo de estados del semáforo escolar
-│   │   │   │   │   └── user.model.ts             # Modelo de usuario, rol y sesión
-│   │   │   │   └── 📂 services/                  # Servicios HTTP y lógica de estado del frontend
-│   │   │   │       ├── admin.service.ts          # Métricas de administración y gestión de usuarios
-│   │   │   │       ├── api.config.ts             # URLs base y configuración del backend
-│   │   │   │       ├── auth.service.ts           # Login, registro dinámico, estado de sesión y claims
-│   │   │   │       ├── report-export.service.ts  # Exportación de reportes a PDF, Excel y CSV
-│   │   │   │       ├── session-timeout.service.ts# Detección de inactividad con temporizador configurable
-│   │   │   │       ├── student.service.ts        # Peticiones del dashboard de alumno y subida de tareas
-│   │   │   │       ├── system-files.service.ts   # Inspección segura de archivos de log del sistema
-│   │   │   │       ├── teacher.service.ts        # Gestión de alumnos, cursos, matrícula y calificaciones
-│   │   │   │       └── theme.service.ts          # Gestión reactiva de tema claro y oscuro (Dark Mode)
-│   │   │   │
-│   │   │   ├── 📂 features/                      # Vistas y flujos funcionales del sistema
-│   │   │   │   ├── 📂 admin/                     # Módulo de Administración
-│   │   │   │   │   ├── admin-dashboard.component.* # Panel de métricas, altas/bajas de usuarios y auditoría
-│   │   │   │   │   └── 📂 system-inspector/      # Visor protegido de logs y estado del sistema
-│   │   │   │   ├── 📂 auth/                      # Módulo de Autenticación
-│   │   │   │   │   └── 📂 login/                 # Formulario dual de Login y Registro dinámico con Captcha
-│   │   │   │   ├── 📂 student/                   # Módulo del Estudiante
-│   │   │   │   │   ├── student-dashboard.component.* # Vista de cursos, notas y tareas asignadas
-│   │   │   │   │   └── 📂 components/            # Componentes internos del estudiante
-│   │   │   │   │       └── 📂 file-drop-zone/    # Zona interactiva Drag & Drop para subir archivos
-│   │   │   │   └── 📂 teacher/                   # Módulo del Docente
-│   │   │   │       └── teacher-dashboard.component.* # Panel docente (cursos, matrícula, tareas, semáforo)
-│   │   │   │
-│   │   │   ├── 📂 shared/                        # Componentes y utilidades compartidas
-│   │   │   │   └── 📂 components/
-│   │   │   │       ├── 📂 data-policy-modal/     # Modal de política de tratamiento de datos y privacidad
-│   │   │   │       ├── 📂 session-warning-modal/ # Modal de alerta por expiración de sesión
-│   │   │   │       └── 📂 theme-toggle/          # Botón interactivo para alternar modo claro/oscuro
-│   │   │   │
-│   │   │   ├── app.component.*                   # Componente raíz con contenedor principal y modales globales
-│   │   │   ├── app.config.ts                     # Configuración de proveedores (HTTP Client, Router, Interceptors)
-│   │   │   └── app.routes.ts                     # Definición de rutas protegidas y redirecciones
-│   │   │
-│   │   ├── index.html                            # Plantilla HTML base con fuentes tipográficas
-│   │   ├── main.ts                               # Punto de entrada de inicialización de Angular
-│   │   └── styles.css                            # Sistema de diseño con variables CSS, animaciones y temas
-│   │
-│   ├── angular.json                              # Configuración de compilación del CLI de Angular
-│   ├── package.json                              # Dependencias de npm y scripts de ejecución
-│   ├── standalone-preview.html                   # Prototipo HTML visual interactivo ejecutable sin Node.js
-│   └── tsconfig.json                             # Configuración del compilador de TypeScript
+│   │   │   ├── 📂 core/
+│   │   │   │   ├── 📂 guards/             # auth.guard, role.guard
+│   │   │   │   ├── 📂 interceptors/       # jwt.interceptor
+│   │   │   │   └── 📂 services/
+│   │   │   │       ├── admin.service.ts   # CRUD usuarios/cursos, backup/restore
+│   │   │   │       ├── auth.service.ts    # Login, registro, Google OAuth
+│   │   │   │       ├── report-export.service.ts
+│   │   │   │       ├── session-timeout.service.ts
+│   │   │   │       ├── student.service.ts
+│   │   │   │       ├── system-files.service.ts
+│   │   │   │       ├── teacher.service.ts
+│   │   │   │       └── theme.service.ts
+│   │   │   ├── 📂 features/
+│   │   │   │   ├── 📂 admin/
+│   │   │   │   │   ├── admin-dashboard.component.*   # Panel con backup/restore BD
+│   │   │   │   │   └── 📂 system-inspector/
+│   │   │   │   ├── 📂 auth/login/
+│   │   │   │   ├── 📂 student/
+│   │   │   │   │   ├── student-dashboard.component.*
+│   │   │   │   │   └── 📂 components/file-drop-zone/
+│   │   │   │   └── 📂 teacher/
+│   │   │   │       └── teacher-dashboard.component.*
+│   │   │   └── 📂 shared/
+│   │   │       ├── 📂 data-policy-modal/
+│   │   │       ├── 📂 session-warning-modal/
+│   │   │       └── 📂 theme-toggle/
+│   │   ├── index.html                    # PWA + Service Worker registro
+│   │   └── styles.css                    # Design system global con dark mode
+│   └── 📂 public/
+│       └── service-worker.js             # SW v6 (sin skipWaiting para evitar loops)
 │
-├── 📂 Scripts y Base de Datos (Raíz)
-│   ├── bd.txt                                    # Script DDL SQL canónico completo para MySQL (`lms_scikids`)
-│   ├── MIGRACION_BD.txt                          # Guía paso a paso para la migración de base de datos
-│   ├── 1_INICIAR_BACKEND.bat                     # Script batch para compilar y ejecutar el Web API (.NET 10)
-│   ├── 2_INICIAR_FRONTEND.bat                    # Script batch para compilar y servir la app Angular (`ng serve`)
-│   ├── ABRIR_MYSQL_WORKBENCH.bat                 # Script de acceso rápido a MySQL Workbench
-│   ├── CONSULTAR_TABLAS_MYSQL.bat                # Script rápido para consultar el conteo de tablas desde consola
-│   ├── VER_FRONTEND_INMEDIATO.bat                # Abre directamente el prototipo en el navegador web
-│   └── README.md                                 # Documentación técnica integral del proyecto
+├── 404.html                              # Redirect SPA para GitHub Pages
+└── README.md
 ```
-
-### 🧩 Desglose por Capas y Responsabilidades
-
-| Capa / Módulo | Ubicación Principal | Responsabilidad |
-| :--- | :--- | :--- |
-| **Controladores REST** | `backend/LMS.API/Controllers/` | Exponen los endpoints HTTP clasificados por dominio (`/api/auth`, `/api/teacher`, `/api/student`, `/api/admin`, `/api/contents`, `/api/systemfiles`). |
-| **Acceso a Datos (ORM)** | `backend/LMS.API/Data/` | `LMSDbContext` gestiona el modelo relacional en MySQL y `DbInitializer` ejecuta el seeding de roles y grados al arrancar. |
-| **Lógica de Negocio** | `backend/LMS.API/Services/` | Algoritmo del semáforo escolar, generación y validación de tokens JWT, almacenamiento de archivos físicos y captcha. |
-| **Pipeline & Seguridad** | `backend/LMS.API/Middleware/` | Inyección de cabeceras de seguridad (`SecurityHeaders`), auditoría a archivos rotativos (`RequestLogging` + `FileLogger`) y manejo global de errores (`GlobalException`). |
-| **Núcleo Frontend** | `frontend/src/app/core/` | Guardianes de navegación por rol (`RoleGuard`), interceptor JWT automático, modelos de datos TypeScript y servicios HTTP centralizados. |
-| **Módulos de Rol** | `frontend/src/app/features/` | Vistas específicas para cada tipo de actor del sistema (Administrador, Docente, Estudiante y Autenticación). |
-| **Componentes Compartidos** | `frontend/src/app/shared/` | Componentes reutilizables entre vistas: cambio de tema claro/oscuro, alerta interactiva de timeout de sesión y políticas de privacidad. |
-| **Persistencia Relacional** | `bd.txt` | Esquema estricto de 11 tablas en MySQL 8.0 con codificación `utf8mb4`, claves foráneas e integridad referencial. |
 
 ---
 
 ## ⚙️ Configuración JWT
-
-El token Bearer se configura en `appsettings.json`:
 
 ```json
 "Jwt": {
@@ -322,77 +261,108 @@ El token Bearer se configura en `appsettings.json`:
 }
 ```
 
-El frontend adjunta automáticamente el token en cada petición HTTP mediante el `JwtInterceptor` de Angular.
+El frontend adjunta automáticamente el token en cada petición mediante el `JwtInterceptor`.
 
 ---
 
 ## 🔒 Middlewares de Seguridad y Logging
 
-El pipeline HTTP incluye 3 middlewares personalizados registrados en `Program.cs`, ubicados en `Middleware/`:
-
 ### `SecurityHeadersMiddleware`
-
-Inyecta cabeceras de seguridad HTTP en todas las respuestas:
 
 | Cabecera | Valor |
 | :--- | :--- |
-| `X-Frame-Options` | `SAMEORIGIN` — previene clickjacking |
-| `X-Content-Type-Options` | `nosniff` — previene MIME-sniffing |
-| `X-XSS-Protection` | `1; mode=block` — protección XSS en navegadores antiguos |
+| `X-Frame-Options` | `SAMEORIGIN` |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-XSS-Protection` | `1; mode=block` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
-| `Content-Security-Policy` | Política restrictiva por defecto |
-| `Permissions-Policy` | Bloquea cámara, micrófono, geolocalización, pagos |
+| `Content-Security-Policy` | Política restrictiva |
+| `Permissions-Policy` | Bloquea cámara, micrófono, geo, pagos |
 
 ### `RequestLoggingMiddleware`
 
-Registra cada petición HTTP en archivos `.log` con rotación automática:
-
 | Archivo | Contenido |
 | :--- | :--- |
-| `logs/access.log` | Todas las peticiones: IP, método, ruta, status, tiempo, User-Agent |
-| `logs/error.log` | Solo respuestas 4xx/5xx y excepciones con stack trace |
-| `logs/app.log` | Eventos de la aplicación (inicio del servidor, logs manuales) |
+| `logs/access.log` | Toda petición HTTP: IP, método, ruta, status, tiempo |
+| `logs/error.log` | Respuestas 4xx/5xx y excepciones con stack trace |
+| `logs/app.log` | Eventos del servidor y logs manuales |
 
-**Características del sistema de logs (`FileLogger`):**
-- **6 niveles de severidad:** `DEBUG`, `INFO`, `WARNING`, `ERROR`, `FATAL`
-- **Rotación automática** por tamaño (5 MB por archivo, máximo 10 archivos rotados)
-- **Thread-safe** mediante `SemaphoreSlim` (seguro para concurrencia)
-- **Registro de excepciones** con stack trace completo
-- Los archivos se generan automáticamente en `bin/Debug/net10.0/logs/`
-
-**Uso directo desde cualquier servicio o controlador:**
-
-```csharp
-await FileLogger.InfoAsync("Usuario autenticado", new { userId = 42 });
-await FileLogger.ErrorAsync("Consulta SQL falló", new { query = sql });
-await FileLogger.ExceptionAsync(ex, "Error en proceso de matrícula");
-```
+- Thread-safe con `SemaphoreSlim`
+- Rotación automática: 5 MB por archivo, máximo 10 archivos
 
 ### `GlobalExceptionMiddleware`
 
-Captura excepciones no controladas y devuelve respuestas JSON estandarizadas:
-
-```json
-{
-  "status": 500,
-  "title": "Error interno del servidor",
-  "message": "Ocurrió un error inesperado. Intente de nuevo más tarde.",
-  "timestamp": "2026-09-11T12:00:00Z",
-  "path": "POST /api/auth/login",
-  "traceId": "0HN7..."
-}
-```
-
-> En modo `Development`, la respuesta incluye el mensaje real de la excepción y el stack trace en el campo `detail`.
+Devuelve respuestas JSON estandarizadas para toda excepción no controlada.
 
 ---
 
-## 📝 Changelog
+## 📝 Changelog Completo
+
+### v6.0.0 — 2026-10-06 _(versión actual)_
+
+- ✅ **Fix definitivo: loop de recarga del Service Worker** — Eliminados `skipWaiting()` y `clients.claim()` del SW que causaban un ciclo infinito `activate → clients.claim → controllerchange → reload → activate…`
+- ✅ **SW v6** — Nuevo service worker estable sin auto-recargas, con Network-First para JS/CSS y Cache-First para estáticos
+- ✅ **index.html** — Eliminado todo código de `onupdatefound` y `window.location.reload()` del registro del SW
+
+### v5.5.0 — 2026-10-06
+
+- ✅ **Botón "📥 Restaurar Backup BD"** — Panel de administrador permite subir un archivo `.sql` y restaurar la base de datos PostgreSQL en Supabase desde la UI sin línea de comandos
+- ✅ **Botón "💾 Descargar Backup BD"** — Genera y descarga dump completo `.sql` de todas las tablas de Supabase con timestamp en el nombre
+- ✅ **`AdminController.cs`** — Nuevos endpoints `GET /api/admin/download-backup` y `POST /api/admin/restore-backup`
+- ✅ **`AdminService.cs`** — Implementada lógica de conexión directa a Supabase PostgreSQL con `Npgsql` para ejecutar scripts SQL arbitrarios en restauración
+- ✅ **Eliminado `window.location.reload()`** del flujo de restauración para evitar 404 en SPA de GitHub Pages; reemplazado por recarga en memoria (`loadMetrics`, `loadUsers`, `loadAdminCourses`)
+- ✅ **`404.html`** — Agregado para manejo correcto de rutas SPA en GitHub Pages
+
+### v5.0.0 — 2026-10-05
+
+- ✅ **CRUD completo de Cursos** en el panel de administrador — Crear, editar, activar/desactivar materias institucionales con asignación de docentes
+- ✅ **CRUD de Usuarios mejorado** — Edición de datos, cambio de contraseña opcional, filtros por rol y estado
+- ✅ **Sección "Auditoría & Logs"** en panel admin con `SystemInspectorComponent` embebido
+- ✅ **Exportación de reportes** PDF y CSV desde las 3 pestañas del panel admin (Usuarios, Materias, Auditoría)
+- ✅ **Métricas institucionales** — 4 tarjetas con conteo de usuarios activos, docentes, alumnos y cursos
+- ✅ **Toast flotante** unificado para feedback de operaciones asíncronas
+
+### v4.0.0 — 2026-09-25
+
+- ✅ **Google OAuth 2.0** — Login con cuenta de Google usando Google Identity Services (GSI)
+- ✅ **reCAPTCHA v2** — Captcha matemático antibot en el registro público
+- ✅ **Dark Mode** — Alternancia reactiva claro/oscuro persistida en localStorage con `ThemeService`
+- ✅ **Modal de Política de Datos** — Cumplimiento de protección de datos personales
+- ✅ **`session-warning-modal`** — Alerta interactiva antes de que expire la sesión JWT
+- ✅ **PWA** — Service Worker, `manifest.webmanifest`, instalación como app en móviles y escritorio
+
+### v3.0.0 — 2026-09-20
+
+- ✅ **Despliegue en GitHub Pages** — Build Angular con `--base-href`, GitHub Actions workflow
+- ✅ **Backend en Render** — Dockerfile configurado, variables de entorno de Supabase
+- ✅ **Migración de MySQL a PostgreSQL (Supabase)** — Reemplazo de Pomelo por Npgsql EF Core
+- ✅ **`SystemFilesController`** — Auditoría de logs del servidor en tiempo real desde el panel admin
+- ✅ **`SystemInspectorComponent`** — Visor de árbol de archivos y contenido de logs en el frontend
+
+### v2.0.0 — 2026-09-15
+
+- ✅ **Dashboard del Estudiante** — Materias inscritas, tareas pendientes, estado de entregas y notas
+- ✅ **Drag & Drop de archivos** (`FileDrop ZoneComponent`) para entrega de tareas
+- ✅ **Semáforo escolar** (`SemaforoService`) — Algoritmo de desempeño 🟢/🟡/🔴 basado en entregas y fechas límite
+- ✅ **Exportación PDF** de reportes del docente con `jsPDF` + `html2canvas`
+- ✅ **Exportación CSV** con `PapaParse`
+- ✅ **`ReportExportService`** — Servicio centralizado de exportación con tablas y tarjetas de resumen
 
 ### v1.1.0 — 2026-09-11
 
-- ✅ Añadido `Middleware/SecurityHeadersMiddleware.cs` — inyecta cabeceras de seguridad HTTP (`X-Frame-Options`, `X-Content-Type-Options`, `CSP`, `Permissions-Policy`).
-- ✅ Añadido `Middleware/RequestLoggingMiddleware.cs` + `FileLogger` — sistema de logging a archivos `.log` con rotación automática, registro de accesos HTTP y errores.
-- ✅ Añadido `Middleware/GlobalExceptionMiddleware.cs` — captura excepciones no controladas y devuelve respuestas JSON estandarizadas con soporte de stack trace en desarrollo.
-- ✅ Integrados los 3 middlewares en `Program.cs` con orden correcto de ejecución.
-- 🗑️ Eliminados `backend/.htaccess` y `backend/helpers/logger.php` (incompatibles con el stack .NET/Kestrel).
+- ✅ `SecurityHeadersMiddleware` — Cabeceras HTTP de seguridad
+- ✅ `RequestLoggingMiddleware` + `FileLogger` — Logging a archivos `.log` con rotación automática
+- ✅ `GlobalExceptionMiddleware` — Manejo estandarizado de excepciones
+- 🗑️ Eliminados `backend/.htaccess` y `backend/helpers/logger.php` (incompatibles con .NET/Kestrel)
+
+### v1.0.0 — 2026-09-05 _(Sprint inicial)_
+
+- ✅ Arquitectura base .NET 10 Web API + Angular 18 Standalone
+- ✅ Autenticación JWT con `AuthController` y `TokenService`
+- ✅ Panel de Docente — CRUD de alumnos, cursos y matrícula
+- ✅ `LMSDbContext` con Fluent API en snake_case
+- ✅ Seeding automático de roles (`Admin`, `Teacher`, `Student`) y grados (1° a 6°)
+- ✅ Interceptor JWT automático en Angular
+
+---
+
+> **Desarrollado por:** Sneider M. · LMS Primaria · 2026
