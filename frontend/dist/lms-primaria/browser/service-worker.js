@@ -1,13 +1,19 @@
-// Service Worker para LMS SciKids - Soporte PWA Offline
-const CACHE_NAME = 'scikids-lms-cache-v5';
-const SCOPE = self.registration ? self.registration.scope : './';
+// Service Worker para LMS SciKids - Versión v6 (estable, sin recargas)
+// Estrategia: solo caché offline para recursos estáticos. NO reload automático.
+const CACHE_NAME = 'scikids-lms-cache-v6';
 
-// Instalación: Precarga de assets críticos
+// Instalación: NO usar skipWaiting para evitar activaciones abruptas
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  // Esperar hasta que el SW anterior libere los clientes antes de activar
+  // NO llamar skipWaiting() aquí para evitar el loop de recarga
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(['./index.html']).catch(() => {});
+    })
+  );
 });
 
-// Activación: Limpieza agresiva de versiones obsoletas y toma de control inmediata
+// Activación: limpiar cachés viejas SIN reclamar clientes activos
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -19,7 +25,9 @@ self.addEventListener('activate', (event) => {
           }
         })
       )
-    ).then(() => self.clients.claim())
+    )
+    // NOTA: No llamar self.clients.claim() para evitar disparar 'controllerchange'
+    // que reinicia la página en clientes ya activos
   );
 });
 
@@ -31,14 +39,14 @@ self.addEventListener('fetch', (event) => {
   // Ignorar esquemas que no sean HTTP/HTTPS
   if (!url.protocol.startsWith('http')) return;
 
-  // 1. Peticiones a la API del backend: Estrategia Network-First con fallback JSON
-  if (url.pathname.startsWith('/api/')) {
+  // 1. Peticiones a la API del backend (Render): siempre red, sin caché
+  if (url.hostname.includes('onrender.com') || url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request).catch(() => {
         return new Response(
           JSON.stringify({
             status: 503,
-            message: 'Estás en modo sin conexión. La sincronización con el servidor se reanudará al conectarte a internet.'
+            message: 'Sin conexión. La sincronización se reanudará al reconectarte.'
           }),
           {
             status: 503,
@@ -50,7 +58,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Solicitudes de navegación (rutas Angular SPA): Network-First
+  // 2. Solicitudes de navegación SPA: Network-First, fallback a index.html en caché
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -61,13 +69,13 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(request).then(res => res || caches.match('./index.html')))
+        .catch(() => caches.match('./index.html'))
     );
     return;
   }
 
-  // 3. Recursos JS, CSS y HTML: Network-First para evitar bundles viejos
-  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html')) {
+  // 3. Recursos JS, CSS: Network-First (bundles cambian con cada build)
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
     event.respondWith(
       fetch(request)
         .then((networkResponse) => {
@@ -82,7 +90,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 4. Recursos estáticos restantes (imágenes, fuentes): Cache-First con fallback a red
+  // 4. Otros recursos estáticos: Cache-First con fallback a red
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) return cachedResponse;
@@ -96,4 +104,3 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
-
