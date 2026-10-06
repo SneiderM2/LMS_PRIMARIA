@@ -1,7 +1,7 @@
 {
   "configVersion": 1,
-  "timestamp": 1791293729685,
-  "index": "/index.html",
+  "timestamp": 1791294663064,
+  "index": "/LMS_PRIMARIA/index.html",
   "assetGroups": [
     {
       "name": "app",
@@ -11,16 +11,16 @@
         "ignoreVary": true
       },
       "urls": [
-        "/chunk-55V7A6PN.js",
-        "/chunk-DCZITNND.js",
-        "/chunk-EQDQRRRY.js",
-        "/chunk-SWBZ2T66.js",
-        "/index.html",
-        "/main-RQBOURGV.js",
-        "/manifest.webmanifest",
-        "/polyfills-FFHMD2TL.js",
-        "/service-worker.js",
-        "/styles-TP4UUFRE.css"
+        "/LMS_PRIMARIA/chunk-55V7A6PN.js",
+        "/LMS_PRIMARIA/chunk-DCZITNND.js",
+        "/LMS_PRIMARIA/chunk-EQDQRRRY.js",
+        "/LMS_PRIMARIA/chunk-SWBZ2T66.js",
+        "/LMS_PRIMARIA/index.html",
+        "/LMS_PRIMARIA/main-AB6VPAGT.js",
+        "/LMS_PRIMARIA/manifest.webmanifest",
+        "/LMS_PRIMARIA/polyfills-FFHMD2TL.js",
+        "/LMS_PRIMARIA/service-worker.js",
+        "/LMS_PRIMARIA/styles-TP4UUFRE.css"
       ],
       "patterns": []
     },
@@ -32,40 +32,40 @@
         "ignoreVary": true
       },
       "urls": [
-        "/assets/icons/icon-192x192.png",
-        "/assets/icons/icon-192x192.svg",
-        "/assets/icons/icon-512x512.png",
-        "/assets/icons/icon-512x512.svg",
-        "/assets/manifest.webmanifest",
-        "/icons/icon-192x192.png",
-        "/icons/icon-192x192.svg",
-        "/icons/icon-512x512.png",
-        "/icons/icon-512x512.svg"
+        "/LMS_PRIMARIA/assets/icons/icon-192x192.png",
+        "/LMS_PRIMARIA/assets/icons/icon-192x192.svg",
+        "/LMS_PRIMARIA/assets/icons/icon-512x512.png",
+        "/LMS_PRIMARIA/assets/icons/icon-512x512.svg",
+        "/LMS_PRIMARIA/assets/manifest.webmanifest",
+        "/LMS_PRIMARIA/icons/icon-192x192.png",
+        "/LMS_PRIMARIA/icons/icon-192x192.svg",
+        "/LMS_PRIMARIA/icons/icon-512x512.png",
+        "/LMS_PRIMARIA/icons/icon-512x512.svg"
       ],
       "patterns": []
     }
   ],
   "dataGroups": [],
   "hashTable": {
-    "/assets/icons/icon-192x192.png": "227dc7eeb4128ac5857843d871c54364fa2da255",
-    "/assets/icons/icon-192x192.svg": "5fd612153a6a541e5adf96b8e03cfc61333e7922",
-    "/assets/icons/icon-512x512.png": "3736d519d25e5731880d6a0de5718faa97a05e3e",
-    "/assets/icons/icon-512x512.svg": "b47e773329271f5f4b3765cf6d409110455bad0d",
-    "/assets/manifest.webmanifest": "904724867c782654bc310102e81d4afad7508d5f",
-    "/chunk-55V7A6PN.js": "be939ffb16829f78dedcb1565f094734dace8b35",
-    "/chunk-DCZITNND.js": "7b8f32b8d81cc50215461075a630dd563d8f413f",
-    "/chunk-EQDQRRRY.js": "c40057a332d0341d595cc1d005fc2ab4f2573957",
-    "/chunk-SWBZ2T66.js": "3497f36b01056cb8f0b15271415d5599d1b016b1",
-    "/icons/icon-192x192.png": "227dc7eeb4128ac5857843d871c54364fa2da255",
-    "/icons/icon-192x192.svg": "5fd612153a6a541e5adf96b8e03cfc61333e7922",
-    "/icons/icon-512x512.png": "3736d519d25e5731880d6a0de5718faa97a05e3e",
-    "/icons/icon-512x512.svg": "b47e773329271f5f4b3765cf6d409110455bad0d",
-    "/index.html": "33cf711881a3e86dbf740d315741199846fa33ab",
-    "/main-RQBOURGV.js": "75eeb91ea26be87626ff718baf4b7211f83557b6",
-    "/manifest.webmanifest": "904724867c782654bc310102e81d4afad7508d5f",
-    "/polyfills-FFHMD2TL.js": "f49b49a155bc7d192db62a4c15d0a612b460a667",
-    "/service-worker.js": "770c3bdf255c3d786d29558848a292c9686028a6",
-    "/styles-TP4UUFRE.css": "61a9287c9ad765dcfdc10aa999c5891e7e9e1cf4"
+    "/LMS_PRIMARIA/assets/icons/icon-192x192.png": "227dc7eeb4128ac5857843d871c54364fa2da255",
+    "/LMS_PRIMARIA/assets/icons/icon-192x192.svg": "5fd612153a6a541e5adf96b8e03cfc61333e7922",
+    "/LMS_PRIMARIA/assets/icons/icon-512x512.png": "3736d519d25e5731880d6a0de5718faa97a05e3e",
+    "/LMS_PRIMARIA/assets/icons/icon-512x512.svg": "b47e773329271f5f4b3765cf6d409110455bad0d",
+    "/LMS_PRIMARIA/assets/manifest.webmanifest": "904724867c782654bc310102e81d4afad7508d5f",
+    "/LMS_PRIMARIA/chunk-55V7A6PN.js": "be939ffb16829f78dedcb1565f094734dace8b35",
+    "/LMS_PRIMARIA/chunk-DCZITNND.js": "7b8f32b8d81cc50215461075a630dd563d8f413f",
+    "/LMS_PRIMARIA/chunk-EQDQRRRY.js": "c40057a332d0341d595cc1d005fc2ab4f2573957",
+    "/LMS_PRIMARIA/chunk-SWBZ2T66.js": "3497f36b01056cb8f0b15271415d5599d1b016b1",
+    "/LMS_PRIMARIA/icons/icon-192x192.png": "227dc7eeb4128ac5857843d871c54364fa2da255",
+    "/LMS_PRIMARIA/icons/icon-192x192.svg": "5fd612153a6a541e5adf96b8e03cfc61333e7922",
+    "/LMS_PRIMARIA/icons/icon-512x512.png": "3736d519d25e5731880d6a0de5718faa97a05e3e",
+    "/LMS_PRIMARIA/icons/icon-512x512.svg": "b47e773329271f5f4b3765cf6d409110455bad0d",
+    "/LMS_PRIMARIA/index.html": "a87d4cd88b82c7fbe21380ed113642db2520153a",
+    "/LMS_PRIMARIA/main-AB6VPAGT.js": "953632700d3d96c22803560cf078ab008fac0dff",
+    "/LMS_PRIMARIA/manifest.webmanifest": "904724867c782654bc310102e81d4afad7508d5f",
+    "/LMS_PRIMARIA/polyfills-FFHMD2TL.js": "f49b49a155bc7d192db62a4c15d0a612b460a667",
+    "/LMS_PRIMARIA/service-worker.js": "770c3bdf255c3d786d29558848a292c9686028a6",
+    "/LMS_PRIMARIA/styles-TP4UUFRE.css": "61a9287c9ad765dcfdc10aa999c5891e7e9e1cf4"
   },
   "navigationUrls": [
     {

@@ -88,7 +88,7 @@
             <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
           </button>
           <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar base de datos desde copia de seguridad .sql">
-            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : '📥 Restaurar Copia (.sql)' }}</span>
+            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : '📥 Restaurar Backup BD' }}</span>
           </button>
           <button class="btn btn-secondary" (click)="goToTeacherView()">
             🚦 Abrir Semáforo
@@ -323,6 +323,12 @@
           <button class="btn btn-primary" (click)="openCreateCourseModal()">
             ➕ Nueva Materia
           </button>
+          <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar copia de seguridad SQL de Supabase">
+            <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
+          </button>
+          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar base de datos desde copia de seguridad .sql">
+            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : '📥 Restaurar Backup BD' }}</span>
+          </button>
         </div>
       </section>
 
@@ -459,11 +465,33 @@
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar copia de seguridad SQL de Supabase">
             <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
           </button>
-          <button type="button" class="btn btn-primary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar base de datos desde copia de seguridad .sql">
-            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : '📥 Restaurar Copia (.sql)' }}</span>
+          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar base de datos desde copia de seguridad .sql">
+            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : '📥 Restaurar Backup BD' }}</span>
           </button>
         </div>
       </section>
+
+      <!-- Tarjeta Destacada de Respaldo y Restauración de Base de Datos -->
+      <section class="crud-users-card glass-panel db-backup-panel" style="margin-bottom: 1.5rem;">
+        <div class="db-backup-header">
+          <div class="db-backup-info">
+            <span class="db-badge">🗄️ PostgreSQL • Supabase Cloud</span>
+            <h2 style="margin: 0.35rem 0; font-size: 1.35rem;">Gestión de Respaldo y Restauración de Base de Datos</h2>
+            <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
+              Exporta un respaldo completo de la base de datos institucional en formato SQL (.sql) o restaura la información a partir de un archivo .sql previamente descargado.
+            </p>
+          </div>
+          <div class="db-backup-actions">
+            <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar archivo de copia de seguridad .sql">
+              <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar la base de datos desde un archivo .sql">
+              <span>{{ isRestoringBackup ? '⏳ Restaurando Base de Datos...' : '📥 Restaurar Backup BD' }}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
       <app-system-inspector></app-system-inspector>
     </div>
 
