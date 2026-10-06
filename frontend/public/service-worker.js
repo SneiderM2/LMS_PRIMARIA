@@ -1,32 +1,13 @@
 // Service Worker para LMS SciKids - Soporte PWA Offline
-const CACHE_NAME = 'scikids-lms-cache-v3';
+const CACHE_NAME = 'scikids-lms-cache-v5';
 const SCOPE = self.registration ? self.registration.scope : './';
 
 // Instalación: Precarga de assets críticos
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      console.log('[SW] Pre-cacheados los recursos estáticos iniciales');
-      const assetsToCache = [
-        new URL('./', SCOPE).href,
-        new URL('index.html', SCOPE).href,
-        new URL('manifest.webmanifest', SCOPE).href,
-        new URL('assets/icons/icon-192x192.png', SCOPE).href,
-        new URL('assets/icons/icon-512x512.png', SCOPE).href
-      ];
-      for (const asset of assetsToCache) {
-        try {
-          await cache.add(asset);
-        } catch (err) {
-          console.warn('[SW] No se pudo pre-cachear:', asset, err);
-        }
-      }
-    })
-  );
   self.skipWaiting();
 });
 
-// Activación: Limpieza de versiones obsoletas
+// Activación: Limpieza agresiva de versiones obsoletas y toma de control inmediata
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -38,9 +19,8 @@ self.addEventListener('activate', (event) => {
           }
         })
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 // Intercepción de solicitudes de red
@@ -48,7 +28,7 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Ignorar esquemas que no sean HTTP/HTTPS (como chrome-extension://)
+  // Ignorar esquemas que no sean HTTP/HTTPS
   if (!url.protocol.startsWith('http')) return;
 
   // 1. Peticiones a la API del backend: Estrategia Network-First con fallback JSON
@@ -70,7 +50,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Solicitudes de navegación (rutas Angular SPA): Fallback al index.html
+  // 2. Solicitudes de navegación (rutas Angular SPA): Network-First
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -81,27 +61,39 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => {
-          return caches.match('/index.html');
-        })
+        .catch(() => caches.match(request).then(res => res || caches.match('./index.html')))
     );
     return;
   }
 
-  // 3. Recursos estáticos (JS, CSS, imágenes, fuentes): Stale-While-Revalidate
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      const fetchPromise = fetch(request)
+  // 3. Recursos JS, CSS y HTML: Network-First para evitar bundles viejos
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html')) {
+    event.respondWith(
+      fetch(request)
         .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          if (networkResponse && networkResponse.status === 200) {
             const clone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return networkResponse;
         })
-        .catch(() => cachedResponse);
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
 
-      return cachedResponse || fetchPromise;
+  // 4. Recursos estáticos restantes (imágenes, fuentes): Cache-First con fallback a red
+  event.respondWith(
+    caches.match(request).then((cachedResponse) => {
+      if (cachedResponse) return cachedResponse;
+      return fetch(request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
+        return networkResponse;
+      });
     })
   );
 });
+

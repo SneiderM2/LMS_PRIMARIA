@@ -29,14 +29,26 @@
 <body>
   <app-root></app-root>
 
-  <!-- Registro del Service Worker para PWA Offline -->
+  <!-- Registro del Service Worker para PWA Offline con auto-recarga al actualizar -->
   <script>
     if ('serviceWorker' in navigator && (window.location.protocol.startsWith('http') || window.location.protocol.startsWith('https'))) {
       window.addEventListener('load', () => {
-        const swUrl = 'service-worker.js';
+        const swUrl = 'service-worker.js?v=5';
         navigator.serviceWorker.register(swUrl)
           .then((registration) => {
             console.log('[PWA] Service Worker registrado exitosamente con alcance:', registration.scope);
+            registration.update();
+            registration.onupdatefound = () => {
+              const installingWorker = registration.installing;
+              if (installingWorker) {
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('[PWA] Nueva versión detectada. Recargando para aplicar cambios...');
+                    window.location.reload();
+                  }
+                };
+              }
+            };
           })
           .catch((error) => {
             console.warn('[PWA] Fallo al registrar el Service Worker:', error);
