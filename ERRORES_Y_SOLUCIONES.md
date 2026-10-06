@@ -23,6 +23,9 @@ Registro histórico de errores, bugs y problemas técnicos encontrados durante e
 | 13 | Frontend / CSS | Dark mode no persistía entre recargas de página | ✅ Resuelto |
 | 14 | Backend / Logs | `FileLogger` lanzaba excepción por ruta de logs en Render | ✅ Resuelto |
 | 15 | Backend / CORS | Render bloqueaba preflight OPTIONS de las peticiones Angular | ✅ Resuelto |
+| 16 | Frontend / Deploy | `root/index.html` desactualizado — GitHub Pages servía SW v5 antiguo | ✅ Resuelto |
+| 17 | Frontend / UX | `http://example.com/avatar.png` en BD — Mixed Content + 404 en avatares | ✅ Resuelto |
+| 18 | Frontend / Inspector | Tab `.htaccess` llamaba endpoint inexistente en .NET — 404 en consola | ✅ Resuelto |
 
 ---
 
@@ -560,7 +563,130 @@ app.MapControllers();
 
 ---
 
-## 📊 Resumen de Categorías
+### #16 — `root/index.html` desactualizado: GitHub Pages servía Service Worker v5
+
+**Categoría:** Frontend / Deploy  
+**Fecha:** 2026-10-06  
+**Gravedad:** 🔴 Crítico
+
+**Síntoma:**
+```
+AbortError: Failed to register a ServiceWorker for scope
+('https://sneiderm2.github.io/LMS_PRIMARIA/')
+with script ('https://sneiderm2.github.io/LMS_PRIMARIA/service-worker.js?v=5')
+```
+Aunque se había actualizado el Service Worker al v6 y corregido el `index.html` en `frontend/src/`, la app en producción seguia cargando el SW v5 antiguo (con `skipWaiting` y el loop de recargas).
+
+**Causa:**
+El flujo de deploy del proyecto es **manual**: el build genera archivos en `frontend/dist/lms-primaria/browser/` que deben copiarse a la raíz del repositorio (donde GitHub Pages sirve los archivos). Sin embargo, en varias sesiones de trabajo sólo se editaba `frontend/src/index.html` y se hacía push sin copiar el output del build a la raíz.
+
+El archivo `index.html` de la raíz (el real de producción) permanecía con el código antiguo:
+```html
+<!-- Raíz del repo: aún con v=5 y window.location.reload() -->
+<script>
+  const swUrl = 'service-worker.js?v=5';
+  registration.update();
+  window.location.reload(); // ← esto causaba el loop
+</script>
+```
+
+**Solución aplicada:**
+Se ejecutó el build completo y se copiaron **todos** los archivos de dist a la raíz:
+```powershell
+npm run build -- --base-href "/LMS_PRIMARIA/"
+Copy-Item -Path "frontend\dist\lms-primaria\browser\*" -Destination "." -Recurse -Force
+git add -A
+git push origin main
+```
+El nuevo `index.html` en la raíz ahora carga `service-worker.js?v=6` y el nuevo bundle `main-ZJEAHE2D.js` sin ningún `window.location.reload()`.
+
+> 💡 **Leccion aprendida**: Siempre copiar el dist a la raíz después de cada build antes de hacer push para producción en GitHub Pages.
+
+**Archivos afectados:**
+- `/index.html` (raíz del repositorio)
+- `service-worker.js` (raíz del repositorio)
+- Todos los assets del build
+
+---
+
+### #17 — `http://example.com/avatar.png` en BD — Mixed Content + 404 en avatares
+
+**Categoría:** Frontend / UX  
+**Fecha:** 2026-10-06  
+**Gravedad:** 🟡 Medio
+
+**Síntoma:**
+```
+Mixed Content: The page was loaded over HTTPS, but requested an insecure
+element 'http://example.com/avatar.png'. This request was automatically
+upgraded to HTTPS.
+
+GET https://example.com/avatar.png 404 (Not Found)
+```
+Los avatares de algunos usuarios en la tabla del panel de administrador no cargaban, mostrando iconos rotos.
+
+**Causa:**
+Algunos usuarios en la base de datos Supabase tenían el campo `avatar_url` con el valor placeholder `http://example.com/avatar.png` — valor de prueba que quedó guardado cuando se crearon las cuentas en etapas tempranas del desarrollo, antes de implementar la generación automática con `dicebear.com`. El template HTML del panel admin mostraba este valor sin ningún fallback:
+
+```html
+<!-- ❌ Sin fallback -->
+<img [src]="user.avatarUrl" alt="Avatar" class="avatar-sm" />
+```
+
+**Solución aplicada:**
+Se agregó un fallback condicional en el template que detecta la URL inválida y genera un avatar dinámico con `dicebear.com`:
+
+```html
+<img
+  [src]="user.avatarUrl && !user.avatarUrl.includes('example.com')
+    ? user.avatarUrl
+    : 'https://api.dicebear.com/7.x/bottts/svg?seed=' + user.username"
+  alt="Avatar" class="avatar-sm" />
+```
+
+**Archivos afectados:**
+- `frontend/src/app/features/admin/admin-dashboard.component.html`
+
+---
+
+### #18 — Tab `.htaccess` del SystemInspector llamaba endpoint 404
+
+**Categoría:** Frontend / System Inspector  
+**Fecha:** 2026-10-06  
+**Gravedad:** 🟡 Medio
+
+**Síntoma:**
+```
+GET https://lms-primaria.onrender.com/api/systemfiles/htaccess 404 (Not Found)
+GET https://lms-primaria.onrender.com/api/systemfiles/logs 401 (Unauthorized)
+```
+El `SystemInspectorComponent` mostraba una pestaña llamada **⋯ Directivas Servidor (.htaccess)** que al hacer clic (y también en el `ngOnInit`) intentaba cargar el endpoint `/api/systemfiles/htaccess`, que devuelve 404 en el backend .NET de Render.
+
+**Causa:**
+El `SystemInspectorComponent` fue diseñado originalmente para un stack PHP/Apache donde `.htaccess` es el archivo de configuración del servidor. Al migrar a .NET Kestrel, el endpoint `/api/systemfiles/htaccess` fue eliminado del backend (no tiene sentido en Kestrel), pero el componente frontend nunca se actualizó para reflejar eso. Adicionalmente, `ngOnInit` llamaba `loadLogsList()` que disparaba el 401 porque el JWT no se propagaba correctamente en el primer ciclo.
+
+**Solución aplicada:**
+Se ocultó la pestaña `.htaccess` del template del `SystemInspectorComponent` mediante un comentario, ya que el endpoint no existe en el backend .NET:
+
+```html
+<!-- Tab .htaccess ocultada: endpoint no disponible en backend .NET/Render -->
+<!-- <button class="tab-btn" (click)="selectTab('htaccess')">...</button> -->
+```
+
+También se actualizó el texto descriptivo del header para no mencionar `.htaccess`:
+```html
+<!-- Antes -->
+Monitoreo de seguridad, inspección estructurada de registros y directivas del servidor (.htaccess).
+<!-- Después -->
+Monitoreo de seguridad e inspección estructurada de registros del servidor Kestrel (.NET).
+```
+
+**Archivos afectados:**
+- `frontend/src/app/features/admin/system-inspector/system-inspector.component.html`
+
+---
+
+
 
 | Categoría | Total de Errores |
 |:---|:---:|
@@ -572,7 +698,10 @@ app.MapControllers();
 | 🟡 Frontend / Angular | 1 |
 | 🔴 Backend / Autenticación | 1 |
 | 🟢 Frontend / UX | 1 |
-| **Total** | **15** |
+| 🟡 Frontend / Deploy (GitHub Pages) | 1 |
+| 🟡 Frontend / System Inspector | 1 |
+| 🟢 Frontend / Avatares / Assets | 1 |
+| **Total** | **18** |
 
 ---
 
