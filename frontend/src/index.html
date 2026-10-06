@@ -29,25 +29,40 @@
 <body>
   <app-root></app-root>
 
-  <!-- Registro del Service Worker para PWA Offline con auto-recarga al actualizar -->
+  <!-- Registro del Service Worker para PWA Offline -->
   <script>
+    // Flag global para bloquear recargas del SW durante operaciones críticas (ej: restaurar BD)
+    window.__swReloadBlocked = false;
+
     if ('serviceWorker' in navigator && (window.location.protocol.startsWith('http') || window.location.protocol.startsWith('https'))) {
       window.addEventListener('load', () => {
         const swUrl = 'service-worker.js?v=5';
         navigator.serviceWorker.register(swUrl)
           .then((registration) => {
-            console.log('[PWA] Service Worker registrado exitosamente con alcance:', registration.scope);
-            registration.update();
+            console.log('[PWA] Service Worker registrado con alcance:', registration.scope);
+            // Solo verificar actualizaciones si ya hay un SW controlando la página
+            // y evitar el bucle de recarga
+            if (navigator.serviceWorker.controller) {
+              registration.update().catch(() => {});
+            }
             registration.onupdatefound = () => {
               const installingWorker = registration.installing;
-              if (installingWorker) {
-                installingWorker.onstatechange = () => {
-                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    console.log('[PWA] Nueva versión detectada. Recargando para aplicar cambios...');
-                    window.location.reload();
+              if (!installingWorker) return;
+              installingWorker.onstatechange = () => {
+                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  if (window.__swReloadBlocked) {
+                    console.log('[PWA] Nueva versión lista, pero recarga bloqueada por operación crítica.');
+                    return;
                   }
-                };
-              }
+                  console.log('[PWA] Nueva versión instalada. Recargando...');
+                  // Usar un pequeño delay y verificar que no se haya bloqueado
+                  setTimeout(() => {
+                    if (!window.__swReloadBlocked) {
+                      window.location.reload();
+                    }
+                  }, 500);
+                }
+              };
             };
           })
           .catch((error) => {

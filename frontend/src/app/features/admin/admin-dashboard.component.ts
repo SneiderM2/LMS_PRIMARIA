@@ -483,11 +483,14 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     this.isRestoringBackup = true;
+    // Bloquear recarga del Service Worker durante la operación crítica
+    (window as any).__swReloadBlocked = true;
     this.showToast('Subiendo y ejecutando script de restauración en Supabase PostgreSQL... Por favor espera.', 'info');
 
     this.adminService.restoreBackup(file).subscribe({
       next: (res: { message?: string; fileName?: string; restoredAt?: string }) => {
         this.isRestoringBackup = false;
+        (window as any).__swReloadBlocked = false;
         this.showToast(res?.message || '✅ Base de datos restaurada exitosamente.', 'success');
         target.value = '';
         // Recargar datos directamente en memoria sin recargar la página del navegador (evita 404 en SPA)
@@ -497,6 +500,7 @@ export class AdminDashboardComponent implements OnInit {
       },
       error: (err: any) => {
         this.isRestoringBackup = false;
+        (window as any).__swReloadBlocked = false;
         console.error('Error al restaurar backup:', err);
         const errorMsg = err?.error?.message || err?.error?.detail || err?.message || 'Error al comunicarse con el servidor.';
         this.showToast(`❌ Error al restaurar: ${errorMsg}`, 'warning');
