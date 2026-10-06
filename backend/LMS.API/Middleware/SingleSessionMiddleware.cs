@@ -20,7 +20,7 @@ public class SingleSessionMiddleware
     {
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
 
-        // Omitir la validación estricta de sesión única en los endpoints de autenticación inicial
+        // Omitir la validación estricta en endpoints de autenticación inicial y backup
         if (path.Contains("/api/auth/login") || 
             path.Contains("/api/auth/google-login") || 
             path.Contains("/api/auth/register") || 

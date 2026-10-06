@@ -101,7 +101,7 @@ export class AdminDashboardComponent implements OnInit {
     private adminService: AdminService,
     private router: Router,
     private reportService: ReportExportService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.loadMetrics();
@@ -543,5 +543,51 @@ export class AdminDashboardComponent implements OnInit {
 
   public logout(): void {
     this.authService.logout();
+  }
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
+  public isRestoring = false;
+
+  // Dispara el selector de archivos oculto
+  public triggerRestore(): void {
+    this.fileInput.nativeElement.click();
+  }
+
+  // Procesa el archivo seleccionado
+  public onFileSelected(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    if (!target.files || target.files.length === 0) return;
+
+    const file = target.files[0];
+
+    if (!file.name.endsWith('.sql')) {
+      alert('Por favor selecciona un archivo con extensión .sql');
+      target.value = ''; // Limpiar input
+      return;
+    }
+
+    const confirmAction = confirm(
+      `⚠️ ¡ATENCIÓN! Restaurar el backup reemplazará o actualizará la información actual de la base de datos con el archivo "${file.name}".\n\n¿Deseas continuar?`
+    );
+
+    if (!confirmAction) {
+      target.value = '';
+      return;
+    }
+
+    this.isRestoring = true;
+
+    this.adminService.restoreBackup(file).subscribe({
+      next: (res) => {
+        this.isRestoring = false;
+        alert('✅ Restauración completada exitosamente.');
+        target.value = '';
+        window.location.reload(); // Recargar para actualizar métricas e interfaz
+      },
+      error: (err) => {
+        this.isRestoring = false;
+        alert(`❌ Error al restaurar el backup: ${err.error?.message || err.message}`);
+        target.value = '';
+      }
+    });
   }
 }
