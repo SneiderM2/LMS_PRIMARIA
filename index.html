@@ -29,32 +29,19 @@
 <body>
   <app-root></app-root>
 
-  <!-- Registro del Service Worker para PWA Offline con auto-recarga al actualizar -->
+  <!-- Registro del Service Worker para PWA Offline -->
   <script>
     if ('serviceWorker' in navigator && (window.location.protocol.startsWith('http') || window.location.protocol.startsWith('https'))) {
       window.addEventListener('load', () => {
-        const swUrl = 'service-worker.js?v=5';
-        navigator.serviceWorker.register(swUrl)
+        navigator.serviceWorker.register('service-worker.js?v=6')
           .then((registration) => {
-            console.log('[PWA] Service Worker registrado exitosamente con alcance:', registration.scope);
-            registration.update();
-            registration.onupdatefound = () => {
-              const installingWorker = registration.installing;
-              if (installingWorker) {
-                installingWorker.onstatechange = () => {
-                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    console.log('[PWA] Nueva versión detectada. Recargando para aplicar cambios...');
-                    window.location.reload();
-                  }
-                };
-              }
-            };
+            console.log('[PWA] Service Worker v6 registrado. Alcance:', registration.scope);
           })
           .catch((error) => {
-            console.warn('[PWA] Fallo al registrar el Service Worker:', error);
+            console.warn('[PWA] Error al registrar el Service Worker:', error);
           });
       });
     }
   </script>
-<link rel="modulepreload" href="chunk-EQDQRRRY.js"><script src="polyfills-FFHMD2TL.js" type="module"></script><script src="main-BXKIHNWP.js" type="module"></script></body>
+<link rel="modulepreload" href="chunk-EQDQRRRY.js"><script src="polyfills-FFHMD2TL.js" type="module"></script><script src="main-ZJEAHE2D.js" type="module"></script></body>
 </html>

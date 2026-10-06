@@ -249,7 +249,7 @@
               <tr *ngFor="let user of filteredUsers" [class.user-inactive]="!user.activo">
                 <td>
                   <div class="user-cell">
-                    <img [src]="user.avatarUrl" alt="Avatar" class="avatar-sm" />
+                    <img [src]="user.avatarUrl && !user.avatarUrl.includes('example.com') ? user.avatarUrl : 'https://api.dicebear.com/7.x/bottts/svg?seed=' + user.username" alt="Avatar" class="avatar-sm" />
                     <div>
                       <strong>{{ user.fullName }}</strong>
                       <span class="user-subid">ID: {{ user.id }}</span>

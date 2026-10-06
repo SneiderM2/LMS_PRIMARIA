@@ -8,7 +8,7 @@
       </div>
       <h2>Auditoría del Sistema y Archivos de Configuración</h2>
       <p class="header-desc">
-        Monitoreo de seguridad, inspección estructurada de registros y directivas del servidor (<code>.htaccess</code>).
+        Monitoreo de seguridad e inspección estructurada de registros del servidor Kestrel (.NET).
       </p>
     </div>
 
@@ -41,7 +41,7 @@
     </div>
   </div>
 
-  <!-- Pestañas Principales (.htaccess vs Logs) -->
+  <!-- Pestañas Principales (solo Logs) -->
   <div class="inspector-tabs">
     <button 
       class="tab-btn" 
@@ -50,12 +50,7 @@
       📋 Registros de Actividad (*.log)
       <span *ngIf="logFiles().length > 0" class="tab-pill">{{ logFiles().length }}</span>
     </button>
-    <button 
-      class="tab-btn" 
-      [class.active]="activeTab() === 'htaccess'" 
-      (click)="selectTab('htaccess')">
-      ⚙️ Directivas Servidor (.htaccess)
-    </button>
+    <!-- Tab .htaccess ocultada: endpoint no disponible en backend .NET/Render -->
   </div>
 
   <!-- Barra de Selección de Archivos de Log y Modo de Vista -->
