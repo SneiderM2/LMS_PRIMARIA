@@ -428,23 +428,53 @@ export class AdminDashboardComponent implements OnInit {
 
   public triggerRestore(): void {
     if (this.isRestoringBackup) return;
-    this.fileInput.nativeElement.click();
+    try {
+      if (this.fileInput?.nativeElement) {
+        this.fileInput.nativeElement.value = '';
+        this.fileInput.nativeElement.click();
+        return;
+      }
+    } catch (e) {
+      console.warn('fileInput nativeElement no disponible:', e);
+    }
+
+    // Selector dinámico infalible que no depende de ViewChild
+    const fileSelector = document.createElement('input');
+    fileSelector.type = 'file';
+    fileSelector.accept = '.sql';
+    fileSelector.style.display = 'none';
+    fileSelector.onchange = (e) => this.onFileSelected(e);
+    document.body.appendChild(fileSelector);
+    fileSelector.click();
+    setTimeout(() => {
+      if (document.body.contains(fileSelector)) {
+        document.body.removeChild(fileSelector);
+      }
+    }, 2000);
   }
 
   public onFileSelected(event: Event): void {
     const target = event.target as HTMLInputElement;
-    if (!target.files || target.files.length === 0) return;
+    if (!target || !target.files || target.files.length === 0) return;
 
     const file = target.files[0];
+    if (!file) return;
 
-    if (!file.name.endsWith('.sql')) {
-      alert('Por favor selecciona un archivo con extensión .sql');
+    if (!file.name.toLowerCase().endsWith('.sql')) {
+      alert('Por favor selecciona un archivo con extensión .sql válido.');
       target.value = '';
       return;
     }
 
+    if (file.size === 0) {
+      alert('El archivo seleccionado está vacío.');
+      target.value = '';
+      return;
+    }
+
+    const sizeKb = (file.size / 1024).toFixed(1);
     const confirmAction = confirm(
-      `⚠️ ¡ATENCIÓN! Restaurar la copia de seguridad actualizará los datos de PostgreSQL en Supabase con la información del archivo "${file.name}".\n\n¿Deseas continuar?`
+      `⚠️ ¡ATENCIÓN! Se restaurará la base de datos de PostgreSQL en Supabase con la información del archivo:\n\n📄 "${file.name}" (${sizeKb} KB)\n\n¿Deseas continuar?`
     );
 
     if (!confirmAction) {
@@ -453,20 +483,24 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     this.isRestoringBackup = true;
-    this.showToast('Ejecutando script de restauración en Supabase PostgreSQL... Por favor espera.', 'info');
+    this.showToast('Subiendo y ejecutando script de restauración en Supabase PostgreSQL... Por favor espera.', 'info');
 
     this.adminService.restoreBackup(file).subscribe({
       next: (res: { message?: string; fileName?: string; restoredAt?: string }) => {
         this.isRestoringBackup = false;
         this.showToast(res?.message || '✅ Base de datos restaurada exitosamente.', 'success');
         target.value = '';
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
+        // Recargar datos directamente en memoria sin recargar la página del navegador (evita 404 en SPA)
+        this.loadMetrics();
+        this.loadUsers();
+        this.loadAdminCourses();
       },
       error: (err: any) => {
         this.isRestoringBackup = false;
-        alert(`❌ Error al restaurar el backup: ${err?.error?.message || err?.message || 'Error desconocido'}`);
+        console.error('Error al restaurar backup:', err);
+        const errorMsg = err?.error?.message || err?.error?.detail || err?.message || 'Error al comunicarse con el servidor.';
+        this.showToast(`❌ Error al restaurar: ${errorMsg}`, 'warning');
+        alert(`❌ No fue posible restaurar la base de datos:\n\n${errorMsg}`);
         target.value = '';
       }
     });
