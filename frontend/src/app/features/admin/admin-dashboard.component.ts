@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -15,6 +15,8 @@ import { ReportExportService } from '../../core/services/report-export.service';
   styleUrls: ['./admin-dashboard.component.css']
 })
 export class AdminDashboardComponent implements OnInit {
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
+
   // Pestañas: 'overview' (Usuarios), 'courses' (Materias/Cursos), 'inspector' (Auditoría/Logs)
   public activeSection: 'overview' | 'courses' | 'inspector' = 'overview';
 
@@ -91,6 +93,10 @@ export class AdminDashboardComponent implements OnInit {
     docenteId: undefined,
     descripcion: ''
   };
+
+  // Estados de Operación de Backup
+  public isDownloadingBackup = false;
+  public isRestoringBackup = false;
 
   // Toast Flotante
   public toastMessage: string | null = null;
@@ -387,7 +393,86 @@ export class AdminDashboardComponent implements OnInit {
     });
   }
 
-  // --- Toasts y Navegación ---
+  // --- Funcionalidades de Respaldos (Backup BD) ---
+  public downloadDatabaseBackup(): void {
+    if (this.isDownloadingBackup) return;
+
+    this.isDownloadingBackup = true;
+    this.showToast('Generando dump SQL de la base de datos Supabase... Por favor espera.', 'info');
+
+    this.adminService.downloadDatabaseBackup().subscribe({
+      next: (blob: Blob) => {
+        this.isDownloadingBackup = false;
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const fileName = `backup_lms_supabase_${timestamp}.sql`;
+
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+
+        this.showToast('Copia de seguridad SQL descargada exitosamente 💾', 'success');
+      },
+      error: (err) => {
+        this.isDownloadingBackup = false;
+        console.error('Error al descargar copia de seguridad:', err);
+        this.showToast('No fue posible generar el backup de la base de datos. Verifica la conexión con Supabase.', 'warning');
+      }
+    });
+  }
+
+  public triggerRestore(): void {
+    if (this.isRestoringBackup) return;
+    this.fileInput.nativeElement.click();
+  }
+
+  public onFileSelected(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    if (!target.files || target.files.length === 0) return;
+
+    const file = target.files[0];
+
+    if (!file.name.endsWith('.sql')) {
+      alert('Por favor selecciona un archivo con extensión .sql');
+      target.value = '';
+      return;
+    }
+
+    const confirmAction = confirm(
+      `⚠️ ¡ATENCIÓN! Restaurar la copia de seguridad actualizará los datos de PostgreSQL en Supabase con la información del archivo "${file.name}".\n\n¿Deseas continuar?`
+    );
+
+    if (!confirmAction) {
+      target.value = '';
+      return;
+    }
+
+    this.isRestoringBackup = true;
+    this.showToast('Ejecutando script de restauración en Supabase PostgreSQL... Por favor espera.', 'info');
+
+    this.adminService.restoreBackup(file).subscribe({
+      next: (res) => {
+        this.isRestoringBackup = false;
+        this.showToast('✅ Base de datos restaurada exitosamente.', 'success');
+        target.value = '';
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      },
+      error: (err) => {
+        this.isRestoringBackup = false;
+        alert(`❌ Error al restaurar el backup: ${err?.error?.message || err.message}`);
+        target.value = '';
+      }
+    });
+  }
+
+  // --- Toasts, Reportes y Navegación ---
   public showToast(message: string, type: 'success' | 'info' | 'warning'): void {
     this.toastMessage = message;
     this.toastType = type;
@@ -437,157 +522,10 @@ export class AdminDashboardComponent implements OnInit {
         });
         this.showToast('Reporte de usuarios en PDF generado exitosamente 📄', 'success');
       }
-    } else if (this.activeSection === 'courses') {
-      const headers = ['ID', 'Nombre de Materia / Curso', 'Grado', 'Grupo', 'Docente Responsable', 'Alumnos Inscritos', 'Estado', 'Descripción'];
-      const rows = this.filteredCourses.map(c => [
-        c.id,
-        c.nombre,
-        c.grado,
-        c.grupo,
-        c.docenteNombre || 'Sin profesor asignado',
-        c.totalStudents || 0,
-        c.activo ? 'Habilitada' : 'Suspendida',
-        c.descripcion || 'Sin descripción'
-      ]);
-
-      if (format === 'csv') {
-        this.reportService.exportToCsv(`reporte_materias_institucionales_${today}`, headers, rows);
-        this.showToast('Catálogo de materias exportado en CSV exitosamente 📊', 'success');
-      } else {
-        this.reportService.exportToPdf({
-          title: 'Reporte Directivo: Asignaturas y Cursos Escolares',
-          subtitle: `Filtro Grado: ${this.courseGradeFilter} • Total de materias listadas: ${this.filteredCourses.length}`,
-          author: authorName,
-          institution: 'LMS Primaria • Control de Cursos Institucionales',
-          headers,
-          rows,
-          filename: `reporte_materias_institucionales_${today}`,
-          summaryCards: [
-            { label: 'Total Materias', value: this.filteredCourses.length, color: 'blue' },
-            { label: 'Alumnos Activos', value: this.metrics.activeStudentsCount, color: 'green' },
-            { label: 'Docentes Activos', value: this.metrics.activeTeachersCount, color: 'purple' },
-            { label: 'Estado Kestrel', value: this.metrics.systemStatus, color: 'yellow' }
-          ]
-        });
-        this.showToast('Reporte de materias en PDF generado exitosamente 📄', 'success');
-      }
-    } else if (this.activeSection === 'inspector') {
-      const headers = ['Componente / Parámetro', 'Estado / Valor', 'Descripción Técnica'];
-      const rows = [
-        ['Estado General del Servidor', this.metrics.systemStatus, 'Kestrel Web Server (.NET 8) y PostgreSQL (Supabase)'],
-        ['Total Usuarios Habilitados', this.metrics.totalActiveUsers, 'Cuentas con acceso activo a la plataforma'],
-        ['Docentes Registrados', this.metrics.activeTeachersCount, 'Profesores titulares de materias'],
-        ['Estudiantes Matriculados', this.metrics.activeStudentsCount, 'Alumnos de 1° a 6° de básica primaria'],
-        ['Cursos y Materias Creadas', this.metrics.totalCoursesCount, 'Asignaturas operativas en el ciclo lectivo'],
-        ['Alertas y Errores (24h)', this.metrics.recentErrorsCount, 'Registros en log de auditoría']
-      ];
-
-      if (format === 'csv') {
-        this.reportService.exportToCsv(`reporte_auditoria_sistema_${today}`, headers, rows);
-        this.showToast('Reporte de auditoría en CSV descargado exitosamente 📊', 'success');
-      } else {
-        this.reportService.exportToPdf({
-          title: 'Reporte de Auditoría e Infraestructura de Servidor',
-          subtitle: `Generado para auditoría directiva de plataforma LMS Primaria`,
-          author: authorName,
-          institution: 'LMS Primaria • Centro de Auditoría y Seguridad',
-          headers,
-          rows,
-          filename: `reporte_auditoria_sistema_${today}`,
-          summaryCards: [
-            { label: 'Estado', value: this.metrics.systemStatus, color: 'green' },
-            { label: 'Usuarios', value: this.metrics.totalActiveUsers, color: 'blue' },
-            { label: 'Cursos', value: this.metrics.totalCoursesCount, color: 'purple' },
-            { label: 'Alertas 24h', value: this.metrics.recentErrorsCount, color: 'yellow' }
-          ]
-        });
-        this.showToast('Reporte de auditoría en PDF generado exitosamente 📄', 'success');
-      }
     }
-  }
-
-  public isDownloadingBackup = false;
-
-  public downloadDatabaseBackup(): void {
-    if (this.isDownloadingBackup) return;
-
-    this.isDownloadingBackup = true;
-    this.showToast('Generando dump SQL de la base de datos Supabase... Por favor espera.', 'info');
-
-    this.adminService.downloadDatabaseBackup().subscribe({
-      next: (blob: Blob) => {
-        this.isDownloadingBackup = false;
-        const now = new Date();
-        const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const fileName = `backup_lms_supabase_${timestamp}.sql`;
-
-        // Crear enlace temporal de descarga en el navegador
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
-
-        this.showToast('Copia de seguridad SQL descargada exitosamente 💾', 'success');
-      },
-      error: (err) => {
-        this.isDownloadingBackup = false;
-        console.error('Error al descargar copia de seguridad:', err);
-        this.showToast('No fue posible generar el backup de la base de datos. Verifica la conexión con Supabase.', 'warning');
-      }
-    });
   }
 
   public logout(): void {
     this.authService.logout();
-  }
-  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
-  public isRestoring = false;
-
-  // Dispara el selector de archivos oculto
-  public triggerRestore(): void {
-    this.fileInput.nativeElement.click();
-  }
-
-  // Procesa el archivo seleccionado
-  public onFileSelected(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    if (!target.files || target.files.length === 0) return;
-
-    const file = target.files[0];
-
-    if (!file.name.endsWith('.sql')) {
-      alert('Por favor selecciona un archivo con extensión .sql');
-      target.value = ''; // Limpiar input
-      return;
-    }
-
-    const confirmAction = confirm(
-      `⚠️ ¡ATENCIÓN! Restaurar el backup reemplazará o actualizará la información actual de la base de datos con el archivo "${file.name}".\n\n¿Deseas continuar?`
-    );
-
-    if (!confirmAction) {
-      target.value = '';
-      return;
-    }
-
-    this.isRestoring = true;
-
-    this.adminService.restoreBackup(file).subscribe({
-      next: (res) => {
-        this.isRestoring = false;
-        alert('✅ Restauración completada exitosamente.');
-        target.value = '';
-        window.location.reload(); // Recargar para actualizar métricas e interfaz
-      },
-      error: (err) => {
-        this.isRestoring = false;
-        alert(`❌ Error al restaurar el backup: ${err.error?.message || err.message}`);
-        target.value = '';
-      }
-    });
   }
 }
