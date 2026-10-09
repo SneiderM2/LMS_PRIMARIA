@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>LMS Primaria | Redirigiendo...</title>
+  <script>
+    // GitHub Pages SPA Redirect: Redirige URLs directas al formato con hash (#)
+    (function() {
+      var path = window.location.pathname;
+      var search = window.location.search || '';
+      var hash = window.location.hash || '';
+
+      var segments = path.split('/').filter(Boolean);
+      var isGitHubPages = window.location.hostname.endsWith('github.io');
+
+      if (isGitHubPages && segments.length > 0) {
+        // En GitHub Pages, el primer segmento es el nombre del repositorio (ej. /LMS_PRIMARIA)
+        var repoName = segments[0];
+        var subRoute = segments.slice(1).join('/');
+        var destination = '/' + repoName + '/#' + (subRoute ? '/' + subRoute : '') + search + hash;
+        window.location.replace(destination);
+      } else {
+        // Dominio raíz o personalizado
+        var destination = '/#' + (path.startsWith('/') ? path : '/' + path) + search + hash;
+        window.location.replace(destination);
+      }
+    })();
+  </script>
+</head>
+<body style="font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f0f9ff; color: #0369a1;">
+  <div style="text-align: center; padding: 24px;">
+    <h2 style="font-size: 1.5rem; margin-bottom: 8px;">🎒 LMS Primaria</h2>
+    <p style="font-size: 1rem; color: #64748b;">Cargando plataforma educativa... ✨</p>
+  </div>
+</body>
+</html>
