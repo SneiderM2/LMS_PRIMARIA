@@ -88,11 +88,26 @@ export class AuthService {
   }
 
   /**
-   * Polling ligero: verifica que la sesión actual siga siendo válida en el servidor.
-   * Si retorna 401 con code DUPLICATE_SESSION, el interceptor maneja el logout.
+   * Polling ligero / Validación: verifica que la sesión actual siga siendo válida en el servidor.
+   * @param skipInterceptorRedirect Si true, evita que el interceptor ejecute redirección automática para permitir manejo del guard
    */
-  public validateSession(): Observable<{ valid: boolean }> {
-    return this.http.get<{ valid: boolean }>(`${this.apiUrl}/auth/validate-session`);
+  public validateSession(skipInterceptorRedirect = false): Observable<{ valid: boolean }> {
+    const headers: { [key: string]: string } = {};
+    if (skipInterceptorRedirect) {
+      headers['X-Skip-Interceptor-Redirect'] = 'true';
+    }
+    return this.http.get<{ valid: boolean }>(`${this.apiUrl}/auth/validate-session`, { headers });
+  }
+
+  public clearSessionData(): void {
+    localStorage.removeItem(this.TOKEN_KEY);
+    localStorage.removeItem(this.USER_KEY);
+    localStorage.removeItem('token');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('lms_token');
+    sessionStorage.clear();
+    this.currentUser.set(null);
   }
 
   public logout(): void {
@@ -101,14 +116,14 @@ export class AuthService {
     if (token) {
       this.http.post(`${this.apiUrl}/auth/logout`, {}).subscribe({ error: () => {} });
     }
-    localStorage.removeItem(this.TOKEN_KEY);
-    localStorage.removeItem(this.USER_KEY);
-    this.currentUser.set(null);
+    this.clearSessionData();
     this.router.navigate(['/login']);
   }
 
   public getToken(): string | null {
-    return localStorage.getItem(this.TOKEN_KEY);
+    return localStorage.getItem(this.TOKEN_KEY) || 
+           localStorage.getItem('token') || 
+           localStorage.getItem('access_token');
   }
 
   public redirectByRole(role: UserRole): void {

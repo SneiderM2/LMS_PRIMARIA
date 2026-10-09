@@ -6,6 +6,7 @@ import { DataPolicyModalComponent } from './shared/components/data-policy-modal/
 import { SessionWarningModalComponent } from './shared/components/session-warning-modal/session-warning-modal.component';
 import { AuthService } from './core/services/auth.service';
 import { SessionTimeoutService } from './core/services/session-timeout.service';
+import { ServerStatusService } from './core/services/server-status.service';
 
 @Component({
   selector: 'app-root',
@@ -24,6 +25,7 @@ export class AppComponent implements OnInit {
 
   constructor(
     public authService: AuthService,
+    public serverStatus: ServerStatusService,
     private sessionTimeoutService: SessionTimeoutService
   ) {}
 

@@ -14,11 +14,13 @@ export const roleGuard: CanActivateFn = (route) => {
     return true;
   }
 
-  // Si no tiene el rol, redirigir a su propio dashboard
+  // Si tiene un rol válido pero diferente al requerido, redirigir a su propio dashboard
   if (currentRole) {
     authService.redirectByRole(currentRole);
-  } else {
-    router.navigate(['/login']);
+    return false;
   }
-  return false;
+
+  // Si no cuenta con rol definido o sesión corrupta, limpiar y retornar UrlTree al login
+  authService.clearSessionData();
+  return router.createUrlTree(['/login']);
 };
