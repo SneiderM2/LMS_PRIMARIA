@@ -6,7 +6,7 @@
       <div class="brand-badge-icon">👨‍🏫</div>
       <div class="brand-titles">
         <span class="brand-title">LMS Primaria</span>
-        <span class="teacher-tag">Portal Docente</span>
+        <span class="teacher-tag">{{ 'teacher.brandTag' | translate }}</span>
       </div>
     </div>
 
@@ -14,10 +14,11 @@
       <img [src]="authService.currentUser()?.avatarUrl" alt="Avatar" class="user-avatar" />
       <div class="user-info">
         <span class="user-name">{{ authService.currentUser()?.fullName }}</span>
-        <span class="user-grade">📚 {{ authService.currentUser()?.gradeLevel || 'Docente Titular' }}</span>
+        <span class="user-grade">📚 {{ authService.currentUser()?.gradeLevel || ('teacher.roleTeacher' | translate) }}</span>
       </div>
-      <button class="btn btn-secondary btn-sm" (click)="logout()" title="Cerrar sesión">
-        🚪 Salir
+      <app-language-selector mode="inline"></app-language-selector>
+      <button class="btn btn-secondary btn-sm" (click)="logout()" [title]="'nav.logout' | translate">
+        🚪 {{ 'nav.logout' | translate }}
       </button>
     </div>
   </header>
@@ -29,22 +30,22 @@
         class="portal-tab-btn"
         [class.active]="activeTab === 'activities'"
         (click)="switchTab('activities')">
-        📝 Actividades y Calificaciones
+        {{ 'teacher.tabActivities' | translate }}
         <span class="tab-badge" *ngIf="academicMetrics.pendingGradingCount > 0">
-          {{ academicMetrics.pendingGradingCount }} pendientes
+          {{ academicMetrics.pendingGradingCount }} {{ 'teacher.pendingCount' | translate }}
         </span>
       </button>
       <button
         class="portal-tab-btn"
         [class.active]="activeTab === 'semaforo'"
         (click)="switchTab('semaforo')">
-        🚦 Monitoreo Semáforo
+        {{ 'teacher.tabSemaforo' | translate }}
       </button>
       <button
         class="portal-tab-btn"
         [class.active]="activeTab === 'students'"
         (click)="switchTab('students')">
-        🎓 Gestión de Alumnos y Matrícula
+        {{ 'teacher.tabStudents' | translate }}
       </button>
     </div>
   </nav>

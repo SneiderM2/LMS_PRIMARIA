@@ -7,11 +7,13 @@ import { StudentStatus, SemaforoSummaryMetrics } from '../../core/models/semafor
 import { CreateContent, StudentSubmission } from '../../core/models/content.model';
 import { Course, TeacherStudent } from '../../core/models/user.model';
 import { ReportExportService } from '../../core/services/report-export.service';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
+import { LanguageSelectorComponent } from '../../shared/components/language-selector/language-selector.component';
 
 @Component({
   selector: 'app-teacher-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TranslatePipe, LanguageSelectorComponent],
   templateUrl: './teacher-dashboard.component.html',
   styleUrls: ['./teacher-dashboard.component.css']
 })

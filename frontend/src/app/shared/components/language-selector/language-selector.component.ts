@@ -67,12 +67,17 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
       align-items: center;
     }
 
-    /* Modo flotante (esquina superior derecha global) */
+    /* Modo flotante (esquina inferior derecha sobre el toggle de tema) */
     .language-selector-container.mode-floating {
       position: fixed;
-      top: 1.15rem;
+      bottom: 5.25rem;
       right: 1.5rem;
-      z-index: 99990;
+      z-index: 99998;
+    }
+
+    .language-selector-container.mode-inline {
+      position: relative;
+      display: inline-flex;
     }
 
     .lang-pill-btn {
@@ -144,6 +149,11 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
       flex-direction: column;
       gap: 3px;
       z-index: 100000;
+    }
+
+    .language-selector-container.mode-floating .lang-dropdown-menu {
+      top: auto;
+      bottom: calc(100% + 8px);
     }
 
     .dropdown-header {
@@ -277,8 +287,8 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
     /* Responsive */
     @media (max-width: 480px) {
       .language-selector-container.mode-floating {
-        top: 0.75rem;
-        right: 0.85rem;
+        bottom: 4.85rem;
+        right: 1.15rem;
       }
       .lang-pill-btn {
         padding: 5px 10px;

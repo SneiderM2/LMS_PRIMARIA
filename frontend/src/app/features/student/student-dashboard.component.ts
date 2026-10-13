@@ -4,11 +4,13 @@ import { StudentService, StudentMetrics, StudentCoursesCatalog } from '../../cor
 import { AuthService } from '../../core/services/auth.service';
 import { Content } from '../../core/models/content.model';
 import { FileDropZoneComponent } from './components/file-drop-zone/file-drop-zone.component';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
+import { LanguageSelectorComponent } from '../../shared/components/language-selector/language-selector.component';
 
 @Component({
   selector: 'app-student-dashboard',
   standalone: true,
-  imports: [CommonModule, FileDropZoneComponent],
+  imports: [CommonModule, FileDropZoneComponent, TranslatePipe, LanguageSelectorComponent],
   templateUrl: './student-dashboard.component.html',
   styleUrls: ['./student-dashboard.component.css']
 })

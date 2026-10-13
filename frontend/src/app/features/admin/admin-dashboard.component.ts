@@ -6,11 +6,13 @@ import { AuthService } from '../../core/services/auth.service';
 import { AdminService, AdminMetrics, AdminUser, CreateAdminUserDto, UpdateAdminUserDto, AdminCourse, CreateAdminCourseDto, UpdateAdminCourseDto } from '../../core/services/admin.service';
 import { SystemInspectorComponent } from './system-inspector/system-inspector.component';
 import { ReportExportService } from '../../core/services/report-export.service';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
+import { LanguageSelectorComponent } from '../../shared/components/language-selector/language-selector.component';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, SystemInspectorComponent],
+  imports: [CommonModule, FormsModule, SystemInspectorComponent, TranslatePipe, LanguageSelectorComponent],
   templateUrl: './admin-dashboard.component.html',
   styleUrls: ['./admin-dashboard.component.css']
 })

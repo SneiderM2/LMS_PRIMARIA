@@ -50,20 +50,20 @@
 
         <div class="form-group">
           <label for="studentId">
-            <span class="label-icon">🆔</span> Carnet o Documento de Identidad
+            <span class="label-icon">🆔</span> {{ 'login.idLabel' | translate }}
           </label>
           <div class="input-box">
             <input id="studentId" type="text" name="id" [(ngModel)]="id"
-              placeholder="Ej: EST-101, DOC-2024 o 1029384756" required autocomplete="username" />
+              [placeholder]="'login.idPlaceholder' | translate" required autocomplete="username" />
           </div>
         </div>
 
         <div class="form-group">
           <label for="password">
-            <span class="label-icon">🔒</span> Tu Contraseña
+            <span class="label-icon">🔒</span> {{ 'login.passwordLabel' | translate }}
           </label>
           <div class="input-box">
-            <input id="password" type="password" name="password" [(ngModel)]="password" placeholder="••••••••" required
+            <input id="password" type="password" name="password" [(ngModel)]="password" [placeholder]="'login.passwordPlaceholder' | translate" required
               autocomplete="current-password" />
           </div>
         </div>
@@ -106,21 +106,21 @@
         <!-- Selección de Rol / Perfil -->
         <div class="form-group">
           <label class="section-label">
-            <span class="label-icon">👤</span> Selecciona tu Perfil:
+            <span class="label-icon">👤</span> {{ 'login.selectProfile' | translate }}
           </label>
           <div class="role-selector-grid">
             <button type="button" class="role-card" [class.selected]="regRole === 'Student'"
               (click)="regRole = 'Student'">
               <span class="role-emoji">🎒</span>
-              <span class="role-title">Estudiante</span>
-              <span class="role-sub">Primaria</span>
+              <span class="role-title">{{ 'login.profileStudent' | translate }}</span>
+              <span class="role-sub">{{ 'login.profileStudentSub' | translate }}</span>
             </button>
 
             <button type="button" class="role-card" [class.selected]="regRole === 'Teacher'"
               (click)="regRole = 'Teacher'">
               <span class="role-emoji">👩‍🏫</span>
-              <span class="role-title">Docente</span>
-              <span class="role-sub">Profesor(a)</span>
+              <span class="role-title">{{ 'login.profileTeacher' | translate }}</span>
+              <span class="role-sub">{{ 'login.profileTeacherSub' | translate }}</span>
             </button>
           </div>
         </div>
@@ -128,37 +128,37 @@
         <!-- Documento o Carnet -->
         <div class="form-group">
           <label for="regId">
-            <span class="label-icon">🆔</span> Carnet o Documento (ID único de acceso)
+            <span class="label-icon">🆔</span> {{ 'login.regIdLabel' | translate }}
           </label>
           <div class="input-box">
             <input id="regId" type="text" name="regId" [(ngModel)]="regId"
-              placeholder="Ej: EST-101, 1029384756 o mi_usuario" required />
+              [placeholder]="'login.regIdPlaceholder' | translate" required />
           </div>
         </div>
 
         <!-- Nombre Completo -->
         <div class="form-group">
           <label for="regFullName">
-            <span class="label-icon">📛</span> Nombre Completo
+            <span class="label-icon">📛</span> {{ 'login.fullNameLabel' | translate }}
           </label>
           <div class="input-box">
             <input id="regFullName" type="text" name="regFullName" [(ngModel)]="regFullName"
-              placeholder="Ej: Sofía Martínez Gómez" required />
+              [placeholder]="'login.fullNamePlaceholder' | translate" required />
           </div>
         </div>
 
         <!-- Grado (Solo para Estudiantes) -->
         <div *ngIf="regRole === 'Student'" class="form-group grade-selector-group">
           <label for="regGrade">
-            <span class="label-icon">📚</span> Grado Escolar de Primaria
+            <span class="label-icon">📚</span> {{ 'login.gradeLabel' | translate }}
           </label>
           <div class="input-box">
             <select id="regGrade" name="regGrade" [(ngModel)]="regGrade" class="custom-form-select">
-              <option value="1°">1° Primaria (Primer Grado)</option>
-              <option value="2°">2° Primaria (Segundo Grado)</option>
-              <option value="3°">3° Primaria (Tercer Grado)</option>
-              <option value="4°">4° Primaria (Cuarto Grado)</option>
-              <option value="5°">5° Primaria (Quinto Grado)</option>
+              <option value="1°">{{ 'login.grade1' | translate }}</option>
+              <option value="2°">{{ 'login.grade2' | translate }}</option>
+              <option value="3°">{{ 'login.grade3' | translate }}</option>
+              <option value="4°">{{ 'login.grade4' | translate }}</option>
+              <option value="5°">{{ 'login.grade5' | translate }}</option>
             </select>
           </div>
         </div>
@@ -167,21 +167,21 @@
         <div class="form-row-2">
           <div class="form-group">
             <label for="regPassword">
-              <span class="label-icon">🔒</span> Contraseña
+              <span class="label-icon">🔒</span> {{ 'login.regPasswordLabel' | translate }}
             </label>
             <div class="input-box">
               <input id="regPassword" type="password" name="regPassword" [(ngModel)]="regPassword"
-                placeholder="Mínimo 4 caracteres" required />
+                [placeholder]="'login.regPasswordPlaceholder' | translate" required />
             </div>
           </div>
 
           <div class="form-group">
             <label for="regConfirmPassword">
-              <span class="label-icon">🔐</span> Repetir
+              <span class="label-icon">🔐</span> {{ 'login.regConfirmPasswordLabel' | translate }}
             </label>
             <div class="input-box">
               <input id="regConfirmPassword" type="password" name="regConfirmPassword" [(ngModel)]="regConfirmPassword"
-                placeholder="Confirma tu clave" required />
+                [placeholder]="'login.regConfirmPasswordPlaceholder' | translate" required />
             </div>
           </div>
         </div>
@@ -193,13 +193,12 @@
 
         <!-- Botón de Registro -->
         <button type="submit" class="btn btn-primary btn-lg btn-block" [disabled]="isLoading">
-          <span *ngIf="!isLoading">🎉 ¡Crear mi Cuenta y Entrar!</span>
-          <span *ngIf="isLoading">⏳ Creando tu cuenta escolar...</span>
+          <span *ngIf="!isLoading">{{ 'login.btnRegister' | translate }}</span>
+          <span *ngIf="isLoading">{{ 'login.btnRegisterLoading' | translate }}</span>
         </button>
 
         <div class="register-prompt">
-          <p>¿Ya tienes una cuenta registrada? <a href="javascript:void(0)" (click)="switchTab('login')">Inicia sesión
-              aquí</a></p>
+          <p>{{ 'login.haveAccount' | translate }} <a href="javascript:void(0)" (click)="switchTab('login')">{{ 'login.loginHere' | translate }}</a></p>
         </div>
 
       </form>
@@ -208,7 +207,7 @@
 
     <!-- Pie de página escolar -->
     <div class="login-footer">
-      <p>🏫 Colegio Primaria Siglo XXI • LMS Scikids</p>
+      <p>{{ 'login.footerSchool' | translate }}</p>
     </div>
   </div>
 
@@ -216,15 +215,15 @@
   <div class="session-modal-overlay" *ngIf="showActiveSessionModal" (click)="onCancelForceLogin()">
     <div class="session-modal-card" (click)="$event.stopPropagation()">
       <div class="session-modal-icon">📱</div>
-      <h2 class="session-modal-title">Sesión Activa Detectada</h2>
+      <h2 class="session-modal-title">{{ 'session.modalTitle' | translate }}</h2>
       <p class="session-modal-desc">
-        Esta cuenta ya tiene una sesión activa en otro dispositivo o navegador.
+        {{ 'session.modalDesc' | translate }}
       </p>
       <p class="session-modal-info" *ngIf="activeSessionInfo?.sessionStartedAt">
-        🕐 Sesión iniciada: <strong>{{ activeSessionInfo?.sessionStartedAt | date:'short' }}</strong>
+        🕐 {{ activeSessionInfo?.sessionStartedAt | date:'short' }}
       </p>
       <p class="session-modal-question">
-        ¿Deseas cerrar esa sesión y continuar desde aquí?
+        {{ 'session.modalQuestion' | translate }}
       </p>
       <div class="session-modal-actions">
         <button
@@ -233,7 +232,7 @@
           class="btn-modal-cancel"
           (click)="onCancelForceLogin()"
         >
-          ❌ Cancelar
+          {{ 'session.modalCancel' | translate }}
         </button>
         <button
           id="btn-confirm-force-login"
@@ -242,8 +241,8 @@
           (click)="onConfirmForceLogin()"
           [disabled]="isLoading"
         >
-          <span *ngIf="!isLoading">✅ Sí, cerrar sesión anterior</span>
-          <span *ngIf="isLoading">⏳ Iniciando...</span>
+          <span *ngIf="!isLoading">{{ 'session.modalConfirm' | translate }}</span>
+          <span *ngIf="isLoading">{{ 'login.btnLoading' | translate }}</span>
         </button>
       </div>
     </div>

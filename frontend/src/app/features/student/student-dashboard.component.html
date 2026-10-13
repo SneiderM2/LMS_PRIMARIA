@@ -5,8 +5,8 @@
     <div class="brand">
       <div class="brand-mascot-box">🎒</div>
       <div class="brand-text">
-        <span class="brand-title">Mi Escuela Mágica</span>
-        <span class="brand-subtitle">Campus Escolar Interactivo</span>
+        <span class="brand-title">{{ 'student.brandTitle' | translate }}</span>
+        <span class="brand-subtitle">{{ 'student.brandTag' | translate }}</span>
       </div>
     </div>
 
@@ -14,10 +14,11 @@
       <img [src]="authService.currentUser()?.avatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=student'" alt="Mi Avatar" class="kid-nav-avatar" />
       <div class="kid-nav-info">
         <span class="kid-name">{{ authService.currentUser()?.fullName }}</span>
-        <span class="kid-grade">⭐ {{ authService.currentUser()?.gradeLevel || 'Primaria' }}</span>
+        <span class="kid-grade">⭐ {{ authService.currentUser()?.gradeLevel || ('student.gradePrimary' | translate) }}</span>
       </div>
-      <button class="btn btn-secondary btn-sm btn-logout" (click)="logout()" title="Cerrar sesión">
-        🚪 Salir
+      <app-language-selector mode="inline"></app-language-selector>
+      <button class="btn btn-secondary btn-sm btn-logout" (click)="logout()" [title]="'nav.logout' | translate">
+        🚪 {{ 'nav.logout' | translate }}
       </button>
     </div>
   </header>
@@ -29,18 +30,18 @@
         class="student-tab-btn" 
         [class.active]="activeTab === 'activities'"
         (click)="switchTab('activities')">
-        🎯 Mis Tareas y Recursos
+        {{ 'student.tabTasks' | translate }}
         <span class="tab-chip-counter" *ngIf="metrics.pendingActivitiesCount > 0">
-          {{ metrics.pendingActivitiesCount }} pendientes
+          {{ metrics.pendingActivitiesCount }} {{ 'student.pendingBadge' | translate }}
         </span>
       </button>
       <button 
         class="student-tab-btn" 
         [class.active]="activeTab === 'courses'"
         (click)="switchTab('courses')">
-        🎒 Mis Clases y Matrícula
+        {{ 'student.tabClasses' | translate }}
         <span *ngIf="coursesCatalog.availableCourses.length > 0" class="tab-chip">
-          {{ coursesCatalog.availableCourses.length }} nuevas
+          {{ coursesCatalog.availableCourses.length }} {{ 'student.newBadge' | translate }}
         </span>
       </button>
     </div>
@@ -58,10 +59,10 @@
     <section class="welcome-hero glass-panel">
       <div class="welcome-text">
         <div class="welcome-tag">
-          <span>✨ ¡Bienvenido(a) a tu espacio de aprendizaje!</span>
+          <span>✨ {{ 'student.brandTag' | translate }}</span>
         </div>
-        <h1>¡Hola, {{ authService.currentUser()?.fullName }}! 🚀</h1>
-        <p>¿Qué aventura emocionante y divertida descubriremos hoy en tus materias?</p>
+        <h1>{{ 'student.welcomeTitle' | translate }}</h1>
+        <p>{{ 'student.welcomeSubtitle' | translate }}</p>
       </div>
       <div class="welcome-badge-icon bounce-animation">
         <span>🏆</span>

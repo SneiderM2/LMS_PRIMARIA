@@ -7,18 +7,19 @@
     <div class="nav-brand">
       <div class="brand-badge-icon">🏫</div>
       <div class="brand-titles">
-        <span class="brand-title">LMS Primaria</span>
-        <span class="admin-tag">Panel Directivo Institucional</span>
+        <span class="brand-title">{{ 'admin.brandTitle' | translate }}</span>
+        <span class="admin-tag">{{ 'admin.brandTag' | translate }}</span>
       </div>
     </div>
 
     <div class="user-pill">
       <div class="user-meta">
-        <span class="user-name">{{ authService.currentUser()?.fullName || 'Administrador' }}</span>
-        <span class="user-role-badge">🛡️ Super Administrador</span>
+        <span class="user-name">{{ authService.currentUser()?.fullName || ('role.admin' | translate) }}</span>
+        <span class="user-role-badge">🛡️ {{ 'role.superAdmin' | translate }}</span>
       </div>
-      <button class="btn btn-secondary btn-sm" (click)="logout()" title="Cerrar sesión">
-        🚪 Salir
+      <app-language-selector mode="inline"></app-language-selector>
+      <button class="btn btn-secondary btn-sm" (click)="logout()" [title]="'nav.logout' | translate">
+        🚪 {{ 'nav.logout' | translate }}
       </button>
     </div>
   </header>
@@ -30,21 +31,21 @@
         class="admin-tab-btn" 
         [class.active]="activeSection === 'overview'"
         (click)="setSection('overview')">
-        👥 Directorio de Usuarios
+        {{ 'admin.tabUsers' | translate }}
         <span class="tab-badge">{{ users.length }}</span>
       </button>
       <button 
         class="admin-tab-btn" 
         [class.active]="activeSection === 'courses'"
         (click)="setSection('courses')">
-        📚 Materias y Cursos
+        {{ 'admin.tabCourses' | translate }}
         <span class="tab-badge">{{ courses.length }}</span>
       </button>
       <button 
         class="admin-tab-btn" 
         [class.active]="activeSection === 'inspector'"
         (click)="setSection('inspector')">
-        🛡️ Auditoría & Logs
+        {{ 'admin.tabLogs' | translate }}
       </button>
     </div>
   </nav>
@@ -67,31 +68,31 @@
         <div class="banner-content">
           <div class="status-pill-live">
             <span class="live-dot"></span>
-            <span>Sistema Operativo • PostgreSQL (Supabase) & .NET Kestrel</span>
+            <span>{{ 'admin.systemStatus' | translate }}</span>
           </div>
-          <h1>Control Global Institucional 🎓</h1>
-          <p>Supervisa cuentas de docentes, estudiantes y administradores con suspensión lógica sin pérdida de historial.</p>
+          <h1>{{ 'admin.bannerTitle' | translate }}</h1>
+          <p>{{ 'admin.bannerDesc' | translate }}</p>
         </div>
         <div class="banner-btns">
           <div class="report-btn-group">
             <button type="button" class="btn-report btn-report-csv" (click)="exportAdminReport('csv')" title="Descargar directorio de usuarios en formato Excel / CSV">
-              <span>📊 Reporte .CSV</span>
+              <span>{{ 'admin.reportCsv' | translate }}</span>
             </button>
             <button type="button" class="btn-report btn-report-pdf" (click)="exportAdminReport('pdf')" title="Descargar directorio de usuarios en formato PDF">
-              <span>📄 Reporte .PDF</span>
+              <span>{{ 'admin.reportPdf' | translate }}</span>
             </button>
           </div>
           <button class="btn btn-primary" (click)="openCreateUserModal()">
-            ➕ Registrar Usuario
+            {{ 'admin.registerUser' | translate }}
           </button>
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar copia de seguridad SQL de Supabase">
-            <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
+            <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : ('admin.downloadBackup' | translate) }}</span>
           </button>
           <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar base de datos desde copia de seguridad .sql">
-            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : '📥 Restaurar Backup BD' }}</span>
+            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : ('admin.restoreBackup' | translate) }}</span>
           </button>
           <button class="btn btn-secondary" (click)="goToTeacherView()">
-            🚦 Abrir Semáforo
+            {{ 'admin.openSemaforo' | translate }}
           </button>
         </div>
       </section>
