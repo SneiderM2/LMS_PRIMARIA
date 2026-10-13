@@ -14,17 +14,17 @@
         <div class="mascot-badge bounce-animation">
           <span class="mascot-emoji">🎒</span>
         </div>
-        <h1 class="portal-title">Aula Mágica</h1>
-        <p class="portal-subtitle">Plataforma Virtual de Primaria</p>
+        <h1 class="portal-title">{{ 'login.title' | translate }}</h1>
+        <p class="portal-subtitle">{{ 'login.subtitle' | translate }}</p>
       </div>
 
       <!-- Selector de Pestañas: Iniciar Sesión / Crear Cuenta -->
       <div class="auth-tabs">
         <button type="button" class="tab-btn" [class.active]="activeTab === 'login'" (click)="switchTab('login')">
-          🔑 Iniciar Sesión
+          {{ 'login.tabSignIn' | translate }}
         </button>
         <button type="button" class="tab-btn" [class.active]="activeTab === 'register'" (click)="switchTab('register')">
-          ✨ Crear Cuenta
+          {{ 'login.tabSignUp' | translate }}
         </button>
       </div>
 
@@ -74,13 +74,13 @@
         </div>
 
         <button type="submit" class="btn btn-primary btn-lg btn-block" [disabled]="isLoading">
-          <span *ngIf="!isLoading">🚀 ¡Entrar a mi Aula Virtual!</span>
-          <span *ngIf="isLoading">⏳ Abriendo las puertas...</span>
+          <span *ngIf="!isLoading">{{ 'login.btnSubmit' | translate }}</span>
+          <span *ngIf="isLoading">{{ 'login.btnLoading' | translate }}</span>
         </button>
 
         <!-- Separador visual -->
         <div class="divider-text">
-          <span>O continúa con</span>
+          <span>{{ 'login.orContinueWith' | translate }}</span>
         </div>
 
         <!-- Botón oficial Google Sign-In (OAuth 2.0) -->
@@ -89,8 +89,7 @@
         </div>
 
         <div class="register-prompt">
-          <p>¿Aún no tienes cuenta escolar? <a href="javascript:void(0)" (click)="switchTab('register')">Regístrate
-              gratis aquí</a></p>
+          <p>{{ 'login.noAccount' | translate }} <a href="javascript:void(0)" (click)="switchTab('register')">{{ 'login.registerHere' | translate }}</a></p>
         </div>
 
       </form>

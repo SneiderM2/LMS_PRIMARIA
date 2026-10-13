@@ -724,3 +724,167 @@
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
+/* ======================================================== */
+/* ESTILOS DE AUDITORÍA GLOBAL (app-audit.log)              */
+/* ======================================================== */
+
+.tab-pill-audit {
+  background: #6366f1 !important;
+  color: #ffffff !important;
+}
+
+.audit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.audit-filters-grid {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.filter-actions-group {
+  display: flex;
+  gap: 0.5rem;
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
+
+.badge-audit {
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+}
+
+.row-audit-error {
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.method-tag {
+  display: inline-block;
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  margin-right: 0.35rem;
+}
+
+.method-tag.get { background: #e0f2fe; color: #0369a1; }
+.method-tag.post { background: #dcfce7; color: #15803d; }
+.method-tag.put { background: #fef9c3; color: #a16207; }
+.method-tag.delete { background: #fee2e2; color: #b91c1c; }
+.method-tag.patch { background: #f3e8ff; color: #7e22ce; }
+
+.status-chip.code-ok {
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 700;
+}
+
+.sub-path {
+  font-family: 'Fira Code', Consolas, Monaco, monospace;
+  font-size: 0.73rem;
+  color: #64748b;
+  margin-top: 0.2rem;
+  word-break: break-all;
+}
+
+.user-cell-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.user-role-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #6366f1;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cell-ip code {
+  font-family: 'Fira Code', Consolas, monospace;
+  font-size: 0.75rem;
+  color: #475569;
+  background: #f8fafc;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.cell-elapsed .ms-chip {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #0284c7;
+  background: #e0f2fe;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+/* Paginación */
+.audit-pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: #475569;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.page-indicator {
+  font-size: 0.85rem;
+  color: #1e293b;
+}
+
+/* Adaptación Dark Mode para Auditoría */
+:host-context(body.dark-mode) .system-inspector {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+:host-context(body.dark-mode) .header-titles h2 {
+  color: #f8fafc;
+}
+
+:host-context(body.dark-mode) .badge-audit {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+:host-context(body.dark-mode) .cell-ip code {
+  background: #1e293b;
+  color: #94a3b8;
+  border-color: #334155;
+}
+
+:host-context(body.dark-mode) .audit-pagination-bar {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+:host-context(body.dark-mode) .page-indicator {
+  color: #f1f5f9;
+}
+

@@ -604,4 +604,59 @@ public class AdminController : ControllerBase
             });
         }
     }
+
+    /// <summary>
+    /// Consulta y filtra los logs estructurados de auditoría del sistema en tiempo real.
+    /// GET: /api/admin/audit-logs
+    /// </summary>
+    [HttpGet("audit-logs")]
+    [ProducesResponseType(typeof(AuditLogResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAuditLogs(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? level = null,
+        [FromQuery] string? keyword = null,
+        [FromQuery] string? role = null,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null)
+    {
+        var safePage = Math.Max(1, page);
+        var safePageSize = Math.Clamp(pageSize, 5, 100);
+
+        var result = await FileLogger.ReadAuditLogsAsync(
+            page: safePage,
+            pageSize: safePageSize,
+            level: level,
+            keyword: keyword,
+            role: role,
+            fromDate: from,
+            toDate: to
+        );
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Descarga el archivo físico consolidado de auditoría del sistema (/logs/app-audit.log).
+    /// GET: /api/admin/audit-logs/download
+    /// </summary>
+    [HttpGet("audit-logs/download")]
+    public IActionResult DownloadAuditLogs()
+    {
+        var auditPath = FileLogger.GetAuditLogPath();
+        if (!System.IO.File.Exists(auditPath))
+        {
+            var accessPath = Path.Combine(FileLogger.LogDirectory, "access.log");
+            if (System.IO.File.Exists(accessPath))
+            {
+                var accessStream = new FileStream(accessPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                return File(accessStream, "text/plain", $"access-log-{DateTime.UtcNow:yyyyMMdd-HHmm}.log");
+            }
+
+            return NotFound(new { message = "No se encontraron archivos de registro de auditoría en el servidor." });
+        }
+
+        var stream = new FileStream(auditPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        return File(stream, "text/plain", $"app-audit-{DateTime.UtcNow:yyyyMMdd-HHmm}.log");
+    }
 }

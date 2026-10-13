@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ThemeToggleComponent } from './shared/components/theme-toggle/theme-toggle.component';
+import { LanguageSelectorComponent } from './shared/components/language-selector/language-selector.component';
 import { DataPolicyModalComponent } from './shared/components/data-policy-modal/data-policy-modal.component';
 import { SessionWarningModalComponent } from './shared/components/session-warning-modal/session-warning-modal.component';
 import { AuthService } from './core/services/auth.service';
@@ -15,6 +16,7 @@ import { ServerStatusService } from './core/services/server-status.service';
     CommonModule,
     RouterOutlet, 
     ThemeToggleComponent, 
+    LanguageSelectorComponent,
     DataPolicyModalComponent, 
     SessionWarningModalComponent
   ],

@@ -7,13 +7,15 @@ import { UserRole } from '../../../core/models/user.model';
 import { SessionTimeoutService } from '../../../core/services/session-timeout.service';
 import { environment } from '../../../../environments/environment';
 
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
+
 declare const google: any;
 declare const grecaptcha: any;
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TranslatePipe],
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css']
 })

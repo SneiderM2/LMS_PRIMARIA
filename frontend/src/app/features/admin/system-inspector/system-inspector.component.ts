@@ -1,33 +1,47 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { SystemFilesService, LogFileInfo, ParsedLogEntry } from '../../../core/services/system-files.service';
+import { SystemFilesService, LogFileInfo, ParsedLogEntry, AuditLogItem } from '../../../core/services/system-files.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 @Component({
   selector: 'app-system-inspector',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TranslatePipe],
   templateUrl: './system-inspector.component.html',
   styleUrls: ['./system-inspector.component.css']
 })
 export class SystemInspectorComponent implements OnInit {
-  public activeTab = signal<'htaccess' | 'logs'>('logs');
+  // Pestañas Principales: 'audit' (Auditoría Global), 'logs' (Archivos tradicionales .log)
+  public activeTab = signal<'audit' | 'logs'>('audit');
   public logViewMode = signal<'friendly' | 'raw'>('friendly');
   public logFiles = signal<LogFileInfo[]>([]);
-  public selectedLogName = signal<string>('access.log');
+  public selectedLogName = signal<string>('app-audit.log');
   
-  public currentFileName = signal<string>('.htaccess');
+  public currentFileName = signal<string>('app-audit.log');
   public currentContent = signal<string>('');
   public fileSize = signal<number>(0);
   public lastModified = signal<string>('');
   
-  // Para el módulo de logs amigable
+  // Auditoría Global Estructurada (JSON)
+  public auditLogs = signal<AuditLogItem[]>([]);
+  public auditTotalCount = signal<number>(0);
+  public auditPage = signal<number>(1);
+  public auditPageSize = 20;
+  public auditSeverity = signal<string>('ALL');
+  public auditRole = signal<string>('ALL');
+  public auditKeyword = signal<string>('');
+  public auditFromDate = signal<string>('');
+  public auditToDate = signal<string>('');
+  public expandedLogId = signal<string | null>(null);
+  public isAuditLoading = signal<boolean>(false);
+
+  // Para el módulo de logs clásicos
   public parsedLogs = signal<ParsedLogEntry[]>([]);
   public selectedSeverity = signal<string>('ALL');
   public selectedDate = signal<string>('');
   public searchUser = signal<string>('');
-  public expandedLogId = signal<string | null>(null);
 
   public isLoading = signal<boolean>(false);
   public errorMessage = signal<string>('');
@@ -40,6 +54,7 @@ export class SystemInspectorComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.loadGlobalAudit();
     this.loadLogsList();
   }
 
@@ -49,13 +64,13 @@ export class SystemInspectorComponent implements OnInit {
     return role === 'admin' || role === 'administrador' || role === '.admin';
   }
 
-  public selectTab(tab: 'htaccess' | 'logs'): void {
+  public selectTab(tab: 'audit' | 'logs'): void {
     this.activeTab.set(tab);
     this.errorMessage.set('');
     this.successMessage.set('');
     
-    if (tab === 'htaccess') {
-      this.loadHtaccess();
+    if (tab === 'audit') {
+      this.loadGlobalAudit();
     } else {
       if (this.selectedLogName()) {
         this.loadLog(this.selectedLogName());
@@ -67,10 +82,64 @@ export class SystemInspectorComponent implements OnInit {
     }
   }
 
+  // --- Auditoría Global ---
+  public loadGlobalAudit(): void {
+    this.isAuditLoading.set(true);
+    this.errorMessage.set('');
+
+    this.systemFilesService.getGlobalAuditLogs({
+      page: this.auditPage(),
+      pageSize: this.auditPageSize,
+      level: this.auditSeverity(),
+      role: this.auditRole(),
+      keyword: this.auditKeyword(),
+      from: this.auditFromDate(),
+      to: this.auditToDate()
+    }).subscribe({
+      next: (res) => {
+        this.auditLogs.set(res.items || []);
+        this.auditTotalCount.set(res.totalCount || 0);
+        this.isAuditLoading.set(false);
+      },
+      error: (err) => {
+        this.isAuditLoading.set(false);
+        this.errorMessage.set('Error al consultar auditoría: ' + (err.error?.message || err.message));
+      }
+    });
+  }
+
+  public applyAuditFilters(): void {
+    this.auditPage.set(1);
+    this.loadGlobalAudit();
+  }
+
+  public resetAuditFilters(): void {
+    this.auditSeverity.set('ALL');
+    this.auditRole.set('ALL');
+    this.auditKeyword.set('');
+    this.auditFromDate.set('');
+    this.auditToDate.set('');
+    this.auditPage.set(1);
+    this.loadGlobalAudit();
+  }
+
+  public changeAuditPage(newPage: number): void {
+    if (newPage < 1) return;
+    this.auditPage.set(newPage);
+    this.loadGlobalAudit();
+  }
+
+  public downloadAuditFile(): void {
+    this.systemFilesService.downloadAuditLogFile();
+  }
+
+  // --- Logs Clásicos ---
   public setViewMode(mode: 'friendly' | 'raw'): void {
     this.logViewMode.set(mode);
     if (mode === 'friendly') {
       this.loadParsedLogs();
+    } else {
+      this.loadRawLog(this.selectedLogName());
     }
   }
 
@@ -82,37 +151,17 @@ export class SystemInspectorComponent implements OnInit {
     }
   }
 
-  public loadHtaccess(): void {
-    this.isLoading.set(true);
-    this.errorMessage.set('');
-    this.systemFilesService.getHtaccess().subscribe({
-      next: (res) => {
-        this.currentFileName.set(res.fileName);
-        this.currentContent.set(res.content);
-        this.fileSize.set(res.size);
-        this.lastModified.set(res.lastModified);
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        this.isLoading.set(false);
-        if (err.status === 403) {
-          this.errorMessage.set('Acceso denegado (403): Tu rol no posee privilegios de administrador (.admin).');
-        } else if (err.status === 404) {
-          this.errorMessage.set('El archivo .htaccess no fue encontrado en el servidor.');
-        } else {
-          this.errorMessage.set('Error al recuperar .htaccess: ' + (err.error?.message || err.message));
-        }
-      }
-    });
-  }
-
   public loadLogsList(): void {
     this.systemFilesService.getLogsList().subscribe({
       next: (res) => {
         this.logFiles.set(res.files || []);
-        if (res.files && res.files.length > 0) {
-          const target = res.files.some(f => f.name === 'access.log') ? 'access.log' : res.files[0].name;
-          this.loadLog(target);
+        if (res.files && res.files.length > 0 && !this.selectedLogName()) {
+          const target = res.files.some(f => f.name === 'app-audit.log') 
+            ? 'app-audit.log' 
+            : res.files.some(f => f.name === 'access.log') 
+              ? 'access.log' 
+              : res.files[0].name;
+          this.selectedLogName.set(target);
         }
       },
       error: (err) => {
@@ -174,8 +223,8 @@ export class SystemInspectorComponent implements OnInit {
   }
 
   public refreshCurrent(): void {
-    if (this.activeTab() === 'htaccess') {
-      this.loadHtaccess();
+    if (this.activeTab() === 'audit') {
+      this.loadGlobalAudit();
     } else {
       if (this.logViewMode() === 'friendly') {
         this.loadParsedLogs();
@@ -206,9 +255,9 @@ export class SystemInspectorComponent implements OnInit {
   }
 
   public copyToClipboard(): void {
-    const textToCopy = this.logViewMode() === 'raw' 
-      ? this.currentContent() 
-      : JSON.stringify(this.parsedLogs(), null, 2);
+    const textToCopy = this.activeTab() === 'audit'
+      ? JSON.stringify(this.auditLogs(), null, 2)
+      : (this.logViewMode() === 'raw' ? this.currentContent() : JSON.stringify(this.parsedLogs(), null, 2));
 
     navigator.clipboard.writeText(textToCopy).then(() => {
       this.successMessage.set('Contenido copiado al portapapeles');

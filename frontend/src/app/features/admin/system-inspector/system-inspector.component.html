@@ -6,21 +6,27 @@
         <span class="badge-icon">🛡️</span>
         <span class="badge-role">Rol Requerido: <code>.admin</code> / Administrador</span>
       </div>
-      <h2>Auditoría del Sistema y Archivos de Configuración</h2>
+      <h2>{{ 'audit.title' | translate }}</h2>
       <p class="header-desc">
-        Monitoreo de seguridad e inspección estructurada de registros del servidor Kestrel (.NET).
+        {{ 'audit.subtitle' | translate }}
       </p>
     </div>
 
     <div class="header-actions">
-      <button class="btn btn-secondary btn-sm" (click)="refreshCurrent()" [disabled]="isLoading()" title="Actualizar datos">
-        <span [class.spin]="isLoading()">🔄</span> Recargar
+      <button class="btn btn-secondary btn-sm" (click)="refreshCurrent()" [disabled]="isLoading() || isAuditLoading()" title="Actualizar datos">
+        <span [class.spin]="isLoading() || isAuditLoading()">🔄</span> {{ 'audit.refresh' | translate }}
       </button>
-      <button class="btn btn-secondary btn-sm" (click)="copyToClipboard()" [disabled]="isLoading()" title="Copiar datos">
-        📋 Copiar
+
+      <button *ngIf="activeTab() === 'audit'" class="btn btn-primary btn-sm" (click)="downloadAuditFile()" title="Descargar log de auditoría completo">
+        📥 {{ 'audit.download' | translate }}
       </button>
+
+      <button class="btn btn-secondary btn-sm" (click)="copyToClipboard()" [disabled]="isLoading() || isAuditLoading()" title="Copiar datos al portapapeles">
+        📋 {{ 'audit.copy' | translate }}
+      </button>
+
       <button *ngIf="activeTab() === 'logs' && selectedLogName()" class="btn btn-danger btn-sm" (click)="clearCurrentLog()" [disabled]="isLoading()" title="Vaciar este archivo de log">
-        🗑️ Limpiar Log
+        🗑️ {{ 'audit.clear' | translate }}
       </button>
     </div>
   </div>
@@ -41,142 +47,169 @@
     </div>
   </div>
 
-  <!-- Pestañas Principales (solo Logs) -->
+  <!-- Pestañas Principales -->
   <div class="inspector-tabs">
+    <button 
+      class="tab-btn" 
+      [class.active]="activeTab() === 'audit'" 
+      (click)="selectTab('audit')">
+      🛡️ Auditoría Global (app-audit.log)
+      <span *ngIf="auditTotalCount() > 0" class="tab-pill tab-pill-audit">{{ auditTotalCount() }}</span>
+    </button>
     <button 
       class="tab-btn" 
       [class.active]="activeTab() === 'logs'" 
       (click)="selectTab('logs')">
-      📋 Registros de Actividad (*.log)
+      📋 Archivos del Servidor (*.log)
       <span *ngIf="logFiles().length > 0" class="tab-pill">{{ logFiles().length }}</span>
     </button>
-    <!-- Tab .htaccess ocultada: endpoint no disponible en backend .NET/Render -->
   </div>
 
-  <!-- Barra de Selección de Archivos de Log y Modo de Vista -->
-  <div *ngIf="activeTab() === 'logs'" class="logs-selector-bar">
-    <div class="file-chips-group">
-      <span class="selector-label">Archivo:</span>
-      <div class="log-chips">
-        <button 
-          *ngFor="let file of logFiles()" 
-          class="chip-btn"
-          [class.selected]="selectedLogName() === file.name"
-          (click)="loadLog(file.name)">
-          <span class="chip-name">{{ file.name }}</span>
-          <span class="chip-meta">{{ formatFileSize(file.size) }}</span>
+  <!-- ================================================================= -->
+  <!-- SECCIÓN 1: AUDITORÍA GLOBAL DE EVENTOS (app-audit.log ESTRUCTURADO) -->
+  <!-- ================================================================= -->
+  <div *ngIf="activeTab() === 'audit'" class="audit-section">
+    <!-- Barra de Filtros Avanzados -->
+    <div class="friendly-filters-bar audit-filters-grid">
+      <!-- Buscador por palabra clave -->
+      <div class="filter-item filter-search">
+        <label>{{ 'audit.search' | translate }}</label>
+        <div class="search-wrap">
+          <input 
+            type="text" 
+            placeholder="IP, correo, acción, ruta..."
+            [ngModel]="auditKeyword()" 
+            (ngModelChange)="auditKeyword.set($event)"
+            (keyup.enter)="applyAuditFilters()"
+            class="form-input" />
+        </div>
+      </div>
+
+      <!-- Filtro por Nivel -->
+      <div class="filter-item">
+        <label>{{ 'audit.filterSeverity' | translate }}:</label>
+        <select 
+          [ngModel]="auditSeverity()" 
+          (ngModelChange)="auditSeverity.set($event); applyAuditFilters()"
+          class="form-select">
+          <option value="ALL">Todos los niveles</option>
+          <option value="INFO">🟢 INFO (Lecturas / Acceso)</option>
+          <option value="AUDIT">🟣 AUDIT (Auth / Operaciones CRUD)</option>
+          <option value="WARNING">🟡 WARNING (Alertas / 4xx)</option>
+          <option value="ERROR">🔴 ERROR (Fallos / 5xx)</option>
+        </select>
+      </div>
+
+      <!-- Filtro por Rol de Usuario -->
+      <div class="filter-item">
+        <label>{{ 'audit.filterRole' | translate }}:</label>
+        <select 
+          [ngModel]="auditRole()" 
+          (ngModelChange)="auditRole.set($event); applyAuditFilters()"
+          class="form-select">
+          <option value="ALL">Todos los roles</option>
+          <option value="Admin">Administrador / .admin</option>
+          <option value="Docente">Docente</option>
+          <option value="Alumno">Estudiante / Alumno</option>
+        </select>
+      </div>
+
+      <!-- Filtro por Rango de Fecha -->
+      <div class="filter-item">
+        <label>Desde:</label>
+        <input 
+          type="date" 
+          [ngModel]="auditFromDate()" 
+          (ngModelChange)="auditFromDate.set($event); applyAuditFilters()"
+          class="form-input" />
+      </div>
+
+      <div class="filter-item">
+        <label>Hasta:</label>
+        <input 
+          type="date" 
+          [ngModel]="auditToDate()" 
+          (ngModelChange)="auditToDate.set($event); applyAuditFilters()"
+          class="form-input" />
+      </div>
+
+      <!-- Botones de Acción de Filtro -->
+      <div class="filter-actions-group">
+        <button class="btn btn-primary btn-sm" (click)="applyAuditFilters()">
+          Filtrar
+        </button>
+        <button class="btn btn-secondary btn-sm" (click)="resetAuditFilters()" title="Restablecer filtros">
+          Limpiar
         </button>
       </div>
     </div>
 
-    <!-- Conmutador de Modo: Amigable vs Crudo -->
-    <div class="view-mode-toggle">
-      <button 
-        class="mode-btn" 
-        [class.active]="logViewMode() === 'friendly'" 
-        (click)="setViewMode('friendly')">
-        📊 Tabla Estructurada (Amigable)
-      </button>
-      <button 
-        class="mode-btn" 
-        [class.active]="logViewMode() === 'raw'" 
-        (click)="setViewMode('raw')">
-        💻 Consola Cruda
-      </button>
-    </div>
-  </div>
-
-  <!-- ========================================================= -->
-  <!-- VISTA 1: MÓDULO DE LOGS AMIGABLE CON FILTROS Y ACORDEÓN   -->
-  <!-- ========================================================= -->
-  <div *ngIf="activeTab() === 'logs' && logViewMode() === 'friendly'" class="friendly-logs-section">
-    <!-- Barra de Filtros -->
-    <div class="friendly-filters-bar">
-      <div class="filter-item">
-        <label>Severidad:</label>
-        <select 
-          [ngModel]="selectedSeverity()" 
-          (ngModelChange)="selectedSeverity.set($event); loadParsedLogs()"
-          class="form-select">
-          <option value="ALL">Todas las severidades</option>
-          <option value="INFO">🟢 INFO (Acceso y operaciones)</option>
-          <option value="WARNING">🟡 WARNING (Alertas / 4xx)</option>
-          <option value="ERROR">🔴 ERROR (Fallos / 5xx / Excepciones)</option>
-        </select>
-      </div>
-
-      <div class="filter-item">
-        <label>Fecha:</label>
-        <input 
-          type="date" 
-          [ngModel]="selectedDate()" 
-          (ngModelChange)="selectedDate.set($event); loadParsedLogs()"
-          class="form-input" />
-      </div>
-
-      <div class="filter-item filter-search">
-        <label>Usuario / Carnet:</label>
-        <div class="search-wrap">
-          <input 
-            type="text" 
-            placeholder="Buscar por usuario o ID..."
-            [ngModel]="searchUser()" 
-            (ngModelChange)="searchUser.set($event)"
-            (keyup.enter)="loadParsedLogs()"
-            class="form-input" />
-          <button class="btn btn-secondary btn-xs" (click)="loadParsedLogs()">Buscar</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Indicador de Carga -->
-    <div *ngIf="isLoading()" class="logs-loading">
+    <div *ngIf="isAuditLoading()" class="logs-loading">
       <div class="spinner"></div>
-      <p>Procesando y sanitizando registros de log del servidor...</p>
+      <p>Consultando registros de auditoría en tiempo real...</p>
     </div>
 
     <!-- Estado Vacío -->
-    <div *ngIf="!isLoading() && parsedLogs().length === 0" class="logs-empty">
+    <div *ngIf="!isAuditLoading() && auditLogs().length === 0" class="logs-empty">
       <span class="empty-icon">📭</span>
-      <p>No se encontraron eventos registrados con los criterios seleccionados.</p>
+      <p>{{ 'audit.noLogs' | translate }}</p>
     </div>
 
-    <!-- Tabla Estructurada -->
-    <div *ngIf="!isLoading() && parsedLogs().length > 0" class="friendly-table-wrap">
-      <table class="friendly-table">
+    <!-- Tabla Estructurada de Auditoría -->
+    <div *ngIf="!isAuditLoading() && auditLogs().length > 0" class="friendly-table-wrap">
+      <table class="friendly-table audit-table">
         <thead>
           <tr>
-            <th style="width: 175px;">Fecha y Hora</th>
-            <th style="width: 110px;">Severidad</th>
-            <th style="width: 160px;">Usuario</th>
-            <th>Evento / Mensaje</th>
-            <th style="width: 100px;">IP / Estado</th>
-            <th style="width: 110px; text-align: center;">Detalles</th>
+            <th style="width: 170px;">{{ 'audit.colTime' | translate }}</th>
+            <th style="width: 110px;">{{ 'audit.colLevel' | translate }}</th>
+            <th style="width: 130px;">{{ 'audit.colMethodStatus' | translate }}</th>
+            <th>{{ 'audit.colAction' | translate }}</th>
+            <th style="width: 180px;">{{ 'audit.colUser' | translate }}</th>
+            <th style="width: 125px;">{{ 'audit.colIp' | translate }}</th>
+            <th style="width: 90px;">{{ 'audit.colElapsed' | translate }}</th>
+            <th style="width: 100px; text-align: center;">{{ 'audit.colDetails' | translate }}</th>
           </tr>
         </thead>
         <tbody>
-          <ng-container *ngFor="let entry of parsedLogs()">
-            <!-- Fila Principal -->
-            <tr [class.row-expanded]="expandedLogId() === entry.id">
+          <ng-container *ngFor="let entry of auditLogs()">
+            <!-- Fila Principal de Evento -->
+            <tr [class.row-expanded]="expandedLogId() === entry.id" [class.row-audit-error]="entry.level === 'ERROR'">
               <td class="cell-time">{{ entry.timestamp }}</td>
               <td>
                 <span 
                   class="badge-severity" 
                   [class.badge-info]="entry.level === 'INFO'"
+                  [class.badge-audit]="entry.level === 'AUDIT'"
                   [class.badge-warning]="entry.level === 'WARNING'"
                   [class.badge-error]="entry.level === 'ERROR'">
-                  {{ entry.level === 'INFO' ? '🟢 INFO' : (entry.level === 'WARNING' ? '🟡 WARN' : '🔴 ERROR') }}
+                  {{ entry.level === 'INFO' ? '🟢 INFO' : (entry.level === 'AUDIT' ? '🟣 AUDIT' : (entry.level === 'WARNING' ? '🟡 WARN' : '🔴 ERROR')) }}
                 </span>
               </td>
-              <td class="cell-user">
-                <span class="user-pill-inline">{{ entry.user }}</span>
+              <td class="cell-meta">
+                <span class="method-tag" [ngClass]="entry.method.toLowerCase()">{{ entry.method }}</span>
+                <span 
+                  class="status-chip" 
+                  [class.code-err]="entry.statusCode >= 400"
+                  [class.code-ok]="entry.statusCode < 400">
+                  {{ entry.statusCode }}
+                </span>
               </td>
               <td class="cell-message">
-                <strong>{{ entry.message }}</strong>
+                <strong>{{ entry.action }}</strong>
+                <div class="sub-path">{{ entry.path }}</div>
               </td>
-              <td class="cell-meta">
-                <span *ngIf="entry.statusCode" class="status-chip" [class.code-err]="entry.statusCode >= 400">{{ entry.statusCode }}</span>
-                <span *ngIf="entry.elapsedMs" class="ms-chip">{{ entry.elapsedMs }}ms</span>
+              <td class="cell-user">
+                <div class="user-cell-meta">
+                  <span class="user-pill-inline">{{ entry.userEmail || entry.userId || 'Anónimo' }}</span>
+                  <span *ngIf="entry.userRole" class="user-role-tag">{{ entry.userRole }}</span>
+                </div>
+              </td>
+              <td class="cell-ip">
+                <code>{{ entry.ip }}</code>
+              </td>
+              <td class="cell-elapsed">
+                <span class="ms-chip">{{ entry.elapsedMs }}ms</span>
               </td>
               <td style="text-align: center;">
                 <button 
@@ -184,20 +217,20 @@
                   class="btn-accordion" 
                   [class.is-open]="expandedLogId() === entry.id"
                   (click)="toggleAccordion(entry.id)"
-                  title="Ver contexto o traza técnica sanitizada">
-                  {{ expandedLogId() === entry.id ? 'Ocultar ▲' : 'Ver Traza ▼' }}
+                  title="Ver detalles o traza del evento">
+                  {{ expandedLogId() === entry.id ? 'Ocultar ▲' : 'Ver ▼' }}
                 </button>
                 <span *ngIf="!entry.details" class="no-details">—</span>
               </td>
             </tr>
 
-            <!-- Fila Acordeón (Detalles y Traza Ocultos y Sanitizados) -->
+            <!-- Fila Acordeón con Detalles Técnicos -->
             <tr *ngIf="expandedLogId() === entry.id" class="accordion-row">
-              <td colspan="6" class="accordion-cell">
+              <td colspan="8" class="accordion-cell">
                 <div class="accordion-content">
                   <div class="accordion-header">
-                    <span class="acc-title">Traza y Contexto Técnico (Rutas Físicas Anonimizadas)</span>
-                    <span class="acc-ip" *ngIf="entry.clientIp">IP Origen: {{ entry.clientIp }}</span>
+                    <span class="acc-title">Contexto Detallado del Evento de Auditoría</span>
+                    <span class="acc-ip">IP: {{ entry.ip }} | Usuario: {{ entry.userEmail || entry.userId || 'N/A' }}</span>
                   </div>
                   <pre class="sanitized-trace">{{ entry.details }}</pre>
                 </div>
@@ -207,70 +240,242 @@
         </tbody>
       </table>
     </div>
+
+    <!-- Barra de Paginación de Auditoría -->
+    <div class="audit-pagination-bar" *ngIf="auditTotalCount() > 0">
+      <div class="pagination-info">
+        <span>{{ 'audit.totalEvents' | translate }} <strong>{{ auditTotalCount() }}</strong></span>
+      </div>
+      <div class="pagination-buttons">
+        <button 
+          class="btn btn-secondary btn-sm" 
+          [disabled]="auditPage() <= 1"
+          (click)="changeAuditPage(auditPage() - 1)">
+          ◀ {{ 'audit.prev' | translate }}
+        </button>
+        <span class="page-indicator">
+          {{ 'audit.page' | translate }} <strong>{{ auditPage() }}</strong>
+        </span>
+        <button 
+          class="btn btn-secondary btn-sm" 
+          [disabled]="(auditPage() * auditPageSize) >= auditTotalCount()"
+          (click)="changeAuditPage(auditPage() + 1)">
+          {{ 'audit.next' | translate }} ▶
+        </button>
+      </div>
+    </div>
   </div>
 
-  <!-- ========================================================= -->
-  <!-- VISTA 2: CONSOLA CRUDA (TERMINAL) O MODO .HTACCESS        -->
-  <!-- ========================================================= -->
-  <div *ngIf="activeTab() === 'htaccess' || logViewMode() === 'raw'">
-    <!-- Barra de Metadatos del Archivo y Filtro de Búsqueda -->
-    <div class="file-toolbar">
-      <div class="file-info-pill">
-        <span class="pill-dot"></span>
-        <strong class="file-name">{{ currentFileName() }}</strong>
-        <span class="file-divider">|</span>
-        <span class="file-stat">Tamaño: <strong>{{ formatFileSize(fileSize()) }}</strong></span>
-        <span *ngIf="lastModified()" class="file-divider">|</span>
-        <span *ngIf="lastModified()" class="file-stat">Modificado: <strong>{{ lastModified() | date:'yyyy-MM-dd HH:mm:ss' }}</strong></span>
-        <span class="file-divider">|</span>
-        <span class="file-stat">Líneas: <strong>{{ filteredLines.length }}</strong></span>
+  <!-- ================================================================= -->
+  <!-- SECCIÓN 2: ARCHIVOS DE REGISTRO DEL SERVIDOR (*.log TRADICIONALES) -->
+  <!-- ================================================================= -->
+  <div *ngIf="activeTab() === 'logs'">
+    <!-- Barra de Selección de Archivos de Log y Modo de Vista -->
+    <div class="logs-selector-bar">
+      <div class="file-chips-group">
+        <span class="selector-label">Archivo:</span>
+        <div class="log-chips">
+          <button 
+            *ngFor="let file of logFiles()" 
+            class="chip-btn"
+            [class.selected]="selectedLogName() === file.name"
+            (click)="loadLog(file.name)">
+            <span class="chip-name">{{ file.name }}</span>
+            <span class="chip-meta">{{ formatFileSize(file.size) }}</span>
+          </button>
+        </div>
       </div>
 
-      <div class="filter-box">
-        <span class="search-icon">🔍</span>
-        <input 
-          type="text" 
-          [ngModel]="filterQuery()"
-          (ngModelChange)="filterQuery.set($event)"
-          placeholder="Filtrar por texto, ERROR, 401, GET..." 
-          class="search-input" />
-        <button *ngIf="filterQuery()" class="clear-search" (click)="filterQuery.set('')">✕</button>
+      <!-- Conmutador de Modo: Amigable vs Crudo -->
+      <div class="view-mode-toggle">
+        <button 
+          class="mode-btn" 
+          [class.active]="logViewMode() === 'friendly'" 
+          (click)="setViewMode('friendly')">
+          📊 Tabla Estructurada
+        </button>
+        <button 
+          class="mode-btn" 
+          [class.active]="logViewMode() === 'raw'" 
+          (click)="setViewMode('raw')">
+          💻 Consola Cruda
+        </button>
       </div>
     </div>
 
-    <!-- Visualizador de Código estilo Terminal -->
-    <div class="terminal-container">
-      <div class="terminal-bar">
-        <div class="terminal-dots">
-          <span class="dot red"></span>
-          <span class="dot yellow"></span>
-          <span class="dot green"></span>
+    <!-- Módulo de Logs Amigable -->
+    <div *ngIf="logViewMode() === 'friendly'" class="friendly-logs-section">
+      <div class="friendly-filters-bar">
+        <div class="filter-item">
+          <label>Severidad:</label>
+          <select 
+            [ngModel]="selectedSeverity()" 
+            (ngModelChange)="selectedSeverity.set($event); loadParsedLogs()"
+            class="form-select">
+            <option value="ALL">Todas las severidades</option>
+            <option value="INFO">🟢 INFO (Acceso)</option>
+            <option value="WARNING">🟡 WARNING (Alertas / 4xx)</option>
+            <option value="ERROR">🔴 ERROR (Fallos / 5xx)</option>
+          </select>
         </div>
-        <span class="terminal-title">Consola de Servidor — {{ currentFileName() }}</span>
-        <span class="terminal-status" [class.loading]="isLoading()">
-          {{ isLoading() ? 'Leyendo...' : 'Listo' }}
-        </span>
+
+        <div class="filter-item">
+          <label>Fecha:</label>
+          <input 
+            type="date" 
+            [ngModel]="selectedDate()" 
+            (ngModelChange)="selectedDate.set($event); loadParsedLogs()"
+            class="form-input" />
+        </div>
+
+        <div class="filter-item filter-search">
+          <label>Usuario / Carnet:</label>
+          <div class="search-wrap">
+            <input 
+              type="text" 
+              placeholder="Buscar por usuario o ID..."
+              [ngModel]="searchUser()" 
+              (ngModelChange)="searchUser.set($event)"
+              (keyup.enter)="loadParsedLogs()"
+              class="form-input" />
+            <button class="btn btn-secondary btn-xs" (click)="loadParsedLogs()">Buscar</button>
+          </div>
+        </div>
       </div>
 
-      <div class="terminal-body" [class.is-loading]="isLoading()">
-        <div *ngIf="isLoading()" class="terminal-loader">
-          <div class="spinner"></div>
-          <p>Consultando archivo en el servidor...</p>
+      <div *ngIf="isLoading()" class="logs-loading">
+        <div class="spinner"></div>
+        <p>Procesando registros de log...</p>
+      </div>
+
+      <div *ngIf="!isLoading() && parsedLogs().length === 0" class="logs-empty">
+        <span class="empty-icon">📭</span>
+        <p>No se encontraron eventos registrados.</p>
+      </div>
+
+      <div *ngIf="!isLoading() && parsedLogs().length > 0" class="friendly-table-wrap">
+        <table class="friendly-table">
+          <thead>
+            <tr>
+              <th style="width: 175px;">Fecha y Hora</th>
+              <th style="width: 110px;">Severidad</th>
+              <th style="width: 160px;">Usuario</th>
+              <th>Evento / Mensaje</th>
+              <th style="width: 100px;">IP / Estado</th>
+              <th style="width: 110px; text-align: center;">Detalles</th>
+            </tr>
+          </thead>
+          <tbody>
+            <ng-container *ngFor="let entry of parsedLogs()">
+              <tr [class.row-expanded]="expandedLogId() === entry.id">
+                <td class="cell-time">{{ entry.timestamp }}</td>
+                <td>
+                  <span 
+                    class="badge-severity" 
+                    [class.badge-info]="entry.level === 'INFO'"
+                    [class.badge-warning]="entry.level === 'WARNING'"
+                    [class.badge-error]="entry.level === 'ERROR'">
+                    {{ entry.level === 'INFO' ? '🟢 INFO' : (entry.level === 'WARNING' ? '🟡 WARN' : '🔴 ERROR') }}
+                  </span>
+                </td>
+                <td class="cell-user">
+                  <span class="user-pill-inline">{{ entry.user }}</span>
+                </td>
+                <td class="cell-message">
+                  <strong>{{ entry.message }}</strong>
+                </td>
+                <td class="cell-meta">
+                  <span *ngIf="entry.statusCode" class="status-chip" [class.code-err]="entry.statusCode >= 400">{{ entry.statusCode }}</span>
+                  <span *ngIf="entry.elapsedMs" class="ms-chip">{{ entry.elapsedMs }}ms</span>
+                </td>
+                <td style="text-align: center;">
+                  <button 
+                    *ngIf="entry.details" 
+                    class="btn-accordion" 
+                    [class.is-open]="expandedLogId() === entry.id"
+                    (click)="toggleAccordion(entry.id)">
+                    {{ expandedLogId() === entry.id ? 'Ocultar ▲' : 'Ver Traza ▼' }}
+                  </button>
+                  <span *ngIf="!entry.details" class="no-details">—</span>
+                </td>
+              </tr>
+
+              <tr *ngIf="expandedLogId() === entry.id" class="accordion-row">
+                <td colspan="6" class="accordion-cell">
+                  <div class="accordion-content">
+                    <div class="accordion-header">
+                      <span class="acc-title">Traza y Contexto Técnico Sanitizado</span>
+                      <span class="acc-ip" *ngIf="entry.clientIp">IP: {{ entry.clientIp }}</span>
+                    </div>
+                    <pre class="sanitized-trace">{{ entry.details }}</pre>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Consola Cruda de Servidor -->
+    <div *ngIf="logViewMode() === 'raw'">
+      <div class="file-toolbar">
+        <div class="file-info-pill">
+          <span class="pill-dot"></span>
+          <strong class="file-name">{{ currentFileName() }}</strong>
+          <span class="file-divider">|</span>
+          <span class="file-stat">Tamaño: <strong>{{ formatFileSize(fileSize()) }}</strong></span>
+          <span *ngIf="lastModified()" class="file-divider">|</span>
+          <span *ngIf="lastModified()" class="file-stat">Modificado: <strong>{{ lastModified() | date:'yyyy-MM-dd HH:mm:ss' }}</strong></span>
+          <span class="file-divider">|</span>
+          <span class="file-stat">Líneas: <strong>{{ filteredLines.length }}</strong></span>
         </div>
 
-        <div *ngIf="!isLoading() && filteredLines.length === 0" class="terminal-empty">
-          <span class="empty-icon">📭</span>
-          <p *ngIf="filterQuery()">No se encontraron coincidencias para "{{ filterQuery() }}" en este archivo.</p>
-          <p *ngIf="!filterQuery()">El archivo está vacío.</p>
+        <div class="filter-box">
+          <span class="search-icon">🔍</span>
+          <input 
+            type="text" 
+            [ngModel]="filterQuery()"
+            (ngModelChange)="filterQuery.set($event)"
+            placeholder="Filtrar por texto, ERROR, 401, GET..." 
+            class="search-input" />
+          <button *ngIf="filterQuery()" class="clear-search" (click)="filterQuery.set('')">✕</button>
+        </div>
+      </div>
+
+      <div class="terminal-container">
+        <div class="terminal-bar">
+          <div class="terminal-dots">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <span class="terminal-title">Consola de Servidor — {{ currentFileName() }}</span>
+          <span class="terminal-status" [class.loading]="isLoading()">
+            {{ isLoading() ? 'Leyendo...' : 'Listo' }}
+          </span>
         </div>
 
-        <div *ngIf="!isLoading() && filteredLines.length > 0" class="code-lines">
-          <div 
-            *ngFor="let line of filteredLines; let i = index" 
-            class="code-line"
-            [ngClass]="getLineClass(line)">
-            <span class="line-num">{{ i + 1 }}</span>
-            <span class="line-content">{{ line || ' ' }}</span>
+        <div class="terminal-body" [class.is-loading]="isLoading()">
+          <div *ngIf="isLoading()" class="terminal-loader">
+            <div class="spinner"></div>
+            <p>Consultando archivo en el servidor...</p>
+          </div>
+
+          <div *ngIf="!isLoading() && filteredLines.length === 0" class="terminal-empty">
+            <span class="empty-icon">📭</span>
+            <p *ngIf="filterQuery()">No se encontraron coincidencias para "{{ filterQuery() }}" en este archivo.</p>
+            <p *ngIf="!filterQuery()">El archivo está vacío.</p>
+          </div>
+
+          <div *ngIf="!isLoading() && filteredLines.length > 0" class="code-lines">
+            <div 
+              *ngFor="let line of filteredLines; let i = index" 
+              class="code-line"
+              [ngClass]="getLineClass(line)">
+              <span class="line-num">{{ i + 1 }}</span>
+              <span class="line-content">{{ line || ' ' }}</span>
+            </div>
           </div>
         </div>
       </div>
