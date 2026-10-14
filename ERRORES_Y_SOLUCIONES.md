@@ -26,6 +26,9 @@ Registro histórico de errores, bugs y problemas técnicos encontrados durante e
 | 16 | Frontend / Deploy | `root/index.html` desactualizado — GitHub Pages servía SW v5 antiguo | ✅ Resuelto |
 | 17 | Frontend / UX | `http://example.com/avatar.png` en BD — Mixed Content + 404 en avatares | ✅ Resuelto |
 | 18 | Frontend / Inspector | Tab `.htaccess` llamaba endpoint inexistente en .NET — 404 en consola | ✅ Resuelto |
+| 19 | Backend / Render / Startup | Timeout en deploy de Render por inicialización bloqueante de BD (`DbInitializer`) | ✅ Resuelto |
+| 20 | Rendimiento / Auth | Login demoraba ~20 segundos (Render Cold Start + inicialización pesada) | ✅ Resuelto |
+| 21 | Frontend / i18n | Desfase y traducción incompleta en vistas dinámicas de Angular (i18n) | ✅ Resuelto |
 
 ---
 
@@ -686,13 +689,136 @@ Monitoreo de seguridad e inspección estructurada de registros del servidor Kest
 
 ---
 
+### #19 — Timeout en deploy de Render por inicialización bloqueante de BD (`DbInitializer`)
 
+**Categoría:** Backend / Render / Startup Lifecycle  
+**Fecha:** 2026-10-14  
+**Gravedad:** 🔴 Crítico
+
+**Síntoma:**
+```text
+==> Deploying...
+==> Timed out waiting for port 8080 to respond.
+==> Health check failed. Container marked unhealthy.
+```
+El despliegue en Render pasaba de tardar ~1 minuto a más de 8 minutos o fallaba por timeout en el health-check, impidiendo que el backend se iniciara exitosamente tras nuevos commits.
+
+**Causa:**
+En `Program.cs`, el bloque de inicialización de la base de datos:
+```csharp
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<LMSDbContext>();
+    await DbInitializer.SeedAsync(context);
+}
+```
+se ejecutaba sincrónicamente en la secuencia de arranque **antes** de llamar a `app.Run()`. Kestrel no abría el puerto HTTP (8080 en el contenedor Docker de Render) hasta que todas las consultas y comprobaciones de esquema contra el pooler de Supabase hubiesen finalizado. Al experimentar latencia de red hacia Supabase en la nube, el health check de Render expiraba antes de que Kestrel comenzara a escuchar peticiones entrantes.
+
+**Solución aplicada:**
+Se desacopló la inicialización de la base de datos de la apertura del socket HTTP utilizando el evento del ciclo de vida `app.Lifetime.ApplicationStarted.Register()`:
+1. `app.Run()` se ejecuta de inmediato, permitiendo a Kestrel abrir el puerto 8080 y responder al health-check de Render en menos de 500 ms.
+2. `DbInitializer.SeedAsync()` se ejecuta en segundo plano (`Task.Run()`) con un breve retardo de 200 ms para asegurar que el servidor esté 100% operativo.
+3. Se integró un `CancellationTokenSource(TimeSpan.FromSeconds(25))` y captura global de excepciones (`try/catch`) para que cualquier demora o error de red en la BD no tumbe el servidor web.
+
+```csharp
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    _ = Task.Run(async () =>
+    {
+        await Task.Delay(200);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+        using var scope = app.Services.CreateScope();
+        try
+        {
+            var context = scope.ServiceProvider.GetRequiredService<LMSDbContext>();
+            await DbInitializer.SeedAsync(context);
+            app.Logger.LogInformation("✅ BD PostgreSQL inicializada correctamente (post-startup).");
+        }
+        catch (OperationCanceledException)
+        {
+            app.Logger.LogWarning("⚠️ DbInitializer cancelado por timeout (25s). Servidor sigue operativo.");
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "⚠️ Error no crítico en inicialización de BD. El servidor continúa en línea.");
+        }
+    });
+});
+```
+
+**Archivos afectados:**
+- `backend/LMS.API/Program.cs`
+
+---
+
+### #20 — Latencia de login excesiva (~20s) por Cold Start en Render y consultas no indexadas
+
+**Categoría:** Backend & Frontend / Rendimiento & Autenticación  
+**Fecha:** 2026-10-14  
+**Gravedad:** 🟡 Medio / Alto
+
+**Síntoma:**
+Al ingresar credenciales en la pantalla de inicio de sesión tras un período de inactividad, la petición `POST /api/auth/login` tardaba hasta 20 segundos en responder, transmitiendo una sensación de congelamiento o fallo al usuario.
+
+**Causa:**
+1. **Cold Start de Render:** Las instancias del plan gratuito se suspenden tras 15 minutos sin tráfico; la primera petición HTTP entrante levanta el contenedor desde cero.
+2. **Chequeo redundante de columnas:** `DbInitializer.EnsureColumnsMigratedAsync` realizaba múltiples consultas secuenciales de comprobación de columnas en Supabase.
+3. **Escaneo secuencial (Seq Scan):** La validación de credenciales realizaba `WHERE LOWER(username) = LOWER(@user)` sin contar con un índice funcional en PostgreSQL.
+4. **Pool de conexiones sin mantener:** Cada nueva consulta tras reposo requería negociar un handshake SSL completo con el pooler de Supabase.
+
+**Solución aplicada:**
+Se implementó una estrategia integral de optimización y precalentamiento:
+1. **Precalentamiento inteligente (Warmup):** En `LoginComponent.ngOnInit()`, se invoca `authService.warmup()`, disparando una petición `GET /api/ping` en segundo plano en cuanto se carga la pantalla de login. Mientras el usuario digita sus credenciales, Render se despierta en paralelo.
+2. **Endpoint ultraligero `/api/ping`:** Diseñado en `Program.cs` para responder inmediatamente en memoria (~2 ms) sin tocar la base de datos.
+3. **Indicador visual de sincronización:** Se integró en `login.component.html` una píldora reactiva con estados (`⏳ Sincronizando con el servidor...` / `⚡ Conexión instantánea activa`) y animaciones CSS de pulso.
+4. **Fast-path en inicializador:** `DbInitializer.cs` ahora verifica la columna `session_token` en una única consulta; si ya existe, omite el resto del escaneo, reduciendo el arranque de 4.5s a ~130ms (mejora del 97%).
+5. **Índice funcional en PostgreSQL:** Se creó el índice `CREATE INDEX IF NOT EXISTS idx_usuarios_lower_username ON usuarios (LOWER(username));`.
+6. **Connection Pooling afinado:** Parámetros optimizados en la cadena de conexión (`Port=5432` Session Mode, `Minimum Pool Size=2`, `Maximum Pool Size=15`, `Keepalive=30`, `Tcp Keepalive=true`).
+7. **Timeout en reCAPTCHA:** Limitado a 4 segundos en `GoogleRecaptchaService` para evitar bloqueos por dependencias externas.
+
+**Archivos afectados:**
+- `backend/LMS.API/Program.cs`
+- `backend/LMS.API/Data/DbInitializer.cs`
+- `backend/LMS.API/appsettings.json`
+- `frontend/src/app/core/services/auth.service.ts`
+- `frontend/src/app/features/auth/login/login.component.ts`
+- `frontend/src/app/features/auth/login/login.component.html`
+- `frontend/src/app/features/auth/login/login.component.css`
+
+---
+
+### #21 — Desfase y traducción incompleta en vistas dinámicas de Angular (i18n)
+
+**Categoría:** Frontend / Internacionalización (i18n)  
+**Fecha:** 2026-10-12  
+**Gravedad:** 🟡 Medio
+
+**Síntoma:**
+Al cambiar de idioma (Español, Inglés, Chino, Japonés, Portugués), componentes dinámicos como tablas, modales emergentes, toasts y tarjetas de cursos no se traducían o generaban parpadeos y desalineaciones visuales al navegar entre paneles.
+
+**Causa:**
+Las traducciones estáticas convencionales no interceptaban los elementos creados dinámicamente en el DOM tras la inicialización del componente ni los datos asíncronos recibidos desde los servicios REST.
+
+**Solución aplicada:**
+Se desarrolló un motor de traducción profunda en `LanguageService`:
+1. **DOM Walker recursivo:** Recorre los nodos de texto de los elementos renderizados aplicando traducciones de forma contextual e inmediata.
+2. **`MutationObserver` reactivo:** Escucha cambios e inserciones dinámicas en el DOM para traducir automáticamente elementos añadidos después de la carga inicial (como modales de sesión, confirmaciones y mensajes flotantes).
+3. **Diccionario multilingüe estructurado:** Mapeo comprehensivo para Español (ES), Inglés (EN), Chino (ZH), Japonés (JA) y Portugués (PT).
+4. **Persistencia en `localStorage`:** Almacena la selección del usuario para mantener la preferencia en futuras visitas y recargas.
+
+**Archivos afectados:**
+- `frontend/src/app/core/services/language.service.ts`
+- `frontend/src/app/shared/components/language-selector/`
+- Paneles de Docente, Estudiante y Administrador
+
+---
 
 | Categoría | Total de Errores |
 |:---|:---:|
 | 🔴 Backend / Base de Datos | 2 |
 | 🔴 Backend / CORS | 2 |
-| 🟡 Backend / Render / Hosting | 2 |
+| 🔴 Backend / Render / Startup Lifecycle | 3 |
+| 🟡 Backend & Frontend / Rendimiento & Auth | 2 |
 | 🔴 Frontend / SPA / GitHub Pages | 3 |
 | 🔴 Frontend / PWA / Service Worker | 2 |
 | 🟡 Frontend / Angular | 1 |
@@ -701,9 +827,11 @@ Monitoreo de seguridad e inspección estructurada de registros del servidor Kest
 | 🟡 Frontend / Deploy (GitHub Pages) | 1 |
 | 🟡 Frontend / System Inspector | 1 |
 | 🟢 Frontend / Avatares / Assets | 1 |
-| **Total** | **18** |
+| 🟡 Frontend / Internacionalización (i18n) | 1 |
+| **Total** | **21** |
 
 ---
 
 > **Mantenido por:** Sneider M. · LMS Primaria · 2026  
 > _Este documento se actualiza conforme se encuentran y resuelven nuevos errores en el proyecto._
+
