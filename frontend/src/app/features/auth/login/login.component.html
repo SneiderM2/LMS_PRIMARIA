@@ -16,6 +16,12 @@
         </div>
         <h1 class="portal-title">{{ 'login.title' | translate }}</h1>
         <p class="portal-subtitle">{{ 'login.subtitle' | translate }}</p>
+
+        <!-- Indicador de conexión instantánea del servidor -->
+        <div class="server-status-pill" [class.ready]="isServerReady" [class.warming]="isServerWarming && !isServerReady">
+          <span class="status-dot"></span>
+          <span class="status-text">{{ isServerReady ? '⚡ Conexión instantánea activa' : '⏳ Sincronizando con el servidor escolar...' }}</span>
+        </div>
       </div>
 
       <!-- Selector de Pestañas: Iniciar Sesión / Crear Cuenta -->
@@ -75,7 +81,7 @@
 
         <button type="submit" class="btn btn-primary btn-lg btn-block" [disabled]="isLoading">
           <span *ngIf="!isLoading">{{ 'login.btnSubmit' | translate }}</span>
-          <span *ngIf="isLoading">{{ 'login.btnLoading' | translate }}</span>
+          <span *ngIf="isLoading">{{ isServerReady ? ('login.btnLoading' | translate) : 'Conectando con el servidor escolar... 🚀' }}</span>
         </button>
 
         <!-- Separador visual -->

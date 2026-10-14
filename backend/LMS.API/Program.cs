@@ -16,7 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 var rawConnectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? builder.Configuration.GetConnectionString("DefaultConnection") 
     ?? builder.Configuration["DATABASE_URL"]
-    ?? "Host=aws-0-us-east-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.rjvsbjjmlmvcihfgbiaz;Password=Sneider0124;SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Maximum Pool Size=10;Connection Idle Lifetime=60;";
+    ?? "Host=aws-0-us-east-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.rjvsbjjmlmvcihfgbiaz;Password=Sneider0124;SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Minimum Pool Size=2;Maximum Pool Size=15;Connection Idle Lifetime=300;Keepalive=30;Tcp Keepalive=true;";
 
 var connectionString = rawConnectionString;
 if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
@@ -62,7 +62,7 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
             }
         }
 
-        connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Maximum Pool Size=10;Connection Idle Lifetime=60;";
+        connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Minimum Pool Size=2;Maximum Pool Size=15;Connection Idle Lifetime=300;Keepalive=30;Tcp Keepalive=true;";
     }
     catch
     {
@@ -88,7 +88,10 @@ builder.Services.AddDbContext<LMSDbContext>(options =>
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ISemaforoService, SemaforoService>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
-builder.Services.AddHttpClient<ICaptchaService, GoogleRecaptchaService>();
+builder.Services.AddHttpClient<ICaptchaService, GoogleRecaptchaService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(4);
+});
 
 // 3. Autenticación JWT
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"] ?? "LmsPrimarySchoolSuperSecretKey2026!@#$%^&*()_+";
@@ -231,6 +234,31 @@ app.UseCors("AllowAngularDev");
 app.UseAuthentication();
 app.UseSingleSessionValidation(); // Middleware de Sesión Única
 app.UseAuthorization();
+
+app.MapGet("/api/ping", () => Results.Ok(new 
+{ 
+    status = "healthy", 
+    message = "LMS Primary School API is active and ready.",
+    timestamp = DateTime.UtcNow 
+}));
+
+app.MapGet("/api/health", async (LMSDbContext context) =>
+{
+    try
+    {
+        var canConnect = await context.Database.CanConnectAsync();
+        return Results.Ok(new 
+        { 
+            status = canConnect ? "healthy" : "degraded",
+            database = canConnect ? "connected" : "error",
+            timestamp = DateTime.UtcNow 
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { status = "error", message = ex.Message }, statusCode: 503);
+    }
+});
 
 app.MapControllers();
 

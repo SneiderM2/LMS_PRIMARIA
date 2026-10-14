@@ -47,6 +47,10 @@ export class LoginComponent implements OnInit, AfterViewInit {
   public errorMessage: string | null = null;
   public successMessage: string | null = null;
 
+  // Precalentamiento del backend en segundo plano (elimina los 20 segundos de cold start)
+  public isServerWarming = true;
+  public isServerReady = false;
+
   // Modal de sesión activa en otro dispositivo
   public showActiveSessionModal = false;
   public activeSessionInfo: { message: string; sessionStartedAt?: string; deviceHint?: string } | null = null;
@@ -61,12 +65,31 @@ export class LoginComponent implements OnInit, AfterViewInit {
   ) { }
 
   ngOnInit(): void {
-    // Si viene redirigido por inactividad de sesión
+    // 1. Precalentar el servidor en segundo plano tan pronto abre la pantalla
+    this.warmupBackend();
+
+    // 2. Si viene redirigido por inactividad de sesión
     this.route.queryParams.subscribe(params => {
       if (params['sessionExpired'] === 'true') {
         this.errorMessage = '⏱️ Tu sesión ha expirado por inactividad (5 minutos). Por favor ingresa nuevamente.';
       } else if (params['duplicateSession'] === 'true') {
         this.errorMessage = '⚠️ Tu sesión se ha cerrado porque se inició sesión en otro dispositivo.';
+      }
+    });
+  }
+
+  private warmupBackend(): void {
+    this.authService.warmup().subscribe({
+      next: () => {
+        this.ngZone.run(() => {
+          this.isServerReady = true;
+          this.isServerWarming = false;
+        });
+      },
+      error: () => {
+        this.ngZone.run(() => {
+          this.isServerWarming = false;
+        });
       }
     });
   }

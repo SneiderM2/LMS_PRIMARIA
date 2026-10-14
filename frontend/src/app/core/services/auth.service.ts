@@ -28,6 +28,17 @@ export class AuthService {
   constructor(private http: HttpClient, private router: Router) { }
 
   /**
+   * Precalentamiento del backend (Wake-up ping).
+   * Despierta el servidor en Render en segundo plano mientras el usuario escribe sus credenciales,
+   * garantizando que el login se procese de forma inmediata cuando haga clic en "Ingresar".
+   */
+  public warmup(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/ping`).pipe(
+      catchError(() => this.http.get<any>(`${this.apiUrl}/auth/diagnostic`))
+    );
+  }
+
+  /**
    * Intenta iniciar sesión.
    * @param credentials Datos de login
    * @param forceLogin Si true, cierra la sesión activa en otro dispositivo

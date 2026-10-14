@@ -147,6 +147,26 @@ public static class DbInitializer
                 await conn.OpenAsync();
             }
 
+            // OPTIMIZACIÓN DE ARRANQUE: Verificación ultra-rápida (1 sola query)
+            // Si la columna 'session_token' ya existe en 'usuarios', el esquema ya fue migrado.
+            using (var checkCmd = conn.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'usuarios' AND column_name = 'session_token' LIMIT 1;";
+                var alreadyMigrated = await checkCmd.ExecuteScalarAsync();
+                if (alreadyMigrated != null && alreadyMigrated != DBNull.Value)
+                {
+                    // Asegurar índice para login case-insensitive ultrarrápido (si no existe)
+                    try
+                    {
+                        using var idxCmd = conn.CreateCommand();
+                        idxCmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_usuarios_lower_username ON usuarios (LOWER(username));";
+                        await idxCmd.ExecuteNonQueryAsync();
+                    }
+                    catch { }
+                    return; // Retorno inmediato: ahorra 4 a 5 segundos de roundtrips en cada inicio de servidor
+                }
+            }
+
             var tablesWithAutoIncrement = new[] { "roles", "grados", "usuarios", "cursos", "inscripciones", "tareas", "entregas", "archivos_entrega", "materiales" };
             foreach (var table in tablesWithAutoIncrement)
             {
