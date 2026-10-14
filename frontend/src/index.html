@@ -25,6 +25,21 @@
   <!-- Sprint 4: Google Identity Services (OAuth 2.0) y Google reCAPTCHA v2 -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
+
+  <!-- Soporte Oficial de Traducción Multilingüe en Tiempo Real -->
+  <div id="google_translate_element" style="display:none;" aria-hidden="true"></div>
+  <script type="text/javascript">
+    function googleTranslateElementInit() {
+      if (window.google && window.google.translate) {
+        new window.google.translate.TranslateElement({
+          pageLanguage: 'es',
+          includedLanguages: 'es,en,zh-CN,ja,pt',
+          autoDisplay: false
+        }, 'google_translate_element');
+      }
+    }
+  </script>
+  <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer></script>
 </head>
 <body>
   <app-root></app-root>
