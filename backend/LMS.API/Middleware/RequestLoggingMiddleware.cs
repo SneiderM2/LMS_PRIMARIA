@@ -83,10 +83,12 @@ public class RequestLoggingMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Ignorar endpoints de Swagger o sondeos técnicos repetitivos
+        // Ignorar endpoints de Swagger, health-checks y sondeos técnicos repetitivos
         var pathValue = context.Request.Path.Value ?? string.Empty;
         if (pathValue.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) ||
-            pathValue.StartsWith("/favicon.ico", StringComparison.OrdinalIgnoreCase))
+            pathValue.StartsWith("/favicon.ico", StringComparison.OrdinalIgnoreCase) ||
+            pathValue.Equals("/health", StringComparison.OrdinalIgnoreCase) ||
+            pathValue.Equals("/ping", StringComparison.OrdinalIgnoreCase))
         {
             await _next(context);
             return;
@@ -155,149 +157,387 @@ public class RequestLoggingMiddleware
     }
 
     private static AuditLogEntry BuildAuditEntry(
-        HttpContext ctx, 
-        DateTime time, 
-        long elapsedMs, 
-        int statusCode, 
+        HttpContext ctx,
+        DateTime time,
+        long elapsedMs,
+        int statusCode,
         Exception? ex)
     {
-        // Extracción de IP (considerando proxies X-Forwarded-For de Render / Nginx)
+        // ── IP real considerando proxies (Render / Nginx / Cloudflare) ──────────
         var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0";
-        if (ctx.Request.Headers.TryGetValue("X-Forwarded-For", out var forwarded) && !string.IsNullOrWhiteSpace(forwarded))
+        foreach (var header in new[] { "CF-Connecting-IP", "X-Real-IP", "X-Forwarded-For" })
         {
-            ip = forwarded.ToString().Split(',')[0].Trim();
+            if (ctx.Request.Headers.TryGetValue(header, out var hVal) && !string.IsNullOrWhiteSpace(hVal))
+            {
+                ip = hVal.ToString().Split(',')[0].Trim();
+                break;
+            }
         }
 
-        var method = ctx.Request.Method;
-        var path = ctx.Request.Path.Value ?? string.Empty;
+        var method  = ctx.Request.Method;
+        var path    = ctx.Request.Path.Value ?? string.Empty;
+        var qs      = ctx.Request.QueryString.Value ?? string.Empty;
 
-        // Claims del usuario autenticado
+        // ── Claims del usuario autenticado ────────────────────────────────────
         var user = ctx.User;
-        string? userId = null;
+        string? userId    = null;
         string? userEmail = null;
-        string? userRole = null;
+        string? userRole  = null;
+        string? userName  = null;
 
         if (user.Identity?.IsAuthenticated == true)
         {
-            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
-                     ?? user.FindFirst("sub")?.Value 
-                     ?? user.Identity.Name;
+            userId    = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                        ?? user.FindFirst("sub")?.Value
+                        ?? user.Identity.Name;
 
-            userEmail = user.FindFirst(ClaimTypes.Email)?.Value 
+            userEmail = user.FindFirst(ClaimTypes.Email)?.Value
                         ?? (user.Identity.Name?.Contains('@') == true ? user.Identity.Name : null);
 
-            userRole = user.FindFirst(ClaimTypes.Role)?.Value 
-                       ?? user.FindFirst("role")?.Value;
+            userRole  = user.FindFirst(ClaimTypes.Role)?.Value
+                        ?? user.FindFirst("role")?.Value;
+
+            userName  = user.FindFirst(ClaimTypes.GivenName)?.Value
+                        ?? user.FindFirst("name")?.Value
+                        ?? user.Identity.Name;
         }
 
-        // Determinación de Nivel (Level)
+        // ── Nivel de severidad ────────────────────────────────────────────────
         string level;
         if (statusCode >= 500 || ex != null)
-        {
             level = "ERROR";
-        }
         else if (statusCode >= 400)
-        {
             level = "WARNING";
-        }
-        else if (method != "GET" || path.Contains("/auth/") || path.Contains("/admin/"))
-        {
+        else if (method != "GET"
+                 || path.Contains("/auth/")
+                 || path.Contains("/admin/")
+                 || path.Contains("/systemfiles/"))
             level = "AUDIT";
-        }
         else
-        {
             level = "INFO";
-        }
 
-        // Resolución de Acción descriptiva en lenguaje humano
-        var action = ResolveActionName(method, path, statusCode);
+        // ── Acción descriptiva ────────────────────────────────────────────────
+        var action = ResolveActionName(method, path, statusCode, qs);
 
-        var details = ex != null
-            ? $"{ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}"
-            : (statusCode >= 400 ? $"HTTP {statusCode} - Respuesta con error en {method} {path}" : null);
+        // ── Detalles de error ────────────────────────────────────────────────
+        string? details = null;
+        if (ex != null)
+            details = $"{ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}";
+        else if (statusCode >= 400)
+            details = $"HTTP {statusCode} — {method} {path}{qs}";
+        else if (!string.IsNullOrEmpty(qs) && level == "AUDIT")
+            details = $"Parámetros: {qs}";
 
         return new AuditLogEntry
         {
             Timestamp = time.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
-            Level = level,
-            Method = method,
-            Path = path + ctx.Request.QueryString,
+            Level     = level,
+            Method    = method,
+            Path      = path + qs,
             StatusCode = statusCode,
             ElapsedMs = elapsedMs,
-            Ip = ip,
-            UserId = userId,
+            Ip        = ip,
+            UserId    = userId,
             UserEmail = userEmail,
-            UserRole = userRole,
-            Action = action,
-            Details = details
+            UserRole  = userRole,
+            Action    = action,
+            Details   = details
         };
     }
 
-    private static string ResolveActionName(string method, string path, int status)
+    /// <summary>
+    /// Asigna una descripción legible en español a cada evento del sistema.
+    /// Cubre: Auth, Admin, CRUD académico, asistencia, calificaciones,
+    /// contenidos, perfil, sesión única, contraseña y errores de seguridad.
+    /// </summary>
+    private static string ResolveActionName(string method, string path, int status, string qs = "")
     {
         var p = path.ToLowerInvariant();
 
+        // ════════════════════════════════════════════════════════════════════
+        //  AUTENTICACIÓN
+        // ════════════════════════════════════════════════════════════════════
         if (p.EndsWith("/auth/login"))
         {
-            if (status == 200) return "Auth: Inicio de Sesión Exitoso";
-            if (status == 409) return "Auth: Alerta - Doble Sesión Activa Detectada";
-            if (status == 423) return "Auth: Cuenta Bloqueada por Intentos Fallidos";
-            return "Auth: Intento de Inicio de Sesión Fallido";
+            return status switch
+            {
+                200 => "Auth: Inicio de Sesión Exitoso",
+                401 => "Auth: Contraseña o Usuario Incorrecto",
+                403 => "Auth: Acceso Denegado en Login",
+                404 => "Auth: Usuario No Encontrado",
+                409 => "Auth: Alerta — Doble Sesión Activa Detectada",
+                423 => "Auth: Cuenta Bloqueada por Demasiados Intentos Fallidos",
+                429 => "Auth: Límite de Intentos de Login Excedido (Rate-Limit)",
+                _   => "Auth: Intento de Inicio de Sesión Fallido"
+            };
         }
-        if (p.EndsWith("/auth/google-login"))
-        {
-            return status == 200 ? "Auth: Login Exitoso con Google OAuth" : "Auth: Fallo en Login con Google";
-        }
+        if (p.EndsWith("/auth/google-login") || p.EndsWith("/auth/google"))
+            return status == 200 ? "Auth: Login Exitoso con Google OAuth" : "Auth: Fallo en Autenticación Google OAuth";
+
         if (p.EndsWith("/auth/force-login"))
-        {
-            return "Auth: Cierre de Sesión Remota y Forzado de Acceso";
-        }
+            return "Auth: Cierre de Sesión Remota Forzado por Administrador";
+
         if (p.EndsWith("/auth/register"))
         {
-            return status == 201 ? "Auth: Registro de Nueva Cuenta Escolar" : "Auth: Intento de Registro";
+            return status switch
+            {
+                201 => "Auth: Registro Exitoso de Nueva Cuenta Escolar",
+                409 => "Auth: Intento de Registro con Email ya Existente",
+                400 => "Auth: Datos de Registro Inválidos",
+                _   => "Auth: Intento de Registro"
+            };
         }
         if (p.EndsWith("/auth/logout"))
-        {
             return "Auth: Cierre de Sesión Voluntario";
+
+        if (p.EndsWith("/auth/refresh") || p.EndsWith("/auth/refresh-token"))
+            return status == 200 ? "Auth: Renovación de Token JWT Exitosa" : "Auth: Fallo al Renovar Token JWT";
+
+        if (p.EndsWith("/auth/forgot-password") || p.EndsWith("/auth/reset-password"))
+            return status == 200 ? "Auth: Solicitud de Restablecimiento de Contraseña" : "Auth: Fallo al Restablecer Contraseña";
+
+        if (p.EndsWith("/auth/change-password"))
+            return status == 200 ? "Auth: Cambio de Contraseña Exitoso" : "Auth: Intento Fallido de Cambio de Contraseña";
+
+        if (p.EndsWith("/auth/verify-email") || p.EndsWith("/auth/confirm-email"))
+            return "Auth: Verificación de Correo Electrónico";
+
+        if (p.EndsWith("/auth/me") || p.EndsWith("/auth/profile"))
+            return "Auth: Consulta de Perfil del Usuario Autenticado";
+
+        if (p.Contains("/auth/"))
+            return $"Auth: Operación de Autenticación [{method} {path}]";
+
+        // ════════════════════════════════════════════════════════════════════
+        //  ADMINISTRACIÓN
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/admin/backup-sql"))
+            return status == 200 ? "Admin: Descarga de Respaldo SQL Generado" : "Admin: Error al Generar Respaldo SQL";
+
+        if (p.Contains("/admin/restore-backup"))
+            return status == 200 ? "Admin: Base de Datos Restaurada desde Respaldo" : "Admin: Error en Restauración de Base de Datos";
+
+        if (p.Contains("/admin/audit-logs/download"))
+            return "Admin: Descarga del Archivo Físico de Auditoría";
+
+        if (p.Contains("/admin/audit-logs"))
+            return "Admin: Consulta Paginada de Logs de Auditoría";
+
+        if (p.Contains("/systemfiles/logs/clear"))
+        {
+            var fn = qs.Contains("fileName=") ? qs.Split("fileName=")[1].Split('&')[0] : "";
+            return $"Admin: Archivo de Log Reiniciado — {fn}";
+        }
+        if (p.Contains("/systemfiles/logs/parsed"))
+            return "Admin: Inspección Parseada de Archivo de Log";
+
+        if (p.Contains("/systemfiles/logs/content"))
+            return "Admin: Inspección de Contenido Raw de Archivo de Log";
+
+        if (p.Contains("/systemfiles/logs"))
+            return "Admin: Listado de Archivos de Log del Servidor";
+
+        if (p.Contains("/systemfiles/htaccess"))
+            return "Admin: Consulta de Configuración del Servidor (.htaccess)";
+
+        if (p.Contains("/admin/stats") || p.Contains("/admin/dashboard"))
+            return "Admin: Consulta de Estadísticas del Panel de Control";
+
+        if (p.Contains("/admin/settings") || p.Contains("/admin/config"))
+        {
+            if (method == "PUT" || method == "PATCH") return "Admin: Actualización de Configuración del Sistema";
+            return "Admin: Consulta de Configuración del Sistema";
         }
 
-        // Operaciones Administrativas
-        if (p.Contains("/admin/backup-sql")) return "Admin: Descarga de Respaldo SQL de Base de Datos";
-        if (p.Contains("/admin/restore-backup")) return "Admin: Restauración de Base de Datos desde Respaldo";
-        if (p.Contains("/admin/audit-logs")) return "Admin: Consulta de Logs de Auditoría Global";
-        if (p.Contains("/systemfiles/logs")) return "Admin: Inspección de Archivos de Logs";
-        if (p.Contains("/systemfiles/htaccess")) return "Admin: Inspección de Configuración del Servidor";
-
-        // Operaciones CRUD
+        // ════════════════════════════════════════════════════════════════════
+        //  GESTIÓN DE USUARIOS (Admin / CRUD)
+        // ════════════════════════════════════════════════════════════════════
         if (p.Contains("/admin/users") || p.Contains("/usuarios"))
         {
-            if (method == "POST") return "Admin: Creación de Nuevo Usuario";
-            if (method == "PUT") return "Admin: Actualización de Datos de Usuario";
-            if (method == "DELETE") return "Admin: Eliminación / Baja de Usuario";
-            return "Admin: Consulta de Directorio de Usuarios";
+            if (p.Contains("/reset-password") || p.Contains("/change-password"))
+                return "Admin: Restablecimiento de Contraseña de Usuario";
+            if (p.Contains("/toggle") || p.Contains("/activate") || p.Contains("/deactivate"))
+                return "Admin: Cambio de Estado de Cuenta de Usuario";
+            if (p.Contains("/role") || p.Contains("/rol"))
+                return "Admin: Cambio de Rol de Usuario";
+            return method switch
+            {
+                "POST"   => "Admin: Creación de Nuevo Usuario en el Sistema",
+                "PUT"    => "Admin: Actualización de Datos de Usuario",
+                "PATCH"  => "Admin: Modificación Parcial de Datos de Usuario",
+                "DELETE" => "Admin: Eliminación / Baja de Usuario del Sistema",
+                _        => "Admin: Consulta de Directorio de Usuarios"
+            };
         }
 
-        if (p.Contains("/cursos") || p.Contains("/courses"))
+        // ════════════════════════════════════════════════════════════════════
+        //  PERFIL DE USUARIO
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/profile") || p.Contains("/perfil"))
         {
-            if (method == "POST") return "Gestión Académica: Creación de Materia/Curso";
-            if (method == "PUT") return "Gestión Académica: Edición de Materia/Curso";
-            if (method == "DELETE") return "Gestión Académica: Eliminación de Materia/Curso";
-            return "Académico: Consulta de Cursos";
+            if (p.Contains("/avatar") || p.Contains("/photo") || p.Contains("/foto"))
+                return method == "POST" || method == "PUT" ? "Usuario: Cambio de Foto de Perfil" : "Usuario: Consulta de Foto de Perfil";
+            return method switch
+            {
+                "PUT"   => "Usuario: Actualización de Perfil Personal",
+                "PATCH" => "Usuario: Modificación Parcial de Perfil Personal",
+                _       => "Usuario: Consulta de Perfil Personal"
+            };
         }
 
-        if (p.Contains("/actividades") || p.Contains("/tasks"))
+        // ════════════════════════════════════════════════════════════════════
+        //  CURSOS / MATERIAS
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/cursos") || p.Contains("/courses") || p.Contains("/materias"))
         {
-            if (method == "POST") return "Docente: Creación de Nueva Actividad/Tarea";
-            if (method == "PUT") return "Docente: Edición de Actividad/Tarea";
-            return "Académico: Consulta de Actividades";
+            if (p.Contains("/enroll") || p.Contains("/inscribir") || p.Contains("/enrollment"))
+                return method == "POST" ? "Académico: Inscripción de Estudiante en Curso" : "Académico: Consulta de Inscripciones";
+            if (p.Contains("/unenroll") || p.Contains("/desinscribir"))
+                return "Académico: Baja de Estudiante en Curso";
+            if (p.Contains("/students") || p.Contains("/estudiantes"))
+                return "Académico: Consulta de Estudiantes del Curso";
+            return method switch
+            {
+                "POST"   => "Gestión Académica: Creación de Nueva Materia/Curso",
+                "PUT"    => "Gestión Académica: Edición de Materia/Curso",
+                "PATCH"  => "Gestión Académica: Modificación Parcial de Materia/Curso",
+                "DELETE" => "Gestión Académica: Eliminación de Materia/Curso",
+                _        => "Académico: Consulta de Cursos"
+            };
         }
 
+        // ════════════════════════════════════════════════════════════════════
+        //  ACTIVIDADES / TAREAS
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/actividades") || p.Contains("/tasks") || p.Contains("/assignments"))
+        {
+            if (p.Contains("/publish") || p.Contains("/publicar"))
+                return "Docente: Publicación de Actividad/Tarea";
+            return method switch
+            {
+                "POST"   => "Docente: Creación de Nueva Actividad/Tarea",
+                "PUT"    => "Docente: Edición de Actividad/Tarea",
+                "PATCH"  => "Docente: Modificación Parcial de Actividad",
+                "DELETE" => "Docente: Eliminación de Actividad/Tarea",
+                _        => "Académico: Consulta de Actividades/Tareas"
+            };
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        //  ENTREGAS / SUBMISSIONS
+        // ════════════════════════════════════════════════════════════════════
         if (p.Contains("/entregas") || p.Contains("/submissions"))
         {
-            if (method == "POST") return "Estudiante: Envío de Tarea / Entrega Académica";
-            return "Académico: Revisión de Entregas";
+            if (p.Contains("/grade") || p.Contains("/calificar") || p.Contains("/review"))
+                return method == "POST" || method == "PUT" ? "Docente: Calificación de Entrega" : "Docente: Revisión de Entregas";
+            if (p.Contains("/file") || p.Contains("/archivo"))
+                return method == "POST" ? "Estudiante: Subida de Archivo de Tarea" : "Académico: Consulta de Archivo de Entrega";
+            return method switch
+            {
+                "POST"   => "Estudiante: Envío de Tarea / Entrega Académica",
+                "PUT"    => "Estudiante: Actualización de Entrega Enviada",
+                "DELETE" => "Estudiante: Retiro de Entrega Enviada",
+                _        => "Académico: Consulta de Entregas"
+            };
         }
 
+        // ════════════════════════════════════════════════════════════════════
+        //  CALIFICACIONES / GRADES
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/calificaciones") || p.Contains("/grades") || p.Contains("/notas"))
+        {
+            if (p.Contains("/bulk") || p.Contains("/masivo"))
+                return "Docente: Registro Masivo de Calificaciones";
+            return method switch
+            {
+                "POST"   => "Docente: Registro de Calificación",
+                "PUT"    => "Docente: Actualización de Calificación",
+                "PATCH"  => "Docente: Ajuste Parcial de Calificación",
+                "DELETE" => "Docente: Eliminación de Calificación",
+                _        => "Académico: Consulta de Calificaciones"
+            };
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        //  ASISTENCIA
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/asistencia") || p.Contains("/attendance"))
+        {
+            if (p.Contains("/report") || p.Contains("/reporte"))
+                return "Docente/Admin: Reporte de Asistencia";
+            if (p.Contains("/semaforo") || p.Contains("/traffic-light"))
+                return "Sistema: Consulta de Semáforo de Asistencia";
+            return method switch
+            {
+                "POST"   => "Docente: Registro de Asistencia de Clase",
+                "PUT"    => "Docente: Corrección de Asistencia Registrada",
+                "DELETE" => "Docente: Eliminación de Registro de Asistencia",
+                _        => "Académico: Consulta de Asistencias"
+            };
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        //  CONTENIDOS / MATERIALES
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/contenidos") || p.Contains("/contents") || p.Contains("/materials") || p.Contains("/recursos"))
+        {
+            if (p.Contains("/download") || p.Contains("/descargar"))
+                return "Académico: Descarga de Material/Contenido";
+            return method switch
+            {
+                "POST"   => "Docente: Subida/Creación de Material de Clase",
+                "PUT"    => "Docente: Actualización de Material de Clase",
+                "DELETE" => "Docente: Eliminación de Material de Clase",
+                _        => "Académico: Consulta de Materiales/Contenidos"
+            };
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        //  ANUNCIOS / NOTIFICATIONS
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/anuncios") || p.Contains("/announcements") || p.Contains("/notificaciones") || p.Contains("/notifications"))
+        {
+            return method switch
+            {
+                "POST"   => "Docente/Admin: Publicación de Anuncio/Notificación",
+                "PUT"    => "Docente/Admin: Edición de Anuncio",
+                "DELETE" => "Docente/Admin: Eliminación de Anuncio",
+                _        => "Usuario: Consulta de Anuncios/Notificaciones"
+            };
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        //  REPORTES / ESTADÍSTICAS
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/reportes") || p.Contains("/reports") || p.Contains("/estadisticas") || p.Contains("/statistics"))
+            return "Admin/Docente: Generación o Consulta de Reporte";
+
+        // ════════════════════════════════════════════════════════════════════
+        //  SESIÓN ÚNICA / SINGLE SESSION
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/session") || p.Contains("/sesion") || p.Contains("/single-session"))
+        {
+            if (method == "DELETE") return "Admin: Cierre Forzado de Sesión Activa";
+            return "Sistema: Validación de Sesión Única";
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        //  ERRORES CONOCIDOS DE SEGURIDAD (sin autenticar en endpoints protegidos)
+        // ════════════════════════════════════════════════════════════════════
+        if (status == 401)
+            return $"Seguridad: Acceso No Autenticado — {method} {path}";
+        if (status == 403)
+            return $"Seguridad: Acceso Denegado por Permisos Insuficientes — {method} {path}";
+        if (status == 404 && method != "GET")
+            return $"Operación sobre Recurso No Encontrado — {method} {path}";
+        if (status == 429)
+            return $"Seguridad: Límite de Solicitudes Excedido (Rate-Limit) — {method} {path}";
+        if (status >= 500)
+            return $"Error Interno del Servidor — {method} {path}";
+
+        // ════════════════════════════════════════════════════════════════════
+        //  GENÉRICO
+        // ════════════════════════════════════════════════════════════════════
         return $"{method} {path}";
     }
 
