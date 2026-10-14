@@ -3,10 +3,10 @@
   <div class="cold-start-container">
     <div class="cold-start-icon">⏳</div>
     <div class="cold-start-info">
-      <h4 class="cold-start-title">Iniciando servidor en la nube...</h4>
+      <h4 class="cold-start-title">{{ 'server.wakingUp' | translate }}</h4>
       <p class="cold-start-desc">{{ serverStatus.statusMessage() }}</p>
     </div>
-    <button type="button" class="cold-start-close" (click)="serverStatus.setWakingUp(false)" aria-label="Cerrar aviso">×</button>
+    <button type="button" class="cold-start-close" (click)="serverStatus.setWakingUp(false)" [attr.aria-label]="'common.close' | translate">×</button>
   </div>
 </div>
 

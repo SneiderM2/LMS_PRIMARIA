@@ -75,21 +75,21 @@
         </div>
         <div class="banner-btns">
           <div class="report-btn-group">
-            <button type="button" class="btn-report btn-report-csv" (click)="exportAdminReport('csv')" title="Descargar directorio de usuarios en formato Excel / CSV">
+            <button type="button" class="btn-report btn-report-csv" (click)="exportAdminReport('csv')" [title]="'admin.reportCsv' | translate">
               <span>{{ 'admin.reportCsv' | translate }}</span>
             </button>
-            <button type="button" class="btn-report btn-report-pdf" (click)="exportAdminReport('pdf')" title="Descargar directorio de usuarios en formato PDF">
+            <button type="button" class="btn-report btn-report-pdf" (click)="exportAdminReport('pdf')" [title]="'admin.reportPdf' | translate">
               <span>{{ 'admin.reportPdf' | translate }}</span>
             </button>
           </div>
           <button class="btn btn-primary" (click)="openCreateUserModal()">
             {{ 'admin.registerUser' | translate }}
           </button>
-          <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar copia de seguridad SQL de Supabase">
-            <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : ('admin.downloadBackup' | translate) }}</span>
+          <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
+            <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar base de datos desde copia de seguridad .sql">
-            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : ('admin.restoreBackup' | translate) }}</span>
+          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" [title]="'admin.restoreBackup' | translate">
+            <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
           <button class="btn btn-secondary" (click)="goToTeacherView()">
             {{ 'admin.openSemaforo' | translate }}
@@ -103,13 +103,13 @@
         <div class="metric-box box-total glass-panel">
           <div class="metric-top">
             <span class="box-icon">👥</span>
-            <span class="metric-trend">Activos</span>
+            <span class="metric-trend">{{ 'admin.filterActive' | translate }}</span>
           </div>
           <span class="box-val">{{ metrics.totalActiveUsers }}</span>
-          <span class="box-label">Usuarios en Plataforma</span>
+          <span class="box-label">{{ 'admin.metricUsersLabel' | translate }}</span>
           <div class="metric-subdetail">
-            <span>👨‍🏫 <strong>{{ metrics.activeTeachersCount }}</strong> Docentes</span>
-            <span>🎒 <strong>{{ metrics.activeStudentsCount }}</strong> Alumnos</span>
+            <span>👨‍🏫 <strong>{{ metrics.activeTeachersCount }}</strong> {{ 'admin.metricTeachersTag' | translate }}</span>
+            <span>🎒 <strong>{{ metrics.activeStudentsCount }}</strong> {{ 'admin.metricStudentsTag' | translate }}</span>
           </div>
         </div>
 
@@ -117,15 +117,15 @@
         <div class="metric-box box-green glass-panel">
           <div class="metric-top">
             <span class="box-icon">🖥️</span>
-            <span class="metric-trend trend-green">En Línea</span>
+            <span class="metric-trend trend-green">{{ 'admin.metricOnline' | translate }}</span>
           </div>
           <span class="box-val status-val" [class.text-danger]="metrics.systemStatus.includes('Degradado')">
             {{ metrics.systemStatus }}
           </span>
-          <span class="box-label">Servicios Principales</span>
+          <span class="box-label">{{ 'admin.metricServicesLabel' | translate }}</span>
           <div class="metric-subdetail">
-            <span>Latencia: Óptima</span>
-            <span>API REST: 200 OK</span>
+            <span>{{ 'admin.metricLatency' | translate }}</span>
+            <span>{{ 'admin.metricApi' | translate }}</span>
           </div>
         </div>
 
@@ -134,14 +134,14 @@
           <div class="metric-top">
             <span class="box-icon">⚠️</span>
             <span class="metric-trend" [class.trend-red]="metrics.recentErrorsCount > 0" [class.trend-green]="metrics.recentErrorsCount === 0">
-              {{ metrics.recentErrorsCount === 0 ? 'Estable' : 'Alerta' }}
+              {{ metrics.recentErrorsCount === 0 ? ('admin.metricStable' | translate) : ('admin.metricAlert' | translate) }}
             </span>
           </div>
           <span class="box-val">{{ metrics.recentErrorsCount }}</span>
-          <span class="box-label">Incidencias (Últimas 24h)</span>
+          <span class="box-label">{{ 'admin.metricErrors' | translate }}</span>
           <div class="metric-subdetail">
-            <span *ngIf="metrics.recentErrorsCount === 0">Sin fallos críticos registrados</span>
-            <span *ngIf="metrics.recentErrorsCount > 0">Ver detalles en error.log</span>
+            <span *ngIf="metrics.recentErrorsCount === 0">{{ 'admin.metricNoErrors' | translate }}</span>
+            <span *ngIf="metrics.recentErrorsCount > 0">{{ 'admin.metricSeeErrors' | translate }}</span>
           </div>
         </div>
 
@@ -149,13 +149,13 @@
         <div class="metric-box box-yellow glass-panel">
           <div class="metric-top">
             <span class="box-icon">📚</span>
-            <span class="metric-trend trend-yellow">1° a 6°</span>
+            <span class="metric-trend trend-yellow">{{ 'admin.metricGrades' | translate }}</span>
           </div>
           <span class="box-val">{{ metrics.totalCoursesCount }}</span>
-          <span class="box-label">Materias Habilitadas</span>
+          <span class="box-label">{{ 'admin.metricCoursesLabel' | translate }}</span>
           <div class="metric-subdetail">
-            <span>Matrículas activas</span>
-            <span>Contenido didáctico</span>
+            <span>{{ 'admin.metricEnrollments' | translate }}</span>
+            <span>{{ 'admin.metricContent' | translate }}</span>
           </div>
         </div>
       </section>
@@ -164,8 +164,8 @@
       <section class="crud-users-card glass-panel">
         <div class="users-header-row">
           <div class="title-block">
-            <h2>Directorio de Cuentas y Accesos</h2>
-            <p>Alta, edición y suspensión lógica con preservación total de notas y entregas.</p>
+            <h2>{{ 'admin.usersTitle' | translate }}</h2>
+            <p>{{ 'admin.usersSub' | translate }}</p>
           </div>
 
           <div class="users-toolbar">
@@ -175,19 +175,19 @@
                 class="chip-btn" 
                 [class.selected]="roleFilter === 'ALL'" 
                 (click)="filterByRole('ALL')">
-                Todos ({{ users.length }})
+                {{ 'admin.filterAll' | translate }} ({{ users.length }})
               </button>
               <button 
                 class="chip-btn" 
                 [class.selected]="roleFilter === 'Teacher'" 
                 (click)="filterByRole('Teacher')">
-                👨‍🏫 Docentes
+                {{ 'admin.filterTeachers' | translate }}
               </button>
               <button 
                 class="chip-btn" 
                 [class.selected]="roleFilter === 'Student'" 
                 (click)="filterByRole('Student')">
-                🎒 Alumnos
+                {{ 'admin.filterStudents' | translate }}
               </button>
             </div>
 
@@ -197,19 +197,19 @@
                 class="chip-btn" 
                 [class.selected]="userStatusFilter === 'ALL'" 
                 (click)="filterByUserStatus('ALL')">
-                Todos
+                {{ 'admin.filterAll' | translate }}
               </button>
               <button 
                 class="chip-btn" 
                 [class.selected]="userStatusFilter === 'ACTIVE'" 
                 (click)="filterByUserStatus('ACTIVE')">
-                🟢 Activos
+                {{ 'admin.filterActive' | translate }}
               </button>
               <button 
                 class="chip-btn" 
                 [class.selected]="userStatusFilter === 'SUSPENDED'" 
                 (click)="filterByUserStatus('SUSPENDED')">
-                🔴 Suspendidos
+                {{ 'admin.filterSuspended' | translate }}
               </button>
             </div>
 
@@ -219,9 +219,9 @@
                 type="text" 
                 [(ngModel)]="userSearchQuery" 
                 (keyup.enter)="onSearch()"
-                placeholder="Buscar por nombre, carnet..." 
+                [placeholder]="'admin.searchPlaceholder' | translate" 
                 class="form-input search-input" />
-              <button class="btn btn-secondary btn-sm" (click)="onSearch()">🔍 Buscar</button>
+              <button class="btn btn-secondary btn-sm" (click)="onSearch()">{{ 'admin.btnSearch' | translate }}</button>
             </div>
           </div>
         </div>
@@ -229,7 +229,7 @@
         <!-- Indicador de Carga -->
         <div *ngIf="isLoadingUsers" class="users-loader">
           <div class="spinner"></div>
-          <p>Consultando base de datos escolar...</p>
+          <p>{{ 'admin.loadingUsers' | translate }}</p>
         </div>
 
         <!-- Tabla CRUD Usuarios -->
@@ -237,13 +237,13 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>Usuario</th>
-                <th>Carnet / Documento</th>
-                <th>Rol</th>
-                <th>Grado Escolar</th>
-                <th>Estado</th>
-                <th>Fecha de Alta</th>
-                <th style="text-align: right;">Acciones</th>
+                <th>{{ 'admin.colUser' | translate }}</th>
+                <th>{{ 'admin.colDoc' | translate }}</th>
+                <th>{{ 'admin.colRole' | translate }}</th>
+                <th>{{ 'admin.colGrade' | translate }}</th>
+                <th>{{ 'admin.colStatus' | translate }}</th>
+                <th>{{ 'admin.colCreated' | translate }}</th>
+                <th style="text-align: right;">{{ 'admin.colActions' | translate }}</th>
               </tr>
             </thead>
             <tbody>
@@ -260,20 +260,20 @@
                 <td><code class="doc-code">{{ user.username }}</code></td>
                 <td>
                   <span class="badge-role-pill" [ngClass]="'role-' + user.role.toLowerCase()">
-                    {{ user.role === 'Student' ? '🎒 Alumno' : (user.role === 'Teacher' ? '👨‍🏫 Docente' : '🛡️ Admin') }}
+                    {{ user.role === 'Student' ? ('admin.roleStudent' | translate) : (user.role === 'Teacher' ? ('admin.roleTeacher' | translate) : ('admin.roleAdmin' | translate)) }}
                   </span>
                 </td>
                 <td>{{ user.gradeLevel || '—' }}</td>
                 <td>
                   <span class="status-badge" [class.badge-active]="user.activo" [class.badge-suspended]="!user.activo">
-                    {{ user.activo ? '🟢 Activo' : '🔴 Suspendido' }}
+                    {{ user.activo ? ('admin.statusActive' | translate) : ('admin.statusSuspended' | translate) }}
                   </span>
                 </td>
                 <td>{{ user.fechaCreacion | date:'dd/MM/yyyy' }}</td>
                 <td style="text-align: right;">
                   <div class="user-actions">
-                    <button class="btn-action btn-action-primary" (click)="openEditUserModal(user)" title="Editar información básica">
-                      ✏️ Editar
+                    <button class="btn-action btn-action-primary" (click)="openEditUserModal(user)" [title]="'admin.btnEdit' | translate">
+                      {{ 'admin.btnEdit' | translate }}
                     </button>
                     <!-- Toggle Suspensión Lógica -->
                     <button 
@@ -281,8 +281,8 @@
                       [class.btn-action-danger]="user.activo"
                       [class.btn-action-warning]="!user.activo"
                       (click)="toggleUserStatus(user)"
-                      [title]="user.activo ? 'Suspender acceso temporalmente' : 'Reactivar acceso'">
-                      {{ user.activo ? '🚫 Suspender' : '✅ Habilitar' }}
+                      [title]="user.activo ? ('admin.btnSuspend' | translate) : ('admin.btnEnable' | translate)">
+                      {{ user.activo ? ('admin.btnSuspend' | translate) : ('admin.btnEnable' | translate) }}
                     </button>
                   </div>
                 </td>
@@ -293,8 +293,8 @@
 
         <div *ngIf="!isLoadingUsers && filteredUsers.length === 0" class="empty-state">
           <span class="empty-icon">🔍</span>
-          <h3>Sin resultados</h3>
-          <p>No se encontraron cuentas con los filtros seleccionados.</p>
+          <h3>{{ 'admin.noResults' | translate }}</h3>
+          <p>{{ 'admin.noResultsSub' | translate }}</p>
         </div>
       </section>
     </div>
@@ -307,28 +307,28 @@
         <div class="banner-content">
           <div class="status-pill-live">
             <span class="live-dot dot-yellow"></span>
-            <span>Módulo Institucional de Asignaturas</span>
+            <span>{{ 'admin.coursesStatus' | translate }}</span>
           </div>
-          <h1>Gestión de Materias y Docentes Responsables 📚</h1>
-          <p>Crea cursos para cada grado (1° a 6° de primaria), asigna al profesor titular y supervisa el aforo de estudiantes.</p>
+          <h1>{{ 'admin.coursesTitle' | translate }}</h1>
+          <p>{{ 'admin.coursesSub' | translate }}</p>
         </div>
         <div class="banner-btns">
           <div class="report-btn-group">
-            <button type="button" class="btn-report btn-report-csv" (click)="exportAdminReport('csv')" title="Descargar materias en formato Excel / CSV">
-              <span>📊 Reporte .CSV</span>
+            <button type="button" class="btn-report btn-report-csv" (click)="exportAdminReport('csv')" [title]="'admin.reportCsv' | translate">
+              <span>{{ 'admin.reportCsv' | translate }}</span>
             </button>
-            <button type="button" class="btn-report btn-report-pdf" (click)="exportAdminReport('pdf')" title="Descargar materias en formato PDF">
-              <span>📄 Reporte .PDF</span>
+            <button type="button" class="btn-report btn-report-pdf" (click)="exportAdminReport('pdf')" [title]="'admin.reportPdf' | translate">
+              <span>{{ 'admin.reportPdf' | translate }}</span>
             </button>
           </div>
           <button class="btn btn-primary" (click)="openCreateCourseModal()">
-            ➕ Nueva Materia
+            {{ 'admin.btnNewSubject' | translate }}
           </button>
-          <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar copia de seguridad SQL de Supabase">
-            <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
+          <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
+            <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar base de datos desde copia de seguridad .sql">
-            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : '📥 Restaurar Backup BD' }}</span>
+          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" [title]="'admin.restoreBackup' | translate">
+            <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
         </div>
       </section>
@@ -337,8 +337,8 @@
       <section class="crud-users-card glass-panel">
         <div class="users-header-row">
           <div class="title-block">
-            <h2>Materias Registradas en la Institución ({{ filteredCourses.length }})</h2>
-            <p>Edita asignaciones de docentes y controla la disponibilidad en el portal.</p>
+            <h2>{{ 'admin.coursesTableTitle' | translate }} ({{ filteredCourses.length }})</h2>
+            <p>{{ 'admin.coursesTableSub' | translate }}</p>
           </div>
 
           <div class="users-toolbar">
@@ -348,7 +348,7 @@
                 class="chip-btn" 
                 [class.selected]="courseGradeFilter === 'ALL'" 
                 (click)="courseGradeFilter = 'ALL'; applyCourseFilters()">
-                Todos los Grados
+                {{ 'admin.filterAllGrades' | translate }}
               </button>
               <button 
                 *ngFor="let g of ['1°', '2°', '3°', '4°', '5°', '6°']"
@@ -365,7 +365,7 @@
                 type="text" 
                 [(ngModel)]="courseSearchQuery" 
                 (input)="applyCourseFilters()"
-                placeholder="Buscar materia o docente..." 
+                [placeholder]="'admin.searchCoursePlaceholder' | translate" 
                 class="form-input search-input" />
             </div>
           </div>
@@ -374,7 +374,7 @@
         <!-- Spinner -->
         <div *ngIf="isLoadingCourses" class="users-loader">
           <div class="spinner"></div>
-          <p>Cargando materias institucionales...</p>
+          <p>{{ 'admin.loadingCourses' | translate }}</p>
         </div>
 
         <!-- Tabla Cursos -->
@@ -382,12 +382,12 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>Materia</th>
-                <th>Grado / Grupo</th>
-                <th>Docente Asignado</th>
-                <th>Estudiantes Matriculados</th>
-                <th>Estado</th>
-                <th style="text-align: right;">Acciones</th>
+                <th>{{ 'admin.colSubject' | translate }}</th>
+                <th>{{ 'admin.colGradeGroup' | translate }}</th>
+                <th>{{ 'admin.colTeacher' | translate }}</th>
+                <th>{{ 'admin.colEnrolled' | translate }}</th>
+                <th>{{ 'admin.colCourseStatus' | translate }}</th>
+                <th style="text-align: right;">{{ 'admin.colActions' | translate }}</th>
               </tr>
             </thead>
             <tbody>
@@ -397,7 +397,7 @@
                   <p *ngIf="c.descripcion" class="row-subtext">{{ c.descripcion }}</p>
                 </td>
                 <td>
-                  <span class="course-pill">{{ c.grado }} • Grupo {{ c.grupo }}</span>
+                  <span class="course-pill">{{ c.grado }} • {{ 'common.group' | translate }} {{ c.grupo }}</span>
                 </td>
                 <td>
                   <div class="teacher-cell">
@@ -406,25 +406,26 @@
                 </td>
                 <td>
                   <span class="students-badge">
-                    🎒 <strong>{{ c.totalStudents }}</strong> alumnos
+                    🎒 <strong>{{ c.totalStudents }}</strong> {{ 'admin.students' | translate }}
                   </span>
                 </td>
                 <td>
                   <span class="status-badge" [class.badge-active]="c.activo" [class.badge-suspended]="!c.activo">
-                    {{ c.activo ? '🟢 Habilitada' : '📦 Suspendida' }}
+                    {{ c.activo ? ('admin.courseActive' | translate) : ('admin.courseSuspended' | translate) }}
                   </span>
                 </td>
                 <td style="text-align: right;">
                   <div class="user-actions">
-                    <button class="btn-action btn-action-primary" (click)="openEditCourseModal(c)" title="Editar materia">
-                      ✏️ Editar
+                    <button class="btn-action btn-action-primary" (click)="openEditCourseModal(c)" [title]="'admin.btnEdit' | translate">
+                      {{ 'admin.btnEdit' | translate }}
                     </button>
                     <button 
                       class="btn-action"
                       [class.btn-action-danger]="c.activo"
                       [class.btn-action-warning]="!c.activo"
-                      (click)="toggleCourseStatus(c)">
-                      {{ c.activo ? '📦 Suspender' : '✅ Habilitar' }}
+                      (click)="toggleCourseStatus(c)"
+                      [title]="c.activo ? ('admin.btnSuspendCourse' | translate) : ('admin.btnEnableCourse' | translate)">
+                      {{ c.activo ? ('admin.btnSuspendCourse' | translate) : ('admin.btnEnableCourse' | translate) }}
                     </button>
                   </div>
                 </td>
@@ -435,8 +436,8 @@
 
         <div *ngIf="!isLoadingCourses && filteredCourses.length === 0" class="empty-state">
           <span class="empty-icon">📘</span>
-          <h3>Sin materias encontradas</h3>
-          <p>No se encontraron cursos que coincidan con la búsqueda.</p>
+          <h3>{{ 'admin.noCoursesFound' | translate }}</h3>
+          <p>{{ 'admin.noCoursesSub' | translate }}</p>
         </div>
       </section>
     </div>
@@ -449,25 +450,25 @@
         <div class="banner-content">
           <div class="status-pill-live">
             <span class="live-dot"></span>
-            <span>Auditoría de Seguridad y Monitoreo Kestrel</span>
+            <span>{{ 'admin.auditStatus' | translate }}</span>
           </div>
-          <h1>Auditoría y Diagnóstico de Infraestructura 🛡️</h1>
-          <p>Consulta registros de eventos, actividad técnica y exporta diagnósticos del estado del sistema.</p>
+          <h1>{{ 'admin.auditTitle' | translate }}</h1>
+          <p>{{ 'admin.auditDesc' | translate }}</p>
         </div>
         <div class="banner-btns">
           <div class="report-btn-group">
-            <button type="button" class="btn-report btn-report-csv" (click)="exportAdminReport('csv')" title="Descargar auditoría en formato Excel / CSV">
-              <span>📊 Reporte .CSV</span>
+            <button type="button" class="btn-report btn-report-csv" (click)="exportAdminReport('csv')" [title]="'admin.reportCsv' | translate">
+              <span>{{ 'admin.reportCsv' | translate }}</span>
             </button>
-            <button type="button" class="btn-report btn-report-pdf" (click)="exportAdminReport('pdf')" title="Descargar auditoría en formato PDF">
-              <span>📄 Reporte .PDF</span>
+            <button type="button" class="btn-report btn-report-pdf" (click)="exportAdminReport('pdf')" [title]="'admin.reportPdf' | translate">
+              <span>{{ 'admin.reportPdf' | translate }}</span>
             </button>
           </div>
-          <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar copia de seguridad SQL de Supabase">
-            <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
+          <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
+            <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar base de datos desde copia de seguridad .sql">
-            <span>{{ isRestoringBackup ? '⏳ Restaurando BD...' : '📥 Restaurar Backup BD' }}</span>
+          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" [title]="'admin.restoreBackup' | translate">
+            <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
         </div>
       </section>
@@ -477,17 +478,17 @@
         <div class="db-backup-header">
           <div class="db-backup-info">
             <span class="db-badge">🗄️ PostgreSQL • Supabase Cloud</span>
-            <h2 style="margin: 0.35rem 0; font-size: 1.35rem;">Gestión de Respaldo y Restauración de Base de Datos</h2>
+            <h2 style="margin: 0.35rem 0; font-size: 1.35rem;">{{ 'admin.dbTitle' | translate }}</h2>
             <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
-              Exporta un respaldo completo de la base de datos institucional en formato SQL (.sql) o restaura la información a partir de un archivo .sql previamente descargado.
+              {{ 'admin.dbDesc' | translate }}
             </p>
           </div>
           <div class="db-backup-actions">
-            <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" title="Descargar archivo de copia de seguridad .sql">
-              <span>💾 {{ isDownloadingBackup ? 'Generando Dump...' : 'Descargar Backup BD' }}</span>
+            <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
+              <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
             </button>
-            <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" title="Restaurar la base de datos desde un archivo .sql">
-              <span>{{ isRestoringBackup ? '⏳ Restaurando Base de Datos...' : '📥 Restaurar Backup BD' }}</span>
+            <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" [title]="'admin.restoreBackup' | translate">
+              <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
             </button>
           </div>
         </div>
@@ -504,7 +505,7 @@
   <div *ngIf="showCreateUserModal" class="modal-overlay" (click)="closeCreateUserModal()">
     <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>👤 Registrar Nuevo Usuario</h2>
+        <h2>{{ 'admin.modalCreateUserTitle' | translate }}</h2>
         <button class="btn-close" (click)="closeCreateUserModal()">✕</button>
       </div>
       <div class="modal-body">
@@ -515,16 +516,16 @@
 
           <div class="form-row">
             <div class="form-group col">
-              <label>Rol Institucional *</label>
+              <label>{{ 'admin.formRole' | translate }}</label>
               <select [(ngModel)]="newUser.role" name="role" class="form-select">
-                <option value="Student">🎒 Alumno / Estudiante</option>
-                <option value="Teacher">👨‍🏫 Docente / Profesor</option>
-                <option value="Admin">🛡️ Administrador</option>
+                <option value="Student">{{ 'admin.roleOptionStudent' | translate }}</option>
+                <option value="Teacher">{{ 'admin.roleOptionTeacher' | translate }}</option>
+                <option value="Admin">{{ 'admin.roleOptionAdmin' | translate }}</option>
               </select>
             </div>
 
             <div class="form-group col" *ngIf="newUser.role === 'Student'">
-              <label>Grado Escolar Asignado</label>
+              <label>{{ 'admin.formGrade' | translate }}</label>
               <select [(ngModel)]="newUser.gradeLevel" name="grade" class="form-select">
                 <option value="1°">1° Primaria</option>
                 <option value="2°">2° Primaria</option>
@@ -537,30 +538,30 @@
           </div>
 
           <div class="form-group">
-            <label>Documento de Identidad / Carnet Escolar *</label>
-            <input type="text" [(ngModel)]="newUser.username" name="username" class="form-input" required placeholder="Ej. DOC-102 o EST-205" />
+            <label>{{ 'admin.formDoc' | translate }}</label>
+            <input type="text" [(ngModel)]="newUser.username" name="username" class="form-input" required [placeholder]="'admin.formDocPlaceholder' | translate" />
           </div>
 
           <div class="form-row">
             <div class="form-group col">
-              <label>Nombre *</label>
-              <input type="text" [(ngModel)]="newUser.nombre" name="nombre" class="form-input" required placeholder="Ej. Ana" />
+              <label>{{ 'admin.formFirstName' | translate }}</label>
+              <input type="text" [(ngModel)]="newUser.nombre" name="nombre" class="form-input" required [placeholder]="'admin.formFirstNamePlaceholder' | translate" />
             </div>
             <div class="form-group col">
-              <label>Apellido *</label>
-              <input type="text" [(ngModel)]="newUser.apellido" name="apellido" class="form-input" required placeholder="Ej. Gómez" />
+              <label>{{ 'admin.formLastName' | translate }}</label>
+              <input type="text" [(ngModel)]="newUser.apellido" name="apellido" class="form-input" required [placeholder]="'admin.formLastNamePlaceholder' | translate" />
             </div>
           </div>
 
           <div class="form-group">
-            <label>Contraseña de Acceso Inicial</label>
-            <input type="password" [(ngModel)]="newUser.password" name="password" class="form-input" placeholder="Por defecto: 123456" />
+            <label>{{ 'admin.formPassword' | translate }}</label>
+            <input type="password" [(ngModel)]="newUser.password" name="password" class="form-input" [placeholder]="'admin.formPasswordPlaceholder' | translate" />
           </div>
 
           <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" (click)="closeCreateUserModal()">Cancelar</button>
+            <button type="button" class="btn btn-secondary" (click)="closeCreateUserModal()">{{ 'common.cancel' | translate }}</button>
             <button type="submit" class="btn btn-primary" [disabled]="isCreatingUser">
-              {{ isCreatingUser ? 'Registrando...' : 'Crear Usuario' }}
+              {{ isCreatingUser ? ('admin.registering' | translate) : ('admin.btnCreateUser' | translate) }}
             </button>
           </div>
         </form>
@@ -574,24 +575,24 @@
   <div *ngIf="showEditUserModal" class="modal-overlay" (click)="closeEditUserModal()">
     <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>✏️ Editar Usuario: {{ selectedUserToEdit?.fullName }}</h2>
+        <h2>{{ 'admin.modalEditUserTitle' | translate }} {{ selectedUserToEdit?.fullName }}</h2>
         <button class="btn-close" (click)="closeEditUserModal()">✕</button>
       </div>
       <div class="modal-body">
         <form (ngSubmit)="saveEditUser()">
           <div class="form-row">
             <div class="form-group col">
-              <label>Nombre *</label>
+              <label>{{ 'admin.formFirstName' | translate }}</label>
               <input type="text" [(ngModel)]="editUserForm.nombre" name="eNombre" class="form-input" required />
             </div>
             <div class="form-group col">
-              <label>Apellido *</label>
+              <label>{{ 'admin.formLastName' | translate }}</label>
               <input type="text" [(ngModel)]="editUserForm.apellido" name="eApellido" class="form-input" required />
             </div>
           </div>
 
           <div class="form-group" *ngIf="selectedUserToEdit?.role === 'Student'">
-            <label>Grado Escolar</label>
+            <label>{{ 'admin.formGrade' | translate }}</label>
             <select [(ngModel)]="editUserForm.gradeLevel" name="eGrade" class="form-select">
               <option value="1°">1° Primaria</option>
               <option value="2°">2° Primaria</option>
@@ -603,14 +604,14 @@
           </div>
 
           <div class="form-group">
-            <label>Restablecer Contraseña (Dejar en blanco si no se cambia)</label>
-            <input type="password" [(ngModel)]="editUserForm.password" name="ePass" class="form-input" placeholder="Nueva contraseña segura..." />
+            <label>{{ 'admin.formResetPassword' | translate }}</label>
+            <input type="password" [(ngModel)]="editUserForm.password" name="ePass" class="form-input" [placeholder]="'admin.formResetPasswordPlaceholder' | translate" />
           </div>
 
           <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" (click)="closeEditUserModal()">Cancelar</button>
+            <button type="button" class="btn btn-secondary" (click)="closeEditUserModal()">{{ 'common.cancel' | translate }}</button>
             <button type="submit" class="btn btn-primary" [disabled]="isEditingUser">
-              {{ isEditingUser ? 'Guardando...' : 'Actualizar Datos' }}
+              {{ isEditingUser ? ('common.saving' | translate) : ('admin.btnUpdateData' | translate) }}
             </button>
           </div>
         </form>
@@ -624,7 +625,7 @@
   <div *ngIf="showCreateCourseModal" class="modal-overlay" (click)="closeCreateCourseModal()">
     <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>📘 Registrar Nueva Materia Institucional</h2>
+        <h2>{{ 'admin.modalCreateCourseTitle' | translate }}</h2>
         <button class="btn-close" (click)="closeCreateCourseModal()">✕</button>
       </div>
       <div class="modal-body">
@@ -634,13 +635,13 @@
           </div>
 
           <div class="form-group">
-            <label>Nombre de la Materia *</label>
-            <input type="text" [(ngModel)]="newCourse.nombre" name="acNombre" class="form-input" required placeholder="Ej. Ciencias Naturales" />
+            <label>{{ 'admin.formCourseName' | translate }}</label>
+            <input type="text" [(ngModel)]="newCourse.nombre" name="acNombre" class="form-input" required [placeholder]="'admin.formCourseNamePlaceholder' | translate" />
           </div>
 
           <div class="form-row">
             <div class="form-group col">
-              <label>Grado Escolar *</label>
+              <label>{{ 'admin.formGradeRequired' | translate }}</label>
               <select [(ngModel)]="newCourse.grado" name="acGrado" class="form-select">
                 <option value="1°">1° Primaria</option>
                 <option value="2°">2° Primaria</option>
@@ -651,15 +652,15 @@
               </select>
             </div>
             <div class="form-group col">
-              <label>Grupo / Salón</label>
+              <label>{{ 'admin.formGroupRoom' | translate }}</label>
               <input type="text" [(ngModel)]="newCourse.grupo" name="acGrupo" class="form-input" placeholder="A" />
             </div>
           </div>
 
           <div class="form-group">
-            <label>Docente Responsable *</label>
+            <label>{{ 'admin.formTeacherResponsible' | translate }}</label>
             <select [(ngModel)]="newCourse.docenteId" name="acDocente" class="form-select">
-              <option [ngValue]="undefined">-- Seleccionar Docente --</option>
+              <option [ngValue]="undefined">{{ 'admin.selectTeacher' | translate }}</option>
               <option *ngFor="let t of teachersList" [ngValue]="t.id">
                 👨‍🏫 {{ t.fullName }} ({{ t.username }})
               </option>
@@ -667,14 +668,14 @@
           </div>
 
           <div class="form-group">
-            <label>Descripción del Curso</label>
-            <textarea [(ngModel)]="newCourse.descripcion" name="acDesc" class="form-input" rows="2" placeholder="Objetivos y temática del curso..."></textarea>
+            <label>{{ 'admin.formCourseDesc' | translate }}</label>
+            <textarea [(ngModel)]="newCourse.descripcion" name="acDesc" class="form-input" rows="2" [placeholder]="'admin.formCourseDescPlaceholder' | translate"></textarea>
           </div>
 
           <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" (click)="closeCreateCourseModal()">Cancelar</button>
+            <button type="button" class="btn btn-secondary" (click)="closeCreateCourseModal()">{{ 'common.cancel' | translate }}</button>
             <button type="submit" class="btn btn-primary" [disabled]="isCreatingCourse">
-              {{ isCreatingCourse ? 'Guardando...' : 'Crear Materia' }}
+              {{ isCreatingCourse ? ('common.saving' | translate) : ('admin.btnCreateCourse' | translate) }}
             </button>
           </div>
         </form>
@@ -688,19 +689,19 @@
   <div *ngIf="showEditCourseModal" class="modal-overlay" (click)="closeEditCourseModal()">
     <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>✏️ Editar Materia: {{ selectedCourseToEdit?.nombre }}</h2>
+        <h2>{{ 'admin.modalEditCourseTitle' | translate }} {{ selectedCourseToEdit?.nombre }}</h2>
         <button class="btn-close" (click)="closeEditCourseModal()">✕</button>
       </div>
       <div class="modal-body">
         <form (ngSubmit)="saveEditCourse()">
           <div class="form-group">
-            <label>Nombre de la Materia *</label>
+            <label>{{ 'admin.formCourseName' | translate }}</label>
             <input type="text" [(ngModel)]="editCourseForm.nombre" name="ecNombre" class="form-input" required />
           </div>
 
           <div class="form-row">
             <div class="form-group col">
-              <label>Grado Escolar *</label>
+              <label>{{ 'admin.formGradeRequired' | translate }}</label>
               <select [(ngModel)]="editCourseForm.grado" name="ecGrado" class="form-select">
                 <option value="1°">1° Primaria</option>
                 <option value="2°">2° Primaria</option>
@@ -711,13 +712,13 @@
               </select>
             </div>
             <div class="form-group col">
-              <label>Grupo</label>
+              <label>{{ 'teacher.groupLabel' | translate }}</label>
               <input type="text" [(ngModel)]="editCourseForm.grupo" name="ecGrupo" class="form-input" />
             </div>
           </div>
 
           <div class="form-group">
-            <label>Docente Responsable</label>
+            <label>{{ 'admin.formTeacherResponsible' | translate }}</label>
             <select [(ngModel)]="editCourseForm.docenteId" name="ecDocente" class="form-select">
               <option *ngFor="let t of teachersList" [ngValue]="t.id">
                 👨‍🏫 {{ t.fullName }} ({{ t.username }})
@@ -726,14 +727,14 @@
           </div>
 
           <div class="form-group">
-            <label>Descripción</label>
+            <label>{{ 'admin.formCourseDesc' | translate }}</label>
             <textarea [(ngModel)]="editCourseForm.descripcion" name="ecDesc" class="form-input" rows="2"></textarea>
           </div>
 
           <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" (click)="closeEditCourseModal()">Cancelar</button>
+            <button type="button" class="btn btn-secondary" (click)="closeEditCourseModal()">{{ 'common.cancel' | translate }}</button>
             <button type="submit" class="btn btn-primary" [disabled]="isEditingCourse">
-              {{ isEditingCourse ? 'Guardando...' : 'Guardar Cambios' }}
+              {{ isEditingCourse ? ('common.saving' | translate) : ('admin.btnSaveChanges' | translate) }}
             </button>
           </div>
         </form>

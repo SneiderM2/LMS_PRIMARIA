@@ -17,18 +17,18 @@
       <div class="title-group">
         <span class="header-icon">🚀</span>
         <div>
-          <h2>Entregar mi Tarea</h2>
+          <h2>{{ 'student.dropTitle' | translate }}</h2>
           <p class="subtitle">{{ assignmentTitle }}</p>
         </div>
       </div>
-      <button class="btn-close" (click)="cancelled.emit()" aria-label="Cerrar modal">✕</button>
+      <button class="btn-close" (click)="cancelled.emit()" [attr.aria-label]="'common.close' | translate">✕</button>
     </div>
 
     <!-- Estado de éxito al finalizar -->
     <div class="success-screen" *ngIf="uploadSuccess">
       <div class="celebrate-emoji bounce-animation">🎉⭐🎈</div>
-      <h3 class="success-title">¡Misión Cumplida!</h3>
-      <p class="success-desc">Tu tarea ya está en el escritorio de tu profesor. ¡Gran trabajo, campeón/campeona!</p>
+      <h3 class="success-title">{{ 'student.dropMissionAccomplished' | translate }}</h3>
+      <p class="success-desc">{{ 'student.dropMissionDesc' | translate }}</p>
     </div>
 
     <!-- Formulario / Zona de Arrastre -->
@@ -55,14 +55,14 @@
         </div>
 
         <h3 class="drop-title">
-          {{ isDragging ? '¡Suelta tu tarea aquí!' : 'Arrastra tu tarea aquí' }}
+          {{ isDragging ? ('student.dropReleaseHere' | translate) : ('student.dropDragHere' | translate) }}
         </h3>
-        <p class="drop-subtitle">o haz un clic grande para buscarla en tu computadora 💻</p>
+        <p class="drop-subtitle">{{ 'student.dropClickToBrowse' | translate }}</p>
 
         <div class="format-badges">
           <span class="format-badge">📄 PDF</span>
-          <span class="format-badge">🖼️ Fotos (JPG, PNG)</span>
-          <span class="format-badge">📝 Word</span>
+          <span class="format-badge">{{ 'student.dropPhotos' | translate }}</span>
+          <span class="format-badge">{{ 'student.dropWord' | translate }}</span>
         </div>
       </div>
 
@@ -74,10 +74,10 @@
         <div class="file-details">
           <h4 class="file-name" [title]="selectedFile.name">{{ selectedFile.name }}</h4>
           <span class="file-size">📦 {{ formatFileSize(selectedFile.size) }}</span>
-          <span class="file-ready">✅ ¡Archivo listo para enviar!</span>
+          <span class="file-ready">{{ 'student.dropFileReady' | translate }}</span>
         </div>
-        <button class="btn-remove" (click)="removeFile()" title="Cambiar archivo">
-          🗑️ Quitar
+        <button class="btn-remove" (click)="removeFile()" [title]="'student.dropRemove' | translate">
+          {{ 'student.dropRemove' | translate }}
         </button>
       </div>
 
@@ -90,7 +90,7 @@
       <!-- Botones de Acción -->
       <div class="modal-footer">
         <button type="button" class="btn btn-cancel" (click)="cancelled.emit()" [disabled]="isUploading">
-          Cancelar
+          {{ 'common.cancel' | translate }}
         </button>
 
         <button *ngIf="selectedFile"
@@ -98,9 +98,9 @@
                 class="btn btn-primary btn-submit-task"
                 (click)="submitAssignment()"
                 [disabled]="isUploading">
-          <span *ngIf="!isUploading">🚀 ¡Enviar al Profe!</span>
+          <span *ngIf="!isUploading">{{ 'student.dropSendToTeacher' | translate }}</span>
           <span *ngIf="isUploading" class="uploading-spinner">
-            ⏳ Enviando tu tarea...
+            {{ 'student.dropSending' | translate }}
           </span>
         </button>
       </div>

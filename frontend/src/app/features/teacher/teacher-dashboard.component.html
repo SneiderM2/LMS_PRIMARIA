@@ -5,7 +5,7 @@
     <div class="nav-brand">
       <div class="brand-badge-icon">👨‍🏫</div>
       <div class="brand-titles">
-        <span class="brand-title">LMS Primaria</span>
+        <span class="brand-title">{{ 'admin.brandTitle' | translate }}</span>
         <span class="teacher-tag">{{ 'teacher.brandTag' | translate }}</span>
       </div>
     </div>
@@ -68,22 +68,22 @@
         <div class="banner-text">
           <div class="status-pill-live">
             <span class="live-dot"></span>
-            <span>Gestión Académica Activa</span>
+            <span>{{ 'teacher.bannerStatus' | translate }}</span>
           </div>
-          <h1>Gestión de Actividades y Evaluaciones 📚</h1>
-          <p>Publica tareas interactivas, consulta las entregas de tus alumnos, califica y envía retroalimentación motivacional.</p>
+          <h1>{{ 'teacher.bannerTitle' | translate }}</h1>
+          <p>{{ 'teacher.bannerDesc' | translate }}</p>
         </div>
         <div class="banner-actions">
           <div class="report-btn-group">
-            <button type="button" class="btn-report btn-report-csv" (click)="exportCurrentTabReport('csv')" title="Descargar reporte en formato Excel / CSV">
-              <span>📊 Reporte .CSV</span>
+            <button type="button" class="btn-report btn-report-csv" (click)="exportCurrentTabReport('csv')" [title]="'teacher.reportCsv' | translate">
+              <span>{{ 'teacher.reportCsv' | translate }}</span>
             </button>
-            <button type="button" class="btn-report btn-report-pdf" (click)="exportCurrentTabReport('pdf')" title="Descargar reporte en formato PDF">
-              <span>📄 Reporte .PDF</span>
+            <button type="button" class="btn-report btn-report-pdf" (click)="exportCurrentTabReport('pdf')" [title]="'teacher.reportPdf' | translate">
+              <span>{{ 'teacher.reportPdf' | translate }}</span>
             </button>
           </div>
           <button class="btn btn-primary" (click)="openCreateModal()">
-            ➕ Publicar Nueva Actividad
+            {{ 'teacher.btnCreateActivity' | translate }}
           </button>
         </div>
       </section>
@@ -93,32 +93,32 @@
         <div class="metric-card card-all glass-panel">
           <div class="metric-top">
             <span class="metric-icon">👥</span>
-            <span class="metric-trend">Total</span>
+            <span class="metric-trend">{{ 'teacher.metricTotal' | translate }}</span>
           </div>
           <span class="metric-value">{{ academicMetrics.totalStudents }}</span>
-          <span class="metric-label">Alumnos a Cargo</span>
-          <span class="metric-tag">En tus materias asignadas</span>
+          <span class="metric-label">{{ 'teacher.metricStudentsLabel' | translate }}</span>
+          <span class="metric-tag">{{ 'teacher.metricStudentsTag' | translate }}</span>
         </div>
 
         <div class="metric-card card-yellow glass-panel" [class.highlight-pending]="academicMetrics.pendingGradingCount > 0">
           <div class="metric-top">
             <span class="metric-icon">📝</span>
-            <span class="metric-trend trend-yellow">Revisión</span>
+            <span class="metric-trend trend-yellow">{{ 'teacher.metricReview' | translate }}</span>
           </div>
           <span class="metric-value">{{ academicMetrics.pendingGradingCount }}</span>
-          <span class="metric-label">Por Calificar</span>
-          <span class="metric-tag" *ngIf="academicMetrics.pendingGradingCount === 0">¡Estás al día! 🎉</span>
-          <span class="metric-tag text-warning" *ngIf="academicMetrics.pendingGradingCount > 0">Entregas pendientes</span>
+          <span class="metric-label">{{ 'teacher.metricGradingLabel' | translate }}</span>
+          <span class="metric-tag" *ngIf="academicMetrics.pendingGradingCount === 0">{{ 'teacher.metricGradingOk' | translate }}</span>
+          <span class="metric-tag text-warning" *ngIf="academicMetrics.pendingGradingCount > 0">{{ 'teacher.metricGradingPending' | translate }}</span>
         </div>
 
         <div class="metric-card card-green glass-panel">
           <div class="metric-top">
             <span class="metric-icon">🚀</span>
-            <span class="metric-trend trend-green">En Curso</span>
+            <span class="metric-trend trend-green">{{ 'teacher.metricActive' | translate }}</span>
           </div>
           <span class="metric-value">{{ academicMetrics.activeTasksCount }}</span>
-          <span class="metric-label">Tareas Publicadas</span>
-          <span class="metric-tag">Disponibles para entrega</span>
+          <span class="metric-label">{{ 'teacher.metricTasksLabel' | translate }}</span>
+          <span class="metric-tag">{{ 'teacher.metricTasksTag' | translate }}</span>
         </div>
 
         <div class="metric-card card-all glass-panel">
@@ -127,7 +127,7 @@
             <span class="metric-trend">{{ academicMetrics.submissionRate }}%</span>
           </div>
           <span class="metric-value">{{ academicMetrics.submissionRate }}%</span>
-          <span class="metric-label">Tasa de Cumplimiento</span>
+          <span class="metric-label">{{ 'teacher.metricRateLabel' | translate }}</span>
           <div class="progress-bar-bg">
             <div class="progress-bar-fill" [style.width.%]="academicMetrics.submissionRate"></div>
           </div>
@@ -138,8 +138,8 @@
       <section class="crud-activities-section glass-panel">
         <div class="section-toolbar-row">
           <div class="toolbar-title">
-            <h2>Catálogo de Trabajos y Evaluaciones ({{ filteredActivities.length }})</h2>
-            <p>Supervisa el estado de cada actividad, revisa entregas de estudiantes y archiva evaluaciones.</p>
+            <h2>{{ 'teacher.tableCatalogTitle' | translate }} ({{ filteredActivities.length }})</h2>
+            <p>{{ 'teacher.tableCatalogSub' | translate }}</p>
           </div>
 
           <div class="toolbar-filters">
@@ -149,19 +149,19 @@
                 class="chip-btn" 
                 [class.selected]="activityStatusFilter === 'ALL'" 
                 (click)="setActivityFilter('ALL')">
-                Todas ({{ activities.length }})
+                {{ 'teacher.filterAll' | translate }} ({{ activities.length }})
               </button>
               <button 
                 class="chip-btn" 
                 [class.selected]="activityStatusFilter === 'ACTIVE'" 
                 (click)="setActivityFilter('ACTIVE')">
-                🟢 Publicadas
+                {{ 'teacher.filterPublished' | translate }}
               </button>
               <button 
                 class="chip-btn" 
                 [class.selected]="activityStatusFilter === 'ARCHIVED'" 
                 (click)="setActivityFilter('ARCHIVED')">
-                📦 Archivadas
+                {{ 'teacher.filterArchived' | translate }}
               </button>
             </div>
 
@@ -171,7 +171,7 @@
                 type="text" 
                 [(ngModel)]="activitySearchQuery" 
                 (input)="applyActivityFilter()"
-                placeholder="Buscar por título..." 
+                [placeholder]="'teacher.searchPlaceholder' | translate" 
                 class="form-input search-input" />
             </div>
           </div>
@@ -180,14 +180,14 @@
         <!-- Indicador de carga -->
         <div *ngIf="isLoadingActivities" class="table-loader">
           <div class="spinner"></div>
-          <p>Cargando actividades y entregas...</p>
+          <p>{{ 'teacher.loadingActivities' | translate }}</p>
         </div>
 
         <!-- Estado vacío -->
         <div *ngIf="!isLoadingActivities && filteredActivities.length === 0" class="empty-state">
           <span class="empty-emoji">📭</span>
-          <h3>No hay actividades registradas</h3>
-          <p>Crea tu primera tarea o recurso educativo usando el botón superior.</p>
+          <h3>{{ 'teacher.emptyActivities' | translate }}</h3>
+          <p>{{ 'teacher.emptyActivitiesSub' | translate }}</p>
         </div>
 
         <!-- Tabla -->
@@ -195,13 +195,13 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>Título de la Actividad</th>
-                <th>Materia / Grado</th>
-                <th>Tipo</th>
-                <th>Fecha Límite</th>
-                <th>Entregas de Alumnos</th>
-                <th>Estado</th>
-                <th style="text-align: right;">Acciones</th>
+                <th>{{ 'teacher.colTitle' | translate }}</th>
+                <th>{{ 'teacher.colSubject' | translate }}</th>
+                <th>{{ 'teacher.colType' | translate }}</th>
+                <th>{{ 'teacher.colDueDate' | translate }}</th>
+                <th>{{ 'teacher.colSubmissions' | translate }}</th>
+                <th>{{ 'teacher.colStatus' | translate }}</th>
+                <th style="text-align: right;">{{ 'teacher.colActions' | translate }}</th>
               </tr>
             </thead>
             <tbody>
@@ -216,12 +216,12 @@
                 </td>
                 <td>
                   <span class="type-badge-inline" [ngClass]="'badge-' + act.kind.toLowerCase()">
-                    {{ act.kind === 'Tarea' ? '📝 Tarea' : '📄 Material' }}
+                    {{ act.kind === 'Tarea' ? ('teacher.typeTask' | translate) : ('teacher.typeMaterial' | translate) }}
                   </span>
                 </td>
                 <td>
                   <span *ngIf="act.dueDate" class="due-badge">{{ act.dueDate | date:'dd/MM/yyyy' }}</span>
-                  <span *ngIf="!act.dueDate" class="text-muted">Sin fecha límite</span>
+                  <span *ngIf="!act.dueDate" class="text-muted">{{ 'teacher.noDueDate' | translate }}</span>
                 </td>
                 <td>
                   <!-- BOTÓN INTERACTIVO PARA VER ENTREGAS Y CALIFICAR -->
@@ -229,24 +229,24 @@
                     <button 
                       class="btn-action btn-action-primary" 
                       (click)="openSubmissionsModal(act)"
-                      title="Ver entregas de alumnos y calificar">
-                      👁️ Ver Entregas ({{ act.submissionsCount }})
+                      [title]="'teacher.viewSubmissions' | translate">
+                      {{ 'teacher.viewSubmissions' | translate }} ({{ act.submissionsCount }})
                       <span *ngIf="act.pendingGradingCount > 0" class="mini-alert-pill">
-                        {{ act.pendingGradingCount }} sin calificar
+                        {{ act.pendingGradingCount }} {{ 'teacher.noGraded' | translate }}
                       </span>
                     </button>
                   </div>
-                  <span *ngIf="act.kind !== 'Tarea'" class="text-muted">Recurso de lectura</span>
+                  <span *ngIf="act.kind !== 'Tarea'" class="text-muted">{{ 'teacher.readingResource' | translate }}</span>
                 </td>
                 <td>
                   <span class="status-badge" [class.badge-active]="act.isActive" [class.badge-archived]="!act.isActive">
-                    {{ act.isActive ? '🟢 Activa' : '📦 Archivada' }}
+                    {{ act.isActive ? ('teacher.statusActive' | translate) : ('teacher.statusArchived' | translate) }}
                   </span>
                 </td>
                 <td style="text-align: right;">
                   <div class="actions-group">
-                    <button class="btn-action btn-action-primary" (click)="openEditModal(act)" title="Editar información">
-                      ✏️ Editar
+                    <button class="btn-action btn-action-primary" (click)="openEditModal(act)" [title]="'teacher.btnEdit' | translate">
+                      {{ 'teacher.btnEdit' | translate }}
                     </button>
                     <!-- Toggle Activar / Desactivar -->
                     <button 
@@ -254,8 +254,8 @@
                       [class.btn-action-danger]="act.isActive"
                       [class.btn-action-warning]="!act.isActive"
                       (click)="toggleActivityStatus(act)" 
-                      [title]="act.isActive ? 'Archivar actividad' : 'Reactivar actividad'">
-                      {{ act.isActive ? '📦 Archivar' : '🔄 Reactivar' }}
+                      [title]="act.isActive ? ('teacher.btnArchive' | translate) : ('teacher.btnReactivate' | translate)">
+                      {{ act.isActive ? ('teacher.btnArchive' | translate) : ('teacher.btnReactivate' | translate) }}
                     </button>
                   </div>
                 </td>
@@ -275,22 +275,22 @@
         <div class="banner-text">
           <div class="status-pill-live">
             <span class="live-dot"></span>
-            <span>Algoritmo de Alerta Temprana Escolar</span>
+            <span>{{ 'teacher.semaforoStatus' | translate }}</span>
           </div>
-          <h1>Monitoreo de Asistencia y Alerta Temprana 🚦</h1>
-          <p>Detecta a tiempo la inactividad de tus alumnos para prevenir rezago escolar o deserción.</p>
+          <h1>{{ 'teacher.semaforoTitle' | translate }}</h1>
+          <p>{{ 'teacher.semaforoDesc' | translate }}</p>
         </div>
         <div class="banner-actions">
           <div class="report-btn-group">
-            <button type="button" class="btn-report btn-report-csv" (click)="exportCurrentTabReport('csv')" title="Descargar reporte de semáforo en formato Excel / CSV">
-              <span>📊 Reporte .CSV</span>
+            <button type="button" class="btn-report btn-report-csv" (click)="exportCurrentTabReport('csv')" [title]="'teacher.reportCsv' | translate">
+              <span>{{ 'teacher.reportCsv' | translate }}</span>
             </button>
-            <button type="button" class="btn-report btn-report-pdf" (click)="exportCurrentTabReport('pdf')" title="Descargar reporte de semáforo en formato PDF">
-              <span>📄 Reporte .PDF</span>
+            <button type="button" class="btn-report btn-report-pdf" (click)="exportCurrentTabReport('pdf')" [title]="'teacher.reportPdf' | translate">
+              <span>{{ 'teacher.reportPdf' | translate }}</span>
             </button>
           </div>
           <button class="btn btn-primary" (click)="openCreateModal()">
-            ➕ Publicar Tarea o Recurso
+            {{ 'teacher.btnPublishTask' | translate }}
           </button>
         </div>
       </section>
@@ -300,41 +300,41 @@
         <div class="metric-card card-all glass-panel" (click)="setStatusFilter('All')" [class.active-card]="selectedStatusFilter === 'All'">
           <div class="metric-top">
             <span class="metric-icon">👥</span>
-            <span class="metric-trend">Total</span>
+            <span class="metric-trend">{{ 'teacher.metricTotal' | translate }}</span>
           </div>
           <span class="metric-value">{{ metrics.totalStudents }}</span>
-          <span class="metric-label">Alumnos Evaluados</span>
-          <span class="metric-tag">1° a 6° Primaria</span>
+          <span class="metric-label">{{ 'teacher.metricSemaforoTotal' | translate }}</span>
+          <span class="metric-tag">{{ 'teacher.metricSemaforoGrades' | translate }}</span>
         </div>
 
         <div class="metric-card card-green glass-panel" (click)="setStatusFilter('Green')" [class.active-card]="selectedStatusFilter === 'Green'">
           <div class="metric-top">
             <span class="metric-icon">🟢</span>
-            <span class="metric-trend trend-green">Al Día</span>
+            <span class="metric-trend trend-green">{{ 'teacher.metricActive' | translate }}</span>
           </div>
           <span class="metric-value">{{ metrics.greenCount }}</span>
-          <span class="metric-label">Ingresaron Hoy</span>
-          <span class="metric-tag">Actividad constante</span>
+          <span class="metric-label">{{ 'teacher.metricSemaforoGreen' | translate }}</span>
+          <span class="metric-tag">{{ 'teacher.metricSemaforoGreenTag' | translate }}</span>
         </div>
 
         <div class="metric-card card-yellow glass-panel" (click)="setStatusFilter('Yellow')" [class.active-card]="selectedStatusFilter === 'Yellow'">
           <div class="metric-top">
             <span class="metric-icon">🟡</span>
-            <span class="metric-trend trend-yellow">Alerta</span>
+            <span class="metric-trend trend-yellow">{{ 'admin.metricAlert' | translate }}</span>
           </div>
           <span class="metric-value">{{ metrics.yellowCount }}</span>
-          <span class="metric-label">2 a 4 Días Ausentes</span>
-          <span class="metric-tag">Seguimiento preventivo</span>
+          <span class="metric-label">{{ 'teacher.metricSemaforoYellow' | translate }}</span>
+          <span class="metric-tag">{{ 'teacher.metricSemaforoYellowTag' | translate }}</span>
         </div>
 
         <div class="metric-card card-red glass-panel" (click)="setStatusFilter('Red')" [class.active-card]="selectedStatusFilter === 'Red'">
           <div class="metric-top">
             <span class="metric-icon">🔴</span>
-            <span class="metric-trend trend-red">Riesgo</span>
+            <span class="metric-trend trend-red">{{ 'teacher.metricSemaforoRedTag' | translate }}</span>
           </div>
           <span class="metric-value">{{ metrics.redCount }}</span>
-          <span class="metric-label">5+ Días Ausentes</span>
-          <span class="metric-tag">Contactar acudientes</span>
+          <span class="metric-label">{{ 'teacher.metricSemaforoRed' | translate }}</span>
+          <span class="metric-tag">{{ 'teacher.metricSemaforoRedTag' | translate }}</span>
         </div>
       </section>
 
@@ -342,23 +342,23 @@
       <section class="students-section glass-panel">
         <div class="section-toolbar-row">
           <div class="toolbar-title">
-            <h2>Estado de Asistencia de los Estudiantes ({{ filteredStudents.length }})</h2>
+            <h2>{{ 'teacher.semaforoTableTitle' | translate }} ({{ filteredStudents.length }})</h2>
           </div>
           <div class="filter-chips-group">
-            <button class="chip-btn" [class.selected]="selectedStatusFilter === 'All'" (click)="setStatusFilter('All')">Todos</button>
-            <button class="chip-btn" [class.selected]="selectedStatusFilter === 'Green'" (click)="setStatusFilter('Green')">🟢 Verde</button>
-            <button class="chip-btn" [class.selected]="selectedStatusFilter === 'Yellow'" (click)="setStatusFilter('Yellow')">🟡 Amarillo</button>
-            <button class="chip-btn" [class.selected]="selectedStatusFilter === 'Red'" (click)="setStatusFilter('Red')">🔴 Rojo</button>
+            <button class="chip-btn" [class.selected]="selectedStatusFilter === 'All'" (click)="setStatusFilter('All')">{{ 'teacher.filterAll2' | translate }}</button>
+            <button class="chip-btn" [class.selected]="selectedStatusFilter === 'Green'" (click)="setStatusFilter('Green')">{{ 'teacher.filterGreen' | translate }}</button>
+            <button class="chip-btn" [class.selected]="selectedStatusFilter === 'Yellow'" (click)="setStatusFilter('Yellow')">{{ 'teacher.filterYellow' | translate }}</button>
+            <button class="chip-btn" [class.selected]="selectedStatusFilter === 'Red'" (click)="setStatusFilter('Red')">{{ 'teacher.filterRed' | translate }}</button>
           </div>
         </div>
 
         <div *ngIf="isLoadingSemaforo" class="table-loader">
           <div class="spinner"></div>
-          <p>Calculando semáforo de asistencia...</p>
+          <p>{{ 'teacher.loadingSemaforo' | translate }}</p>
         </div>
 
         <div *ngIf="!isLoadingSemaforo && filteredStudents.length === 0" class="empty-state">
-          <p>No hay alumnos registrados con el filtro seleccionado.</p>
+          <p>{{ 'teacher.emptyFilter' | translate }}</p>
         </div>
 
         <div *ngIf="!isLoadingSemaforo && filteredStudents.length > 0" class="cards-grid">
@@ -383,22 +383,22 @@
         <div class="banner-text">
           <div class="status-pill-live">
             <span class="live-dot dot-yellow"></span>
-            <span>Control de Matrícula y Aforo</span>
+            <span>{{ 'teacher.studentsStatus' | translate }}</span>
           </div>
-          <h1>Directorio Escolar y Asignación de Materias 🎓</h1>
-          <p>Matricula a tus estudiantes por curso, da de baja asignaciones y crea nuevas clases para tu grado.</p>
+          <h1>{{ 'teacher.studentsTitle' | translate }}</h1>
+          <p>{{ 'teacher.studentsDesc' | translate }}</p>
         </div>
         <div class="banner-actions">
           <div class="report-btn-group">
-            <button type="button" class="btn-report btn-report-csv" (click)="exportCurrentTabReport('csv')" title="Descargar reporte de alumnos en formato Excel / CSV">
-              <span>📊 Reporte .CSV</span>
+            <button type="button" class="btn-report btn-report-csv" (click)="exportCurrentTabReport('csv')" [title]="'teacher.reportCsv' | translate">
+              <span>{{ 'teacher.reportCsv' | translate }}</span>
             </button>
-            <button type="button" class="btn-report btn-report-pdf" (click)="exportCurrentTabReport('pdf')" title="Descargar reporte de alumnos en formato PDF">
-              <span>📄 Reporte .PDF</span>
+            <button type="button" class="btn-report btn-report-pdf" (click)="exportCurrentTabReport('pdf')" [title]="'teacher.reportPdf' | translate">
+              <span>{{ 'teacher.reportPdf' | translate }}</span>
             </button>
           </div>
-          <button class="btn btn-secondary" (click)="openCreateCourseModal()">📘 Nuevo Curso</button>
-          <button class="btn btn-primary" (click)="openCreateStudentModal()">🎓 Registrar Alumno</button>
+          <button class="btn btn-secondary" (click)="openCreateCourseModal()">{{ 'teacher.btnNewCourse' | translate }}</button>
+          <button class="btn btn-primary" (click)="openCreateStudentModal()">{{ 'teacher.btnRegisterStudent' | translate }}</button>
         </div>
       </section>
 
@@ -406,22 +406,22 @@
       <section class="course-selector-card glass-panel">
         <div class="selector-row">
           <div class="selector-label-block">
-            <h3>Seleccionar Materia / Curso para Gestionar:</h3>
-            <p>Filtra los estudiantes matriculados y disponibles para esta clase.</p>
+            <h3>{{ 'teacher.selectCourseTitle' | translate }}</h3>
+            <p>{{ 'teacher.selectCourseSub' | translate }}</p>
           </div>
           <div class="selector-dropdown-block">
             <select [(ngModel)]="selectedCourseId" (change)="onCourseChange()" class="form-select course-select">
               <option *ngFor="let c of courses" [ngValue]="c.id">
-                📘 {{ c.nombre }} • {{ c.grado }} (Grupo {{ c.grupo }}) — {{ c.totalStudents }} alumnos
+                📘 {{ c.nombre }} • {{ c.grado }} ({{ 'common.group' | translate }} {{ c.grupo }}) — {{ c.totalStudents }} {{ 'admin.students' | translate }}
               </option>
             </select>
           </div>
         </div>
 
         <div *ngIf="currentSelectedCourse" class="selected-course-banner">
-          <span>Materia Activa: <strong>{{ currentSelectedCourse.nombre }}</strong> ({{ currentSelectedCourse.grado }} • Grupo {{ currentSelectedCourse.grupo }})</span>
-          <span>Docente: <strong>{{ currentSelectedCourse.docenteNombre }}</strong></span>
-          <span>Aforo Actual: <strong>{{ currentSelectedCourse.totalStudents }} matriculados</strong></span>
+          <span>{{ 'teacher.activeCourse' | translate }} <strong>{{ currentSelectedCourse.nombre }}</strong> ({{ currentSelectedCourse.grado }} • {{ 'common.group' | translate }} {{ currentSelectedCourse.grupo }})</span>
+          <span>{{ 'teacher.courseTeacher' | translate }} <strong>{{ currentSelectedCourse.docenteNombre }}</strong></span>
+          <span>{{ 'teacher.courseEnrollment' | translate }} <strong>{{ currentSelectedCourse.totalStudents }} {{ 'teacher.enrolled' | translate }}</strong></span>
         </div>
       </section>
 
@@ -432,11 +432,11 @@
             type="text" 
             [(ngModel)]="studentSearch" 
             (input)="onStudentFilterChange()"
-            placeholder="Buscar por nombre o carnet..." 
+            [placeholder]="'teacher.searchStudentPlaceholder' | translate" 
             class="form-input search-input" />
         </div>
         <div class="role-chips">
-          <button class="chip-btn" [class.selected]="studentGradeFilter === ''" (click)="studentGradeFilter = ''; onStudentFilterChange()">Todos los Grados</button>
+          <button class="chip-btn" [class.selected]="studentGradeFilter === ''" (click)="studentGradeFilter = ''; onStudentFilterChange()">{{ 'teacher.filterAllGrades' | translate }}</button>
           <button *ngFor="let g of ['1°', '2°', '3°', '4°', '5°', '6°']" class="chip-btn" [class.selected]="studentGradeFilter === g" (click)="studentGradeFilter = g; onStudentFilterChange()">{{ g }}</button>
         </div>
       </div>
@@ -445,24 +445,24 @@
       <section class="crud-activities-section glass-panel" style="margin-bottom: 2rem;">
         <div class="section-toolbar-row">
           <div class="toolbar-title">
-            <h2>🎒 Alumnos Matriculados en {{ currentSelectedCourse?.nombre || 'este curso' }} ({{ enrolledStudentsInSelectedCourse.length }})</h2>
-            <p>Estudiantes que tienen acceso activo a las tareas y contenidos de esta materia.</p>
+            <h2>{{ 'teacher.enrolledTitle' | translate }} {{ currentSelectedCourse?.nombre || '' }} ({{ enrolledStudentsInSelectedCourse.length }})</h2>
+            <p>{{ 'teacher.enrolledSub' | translate }}</p>
           </div>
         </div>
 
         <div *ngIf="enrolledStudentsInSelectedCourse.length === 0" class="empty-state">
-          <p>No hay alumnos matriculados en este curso actualmente. Puedes matricularlos desde la lista inferior.</p>
+          <p>{{ 'teacher.noEnrolled' | translate }}</p>
         </div>
 
         <div *ngIf="enrolledStudentsInSelectedCourse.length > 0" class="table-responsive">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Documento / Carnet</th>
-                <th>Nombre del Alumno</th>
-                <th>Grado</th>
-                <th>Otras Materias</th>
-                <th style="text-align: right;">Acción</th>
+                <th>{{ 'teacher.colDoc' | translate }}</th>
+                <th>{{ 'teacher.colStudentName' | translate }}</th>
+                <th>{{ 'teacher.colGrade' | translate }}</th>
+                <th>{{ 'teacher.colOtherSubjects' | translate }}</th>
+                <th style="text-align: right;">{{ 'teacher.colAction' | translate }}</th>
               </tr>
             </thead>
             <tbody>
@@ -481,8 +481,8 @@
                   </span>
                 </td>
                 <td style="text-align: right;">
-                  <button class="btn-action btn-action-danger" (click)="unenrollStudent(student)" title="Retirar del curso">
-                    ❌ Desmatricular
+                  <button class="btn-action btn-action-danger" (click)="unenrollStudent(student)" [title]="'teacher.btnUnenroll' | translate">
+                    {{ 'teacher.btnUnenroll' | translate }}
                   </button>
                 </td>
               </tr>
@@ -495,24 +495,24 @@
       <section class="crud-activities-section glass-panel">
         <div class="section-toolbar-row">
           <div class="toolbar-title">
-            <h2>➕ Alumnos Disponibles para Matricular ({{ availableStudentsForSelectedCourse.length }})</h2>
-            <p>Estudiantes registrados que aún no han sido inscritos en esta materia.</p>
+            <h2>{{ 'teacher.availableTitle' | translate }} ({{ availableStudentsForSelectedCourse.length }})</h2>
+            <p>{{ 'teacher.availableSub' | translate }}</p>
           </div>
         </div>
 
         <div *ngIf="availableStudentsForSelectedCourse.length === 0" class="empty-state">
-          <p>Todos los alumnos que coinciden con los filtros ya están matriculados en esta clase.</p>
+          <p>{{ 'teacher.allEnrolled' | translate }}</p>
         </div>
 
         <div *ngIf="availableStudentsForSelectedCourse.length > 0" class="table-responsive">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Documento / Carnet</th>
-                <th>Nombre Completo</th>
-                <th>Grado</th>
-                <th>Materias Actuales</th>
-                <th style="text-align: right;">Acción</th>
+                <th>{{ 'teacher.colDoc' | translate }}</th>
+                <th>{{ 'teacher.colFullName' | translate }}</th>
+                <th>{{ 'teacher.colGrade' | translate }}</th>
+                <th>{{ 'teacher.colCurrentSubjects' | translate }}</th>
+                <th style="text-align: right;">{{ 'teacher.colAction' | translate }}</th>
               </tr>
             </thead>
             <tbody>
@@ -526,7 +526,7 @@
                 </td>
                 <td><span class="course-pill">{{ student.grade }}</span></td>
                 <td>
-                  <span *ngIf="student.enrolledCourses.length === 0" class="text-muted">Sin materias</span>
+                  <span *ngIf="student.enrolledCourses.length === 0" class="text-muted">{{ 'teacher.noSubjects' | translate }}</span>
                   <span *ngFor="let ec of student.enrolledCourses" class="badge-active" style="padding: 0.2rem 0.45rem; font-size: 0.75rem; border-radius: 4px; margin-right: 0.25rem;">
                     {{ ec.courseName }}
                   </span>
@@ -536,7 +536,7 @@
                     class="btn btn-primary btn-sm"
                     [disabled]="enrollingMap[student.id]"
                     (click)="enrollStudent(student)">
-                    {{ enrollingMap[student.id] ? 'Matriculando...' : '➕ Matricular' }}
+                    {{ enrollingMap[student.id] ? ('teacher.enrolling' | translate) : ('teacher.btnEnroll' | translate) }}
                   </button>
                 </td>
               </tr>
@@ -555,7 +555,7 @@
     <div class="modal-content modal-content-lg glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <div>
-          <h2>📝 Entregas de Tarea: {{ selectedActivityForSubmissions?.title }}</h2>
+          <h2>{{ 'teacher.modalSubmissionsTitle' | translate }} {{ selectedActivityForSubmissions?.title }}</h2>
           <span class="header-subinfo">{{ selectedActivityForSubmissions?.courseName }} • {{ selectedActivityForSubmissions?.gradeName }}</span>
         </div>
         <button class="btn-close" (click)="closeSubmissionsModal()">✕</button>
@@ -564,13 +564,13 @@
       <div class="modal-body">
         <div *ngIf="isLoadingSubmissions" class="table-loader">
           <div class="spinner"></div>
-          <p>Consultando entregas de los estudiantes...</p>
+          <p>{{ 'teacher.loadingSubmissions' | translate }}</p>
         </div>
 
         <div *ngIf="!isLoadingSubmissions && submissionsList.length === 0" class="empty-state">
           <span class="empty-emoji">⏳</span>
-          <h3>Aún no hay entregas</h3>
-          <p>Ningún estudiante ha subido archivos para esta tarea todavía.</p>
+          <h3>{{ 'teacher.noSubmissions' | translate }}</h3>
+          <p>{{ 'teacher.noSubmissionsSub' | translate }}</p>
         </div>
 
         <!-- Lista de Entregas -->
@@ -587,51 +587,51 @@
 
               <div class="submission-status-pill">
                 <span *ngIf="sub.grade !== null && sub.grade !== undefined" class="badge-active">
-                  ⭐ Calificado: <strong>{{ sub.grade }}</strong>
+                  {{ 'teacher.graded' | translate }} <strong>{{ sub.grade }}</strong>
                 </span>
                 <span *ngIf="sub.grade === null || sub.grade === undefined" class="badge-suspended">
-                  ⏳ Por Calificar
+                  {{ 'teacher.toGrade' | translate }}
                 </span>
               </div>
             </div>
 
             <div class="submission-file-row">
-              <span class="submitted-date">Entregado: {{ sub.submittedAt | date:'dd/MM/yyyy, hh:mm a' }}</span>
+              <span class="submitted-date">{{ 'teacher.submittedAt' | translate }} {{ sub.submittedAt | date:'dd/MM/yyyy, hh:mm a' }}</span>
               <a *ngIf="sub.fileUrl" [href]="sub.fileUrl" target="_blank" class="btn-download-file">
-                📄 Descargar: <strong>{{ sub.originalFileName }}</strong>
+                {{ 'teacher.download' | translate }} <strong>{{ sub.originalFileName }}</strong>
               </a>
             </div>
 
             <!-- Feedback y Calificación Existente -->
             <div *ngIf="sub.feedback" class="feedback-quote-box">
-              <span class="quote-label">Retroalimentación del Docente:</span>
+              <span class="quote-label">{{ 'teacher.feedbackLabel' | translate }}</span>
               <p>{{ sub.feedback }}</p>
             </div>
 
             <!-- Formulario para Calificar -->
             <div *ngIf="gradingSubmission?.id === sub.id" class="grading-inline-form animate-fade-in">
-              <h4>Calificar Entrega de {{ sub.studentName }} ⭐</h4>
+              <h4>{{ 'teacher.gradingTitle' | translate }} {{ sub.studentName }} ⭐</h4>
               <div class="form-row">
                 <div class="form-group col">
-                  <label>Nota / Calificación (Escala 1.0 - 5.0 o 0 - 100) *</label>
+                  <label>{{ 'teacher.gradeLabel' | translate }}</label>
                   <input type="number" [(ngModel)]="gradeInput" step="0.1" min="0" max="100" class="form-input" required />
                 </div>
               </div>
               <div class="form-group">
-                <label>Comentario / Retroalimentación Motivacional</label>
-                <textarea [(ngModel)]="feedbackInput" rows="2" class="form-input" placeholder="¡Felicitaciones por tu esfuerzo! Te sugiero revisar..."></textarea>
+                <label>{{ 'teacher.feedbackInput' | translate }}</label>
+                <textarea [(ngModel)]="feedbackInput" rows="2" class="form-input" [placeholder]="'teacher.feedbackPlaceholder' | translate"></textarea>
               </div>
               <div class="modal-actions" style="margin-top: 0.5rem; padding-top: 0.5rem;">
-                <button class="btn btn-secondary btn-sm" (click)="cancelGrading()">Cancelar</button>
+                <button class="btn btn-secondary btn-sm" (click)="cancelGrading()">{{ 'common.cancel' | translate }}</button>
                 <button class="btn btn-primary btn-sm" [disabled]="isSavingGrade" (click)="saveGrade()">
-                  {{ isSavingGrade ? 'Guardando...' : '💾 Guardar Calificación' }}
+                  {{ isSavingGrade ? ('teacher.saving' | translate) : ('teacher.btnSaveGrade' | translate) }}
                 </button>
               </div>
             </div>
 
             <div *ngIf="gradingSubmission?.id !== sub.id" class="submission-actions">
               <button class="btn btn-primary btn-sm" (click)="startGrading(sub)">
-                ⭐ {{ sub.grade ? 'Modificar Calificación' : 'Calificar esta Entrega' }}
+                {{ sub.grade ? ('teacher.btnModifyGrade' | translate) : ('teacher.btnGrade' | translate) }}
               </button>
             </div>
           </div>
@@ -644,58 +644,58 @@
   <div *ngIf="showCreateModal" class="modal-overlay" (click)="closeCreateModal()">
     <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>📝 Publicar Tarea o Recurso Educativo</h2>
+        <h2>{{ 'teacher.createTitle' | translate }}</h2>
         <button class="btn-close" (click)="closeCreateModal()">✕</button>
       </div>
       <div class="modal-body">
         <form (ngSubmit)="saveContent()">
           <div class="form-group">
-            <label>Título de la Actividad *</label>
-            <input type="text" [(ngModel)]="newContent.title" name="title" class="form-input" required placeholder="Ej. Taller de Fracciones Mágicas" />
+            <label>{{ 'teacher.formTitleLabel' | translate }}</label>
+            <input type="text" [(ngModel)]="newContent.title" name="title" class="form-input" required [placeholder]="'teacher.formTitlePlaceholder' | translate" />
           </div>
 
           <div class="form-group">
-            <label>Descripción / Instrucciones para los Niños</label>
-            <textarea [(ngModel)]="newContent.description" name="description" class="form-input" rows="3" placeholder="Instrucciones paso a paso..."></textarea>
+            <label>{{ 'teacher.formDescLabel' | translate }}</label>
+            <textarea [(ngModel)]="newContent.description" name="description" class="form-input" rows="3" [placeholder]="'teacher.formDescPlaceholder' | translate"></textarea>
           </div>
 
           <div class="form-row">
             <div class="form-group col">
-              <label>Materia</label>
+              <label>{{ 'teacher.formSubjectLabel' | translate }}</label>
               <select [(ngModel)]="newContent.subject" name="cSub" class="form-select">
                 <option *ngFor="let c of courses" [value]="c.nombre">{{ c.nombre }} ({{ c.grado }})</option>
               </select>
             </div>
 
             <div class="form-group col">
-              <label>Tipo de Contenido</label>
+              <label>{{ 'teacher.formTypeLabel' | translate }}</label>
               <select [(ngModel)]="newContent.type" name="type" class="form-select">
-                <option value="Assignment">📝 Tarea con Entrega</option>
-                <option value="Video">🎥 Video Educativo</option>
-                <option value="Pdf">📄 Guía de Lectura</option>
+                <option value="Assignment">{{ 'teacher.formTypeAssignment' | translate }}</option>
+                <option value="Video">{{ 'teacher.formTypeVideo' | translate }}</option>
+                <option value="Pdf">{{ 'teacher.formTypePdf' | translate }}</option>
               </select>
             </div>
           </div>
 
           <div class="form-row" *ngIf="newContent.type === 'Assignment'">
             <div class="form-group col">
-              <label>Fecha Límite de Entrega</label>
+              <label>{{ 'teacher.formDueDateLabel' | translate }}</label>
               <input type="date" [(ngModel)]="newContent.dueDate" name="dueDate" class="form-input" />
             </div>
           </div>
 
           <!-- Subir archivo adjunto de guía / recurso opcional -->
           <div class="form-group">
-            <label>Adjuntar Archivo de Guía / Recurso (Opcional)</label>
+            <label>{{ 'teacher.formFileLabel' | translate }}</label>
             <input type="file" (change)="onResourceFileSelected($event)" class="form-input" />
-            <span *ngIf="isUploadingResourceFile" class="text-muted">Subiendo archivo adjunto...</span>
-            <span *ngIf="newContent.fileUrl" class="badge-active" style="display:inline-block; margin-top:0.3rem;">Archivo adjuntado correctamente</span>
+            <span *ngIf="isUploadingResourceFile" class="text-muted">{{ 'teacher.formFileUploading' | translate }}</span>
+            <span *ngIf="newContent.fileUrl" class="badge-active" style="display:inline-block; margin-top:0.3rem;">{{ 'teacher.formFileOk' | translate }}</span>
           </div>
 
           <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" (click)="closeCreateModal()">Cancelar</button>
+            <button type="button" class="btn btn-secondary" (click)="closeCreateModal()">{{ 'common.cancel' | translate }}</button>
             <button type="submit" class="btn btn-primary" [disabled]="isSavingContent">
-              {{ isSavingContent ? 'Publicando...' : 'Publicar Actividad' }}
+              {{ isSavingContent ? ('teacher.publishing' | translate) : ('teacher.btnPublishActivity' | translate) }}
             </button>
           </div>
         </form>
@@ -707,36 +707,36 @@
   <div *ngIf="showEditModal" class="modal-overlay" (click)="closeEditModal()">
     <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>✏️ Editar Actividad: {{ selectedActivityToEdit?.title }}</h2>
+        <h2>{{ 'teacher.editTitle' | translate }} {{ selectedActivityToEdit?.title }}</h2>
         <button class="btn-close" (click)="closeEditModal()">✕</button>
       </div>
       <div class="modal-body">
         <form (ngSubmit)="saveEditActivity()">
           <div class="form-group">
-            <label>Título *</label>
+            <label>{{ 'teacher.formEditTitleLabel' | translate }}</label>
             <input type="text" [(ngModel)]="editActivityForm.title" name="editTitle" class="form-input" required />
           </div>
 
           <div class="form-group">
-            <label>Descripción</label>
+            <label>{{ 'teacher.formEditDescLabel' | translate }}</label>
             <textarea [(ngModel)]="editActivityForm.description" name="editDesc" class="form-input" rows="3"></textarea>
           </div>
 
           <div class="form-row" *ngIf="selectedActivityToEdit?.kind === 'Tarea'">
             <div class="form-group col">
-              <label>Fecha Límite</label>
+              <label>{{ 'teacher.formEditDueDateLabel' | translate }}</label>
               <input type="date" [(ngModel)]="editActivityForm.dueDate" name="editDueDate" class="form-input" />
             </div>
             <div class="form-group col">
-              <label>Puntaje Máximo</label>
+              <label>{{ 'teacher.formEditMaxScore' | translate }}</label>
               <input type="number" [(ngModel)]="editActivityForm.maxScore" name="editMaxScore" class="form-input" />
             </div>
           </div>
 
           <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" (click)="closeEditModal()">Cancelar</button>
+            <button type="button" class="btn btn-secondary" (click)="closeEditModal()">{{ 'common.cancel' | translate }}</button>
             <button type="submit" class="btn btn-primary" [disabled]="isEditingActivity">
-              {{ isEditingActivity ? 'Guardando Cambios...' : 'Actualizar Actividad' }}
+              {{ isEditingActivity ? ('teacher.savingChanges' | translate) : ('teacher.btnUpdate' | translate) }}
             </button>
           </div>
         </form>
@@ -748,18 +748,18 @@
   <div *ngIf="showCreateCourseModal" class="modal-overlay" (click)="closeCreateCourseModal()">
     <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>📘 Crear Nueva Materia / Curso</h2>
+        <h2>{{ 'teacher.createCourseTitle' | translate }}</h2>
         <button class="btn-close" (click)="closeCreateCourseModal()">✕</button>
       </div>
       <div class="modal-body">
         <form (ngSubmit)="saveCourse()">
           <div class="form-group">
-            <label>Nombre de la Materia *</label>
-            <input type="text" [(ngModel)]="newCourse.nombre" name="cNombre" class="form-input" required placeholder="Ej. Ciencias Naturales" />
+            <label>{{ 'teacher.courseNameLabel' | translate }}</label>
+            <input type="text" [(ngModel)]="newCourse.nombre" name="cNombre" class="form-input" required [placeholder]="'teacher.courseNamePlaceholder' | translate" />
           </div>
           <div class="form-row">
             <div class="form-group col">
-              <label>Grado</label>
+              <label>{{ 'teacher.gradeLabel2' | translate }}</label>
               <select [(ngModel)]="newCourse.grado" name="cGrado" class="form-select">
                 <option value="1°">1° Primaria</option>
                 <option value="2°">2° Primaria</option>
@@ -770,13 +770,13 @@
               </select>
             </div>
             <div class="form-group col">
-              <label>Grupo</label>
-              <input type="text" [(ngModel)]="newCourse.grupo" name="cGrupo" class="form-input" placeholder="A" />
+              <label>{{ 'teacher.groupLabel' | translate }}</label>
+              <input type="text" [(ngModel)]="newCourse.grupo" name="cGrupo" class="form-input" [placeholder]="'teacher.groupPlaceholder' | translate" />
             </div>
           </div>
           <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" (click)="closeCreateCourseModal()">Cancelar</button>
-            <button type="submit" class="btn btn-primary" [disabled]="isCreatingCourse">Crear Curso</button>
+            <button type="button" class="btn btn-secondary" (click)="closeCreateCourseModal()">{{ 'common.cancel' | translate }}</button>
+            <button type="submit" class="btn btn-primary" [disabled]="isCreatingCourse">{{ isCreatingCourse ? ('teacher.creatingCourse' | translate) : ('teacher.btnCreateCourse' | translate) }}</button>
           </div>
         </form>
       </div>
@@ -787,7 +787,7 @@
   <div *ngIf="showCreateStudentModal" class="modal-overlay" (click)="closeCreateStudentModal()">
     <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>🎓 Registrar Nuevo Alumno</h2>
+        <h2>{{ 'teacher.createStudentTitle' | translate }}</h2>
         <button class="btn-close" (click)="closeCreateStudentModal()">✕</button>
       </div>
       <div class="modal-body">
@@ -796,16 +796,16 @@
             ⚠️ {{ createStudentError }}
           </div>
           <div class="form-group">
-            <label>Documento / Carnet Escolar *</label>
-            <input type="text" [(ngModel)]="newStudent.username" name="sUser" class="form-input" required placeholder="Ej. EST-105" />
+            <label>{{ 'teacher.studentDocLabel' | translate }}</label>
+            <input type="text" [(ngModel)]="newStudent.username" name="sUser" class="form-input" required [placeholder]="'teacher.studentDocPlaceholder' | translate" />
           </div>
           <div class="form-group">
-            <label>Nombre Completo *</label>
-            <input type="text" [(ngModel)]="newStudent.fullName" name="sName" class="form-input" required placeholder="Ej. Lucía Martínez" />
+            <label>{{ 'teacher.studentNameLabel' | translate }}</label>
+            <input type="text" [(ngModel)]="newStudent.fullName" name="sName" class="form-input" required [placeholder]="'teacher.studentNamePlaceholder' | translate" />
           </div>
           <div class="form-row">
             <div class="form-group col">
-              <label>Grado Escolar</label>
+              <label>{{ 'teacher.studentGradeLabel' | translate }}</label>
               <select [(ngModel)]="newStudent.grade" name="sGrade" class="form-select">
                 <option value="1°">1° Primaria</option>
                 <option value="2°">2° Primaria</option>
@@ -816,13 +816,13 @@
               </select>
             </div>
             <div class="form-group col">
-              <label>Contraseña Inicial (Opcional)</label>
+              <label>{{ 'teacher.studentPassLabel' | translate }}</label>
               <input type="password" [(ngModel)]="newStudent.password" name="sPass" class="form-input" placeholder="123456" />
             </div>
           </div>
           <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" (click)="closeCreateStudentModal()">Cancelar</button>
-            <button type="submit" class="btn btn-primary" [disabled]="isCreatingStudent">Registrar Alumno</button>
+            <button type="button" class="btn btn-secondary" (click)="closeCreateStudentModal()">{{ 'common.cancel' | translate }}</button>
+            <button type="submit" class="btn btn-primary" [disabled]="isCreatingStudent">{{ isCreatingStudent ? ('teacher.creatingStudent' | translate) : ('teacher.btnRegister' | translate) }}</button>
           </div>
         </form>
       </div>

@@ -8,14 +8,14 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
   imports: [CommonModule],
   template: `
     <div 
-      class="language-selector-container" 
+      class="language-selector-container notranslate skiptranslate" 
       [class.mode-floating]="mode === 'floating'"
       [class.mode-inline]="mode === 'inline'">
       
       <!-- Botón Desplegable -->
       <button 
         type="button"
-        class="lang-pill-btn"
+        class="lang-pill-btn notranslate"
         [class.menu-open]="isOpen()"
         (click)="toggleDropdown()"
         [attr.aria-expanded]="isOpen()"
@@ -28,7 +28,7 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
 
       <!-- Menú Flotante con las 5 opciones -->
       @if (isOpen()) {
-        <div class="lang-dropdown-menu animate-fade-scale" role="listbox">
+        <div class="lang-dropdown-menu animate-fade-scale notranslate skiptranslate" role="listbox">
           <div class="dropdown-header">
             <span>🌐 Idioma / Language</span>
           </div>
@@ -36,7 +36,8 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
           @for (item of langService.languages; track item.code) {
             <button 
               type="button" 
-              class="lang-option-item"
+              class="lang-option-item notranslate"
+              [attr.data-lang]="item.code"
               [class.selected]="item.code === langService.currentLang()"
               (click)="onSelectLanguage(item.code)"
               role="option"

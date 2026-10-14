@@ -8,6 +8,7 @@ import { SessionWarningModalComponent } from './shared/components/session-warnin
 import { AuthService } from './core/services/auth.service';
 import { SessionTimeoutService } from './core/services/session-timeout.service';
 import { ServerStatusService } from './core/services/server-status.service';
+import { TranslatePipe } from './shared/pipes/translate.pipe';
 
 @Component({
   selector: 'app-root',
@@ -18,7 +19,8 @@ import { ServerStatusService } from './core/services/server-status.service';
     ThemeToggleComponent, 
     LanguageSelectorComponent,
     DataPolicyModalComponent, 
-    SessionWarningModalComponent
+    SessionWarningModalComponent,
+    TranslatePipe
   ],
   templateUrl: './app.component.html'
 })

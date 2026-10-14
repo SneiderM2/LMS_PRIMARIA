@@ -3,7 +3,7 @@
   class="theme-emoji-btn" 
   [class.dark-active]="themeService.isDarkMode()"
   (click)="toggle()"
-  [attr.aria-label]="themeService.isDarkMode() ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'"
-  [title]="themeService.isDarkMode() ? 'Cambiar a Modo Claro ☀️' : 'Cambiar a Modo Oscuro 🌙'">
+  [attr.aria-label]="themeService.isDarkMode() ? ('theme.toLight' | translate) : ('theme.toDark' | translate)"
+  [title]="themeService.isDarkMode() ? ('theme.toLight' | translate) : ('theme.toDark' | translate)">
   {{ themeService.isDarkMode() ? '🌙' : '☀️' }}
 </button>
