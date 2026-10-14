@@ -188,27 +188,41 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// 7. Migración e Inicialización en Supabase
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    try
-    {
-        var context = services.GetRequiredService<LMSDbContext>();
-        await DbInitializer.SeedAsync(context);
-        app.Logger.LogInformation("Base de datos PostgreSQL (Supabase) inicializada correctamente.");
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Ocurrió un error al inicializar la base de datos.");
-    }
-}
 
-// 8. Logs
+// 7. Logs (solo I/O local, no bloquea red)
 var logsPath = Path.Combine(AppContext.BaseDirectory, "logs");
-Directory.CreateDirectory(logsPath);
+try { Directory.CreateDirectory(logsPath); } catch { logsPath = Path.Combine(Path.GetTempPath(), "lms-logs"); Directory.CreateDirectory(logsPath); }
 FileLogger.SetLogDirectory(logsPath);
-await FileLogger.InfoAsync("Servidor LMS iniciado", new { environment = app.Environment.EnvironmentName });
+
+// 8. Inicialización de BD en Supabase — se ejecuta DESPUÉS de que Kestrel empieza a escuchar.
+//    Esto evita que el health-check de Render falle por timeout durante el arranque.
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    _ = Task.Run(async () =>
+    {
+        // Dar 200 ms para que el servidor esté 100% operativo antes de tocar la BD
+        await Task.Delay(200);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+        using var scope = app.Services.CreateScope();
+        try
+        {
+            var context = scope.ServiceProvider.GetRequiredService<LMSDbContext>();
+            await DbInitializer.SeedAsync(context);
+            app.Logger.LogInformation("✅ Base de datos PostgreSQL (Supabase) inicializada correctamente (post-startup).");
+        }
+        catch (OperationCanceledException)
+        {
+            app.Logger.LogWarning("⚠️  DbInitializer cancelado por timeout (25 s). El servidor sigue operando con normalidad.");
+        }
+        catch (Exception ex)
+        {
+            // NO relanzar — un error de semilla no debe tumbar el servidor
+            app.Logger.LogError(ex, "⚠️  Error no crítico en inicialización de BD (post-startup). El servidor continúa en línea.");
+        }
+    });
+});
+
 
 // 9. Middlewares
 app.UseGlobalExceptionHandler();
