@@ -1,67 +1,79 @@
-name: Deploy Frontend to GitHub Pages
+name: Deploy Angular to GitHub Pages
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'frontend/**'
+      - 'frontend/src/**'
+      - 'frontend/public/**'
+      - 'frontend/package.json'
+      - 'frontend/angular.json'
+      - 'frontend/tsconfig.json'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
-# Permisos requeridos para publicar en GitHub Pages
+# Permisos necesarios para deploy-pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Permite un solo despliegue concurrente, descartando los que estén en cola
+# Un solo despliegue activo a la vez; cancela los que estén en cola
 concurrency:
   group: 'pages'
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
+    name: Build Angular
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js LTS
+      - name: Configurar Node.js 20 LTS
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Instalar dependencias de Frontend
-        working-directory: ./frontend
+      - name: Instalar dependencias (npm ci)
+        working-directory: frontend
         run: npm ci
 
       - name: Compilar Angular para Producción
-        working-directory: ./frontend
+        working-directory: frontend
         run: npx ng build --configuration production --base-href /LMS_PRIMARIA/
 
-      - name: Copiar 404.html y crear .nojekyll en el output
-        run: |
-          BUILD_DIR="./frontend/dist/lms-primaria/browser"
-          if [ -d "$BUILD_DIR" ]; then
-            cp ./frontend/public/404.html "$BUILD_DIR/404.html" || true
-            touch "$BUILD_DIR/.nojekyll"
-          fi
+      # Paso crítico: evita que Jekyll reescriba el output de Angular
+      - name: Deshabilitar Jekyll (crear .nojekyll)
+        run: touch frontend/dist/lms-primaria/browser/.nojekyll
+
+      # Copia 404.html para corregir navegación directa (HashLocationStrategy fallback)
+      - name: Copiar 404.html al output de compilación
+        run: cp frontend/public/404.html frontend/dist/lms-primaria/browser/404.html
 
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Subir artefacto compilado
+      - name: Subir artefacto de GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './frontend/dist/lms-primaria/browser'
+          path: frontend/dist/lms-primaria/browser
 
-      - name: Desplegar a GitHub Pages
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Desplegar en GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
