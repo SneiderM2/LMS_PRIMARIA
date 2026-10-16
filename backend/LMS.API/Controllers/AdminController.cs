@@ -117,7 +117,14 @@ public class AdminController : ControllerBase
         }
 
         var users = await query
-            .OrderByDescending(u => u.FechaCreacion)
+            .OrderBy(u => (u.Rol.Nombre == "ADMINISTRADOR" || u.Rol.Nombre == ".admin" || u.Rol.Nombre.Contains("ADMIN")) ? 1
+                        : (u.Rol.Nombre == "DOCENTE" ? 2
+                        : (u.Rol.Nombre == "ALUMNO" ? 3 : 4)))
+            .ThenBy(u => (u.Rol.Nombre == "ALUMNO" && (u.Alumno == null || u.Alumno.Grado == null || string.IsNullOrEmpty(u.Alumno.Grado.Nombre))) ? 1 : 0)
+            .ThenBy(u => (u.Alumno != null && u.Alumno.Grado != null) ? u.Alumno.Grado.Nombre : string.Empty)
+            .ThenBy(u => u.Nombre)
+            .ThenBy(u => u.Apellido)
+            .ThenByDescending(u => u.Id)
             .Select(u => new AdminUserDto
             {
                 Id = u.Id,

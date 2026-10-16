@@ -146,7 +146,7 @@ export class AdminDashboardComponent implements OnInit {
     this.isLoadingUsers = true;
     this.adminService.getUsers(this.roleFilter, this.userSearchQuery).subscribe({
       next: (data) => {
-        this.users = data;
+        this.users = this.sortUsers(data);
         this.applyUserFilters();
         this.isLoadingUsers = false;
       },
@@ -177,7 +177,73 @@ export class AdminDashboardComponent implements OnInit {
     } else if (this.userStatusFilter === 'SUSPENDED') {
       list = list.filter(u => !u.activo);
     }
-    this.filteredUsers = list;
+    this.filteredUsers = this.sortUsers(list);
+  }
+
+  /**
+   * Jerarquía de roles:
+   * 1° Administradores (Admin)
+   * 2° Docentes (Teacher / Profe)
+   * 3° Alumnos (Student / Alumno)
+   */
+  private getRolePriority(role?: string): number {
+    if (!role) return 4;
+    const r = role.toLowerCase();
+    if (r.includes('admin')) return 1;
+    if (r.includes('teacher') || r.includes('docente') || r.includes('profe')) return 2;
+    if (r.includes('student') || r.includes('alumno') || r.includes('estudiante')) return 3;
+    return 4;
+  }
+
+  /**
+   * Peso para orden ascendente de grado (1°, 2°, 3°, 4°, 5°).
+   * Alumnos sin grado asignado ("—", null o vacíos) van al final (999).
+   */
+  private getGradeWeight(gradeLevel?: string | null): number {
+    if (!gradeLevel) return 999;
+    const trimmed = gradeLevel.trim();
+    if (!trimmed || trimmed === '—' || trimmed === '-' || trimmed === 'N/A') return 999;
+    const match = trimmed.match(/\d+/);
+    if (match) {
+      return parseInt(match[0], 10);
+    }
+    return 500;
+  }
+
+  /**
+   * Ordena los usuarios según prioridades estrictas:
+   * 1. Rol: Admin -> Docente -> Alumno
+   * 2. Grado escolar (Alumnos): 1°, 2°, 3°, 4°, 5°... y alumnos sin grado ("—") al final.
+   * 3. Nombre alfabético (o ID descendente en desempate).
+   */
+  public sortUsers(usersList: AdminUser[]): AdminUser[] {
+    return [...usersList].sort((a, b) => {
+      // 1. Orden por Rol
+      const roleA = this.getRolePriority(a.role);
+      const roleB = this.getRolePriority(b.role);
+      if (roleA !== roleB) {
+        return roleA - roleB;
+      }
+
+      // 2. Orden secundario por Grado Escolar (dentro de Alumnos)
+      if (roleA === 3) {
+        const gradeA = this.getGradeWeight(a.gradeLevel);
+        const gradeB = this.getGradeWeight(b.gradeLevel);
+        if (gradeA !== gradeB) {
+          return gradeA - gradeB;
+        }
+      }
+
+      // 3. Orden terciario por Nombre / Apellido (o ID descendente)
+      const nameA = (a.nombre || a.fullName || a.username || '').trim().toLowerCase();
+      const nameB = (b.nombre || b.fullName || b.username || '').trim().toLowerCase();
+      const nameComp = nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      if (nameComp !== 0) {
+        return nameComp;
+      }
+
+      return (b.id || 0) - (a.id || 0);
+    });
   }
 
   public get teachersList(): AdminUser[] {
