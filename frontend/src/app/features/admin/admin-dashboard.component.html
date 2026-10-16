@@ -103,7 +103,7 @@
         <div class="metric-box box-total glass-panel">
           <div class="metric-top">
             <span class="box-icon">👥</span>
-            <span class="metric-trend">{{ 'admin.filterActive' | translate }}</span>
+            <span class="metric-trend">{{ 'admin.metricActiveUsers' | translate }}</span>
           </div>
           <span class="box-val">{{ metrics.totalActiveUsers }}</span>
           <span class="box-label">{{ 'admin.metricUsersLabel' | translate }}</span>
@@ -119,8 +119,8 @@
             <span class="box-icon">🖥️</span>
             <span class="metric-trend trend-green">{{ 'admin.metricOnline' | translate }}</span>
           </div>
-          <span class="box-val status-val" [class.text-danger]="metrics.systemStatus.includes('Degradado')">
-            {{ metrics.systemStatus }}
+          <span class="box-val status-val" [class.text-danger]="metrics.systemStatus && metrics.systemStatus.includes('Degradado')">
+            {{ getSystemStatusKey(metrics.systemStatus) | translate }}
           </span>
           <span class="box-label">{{ 'admin.metricServicesLabel' | translate }}</span>
           <div class="metric-subdetail">

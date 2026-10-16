@@ -20,6 +20,10 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
 // Diccionario exhaustivo de claves jerárquicas (Dot-Notation)
 const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
   "es": {
+    "STATUS.OPERATIONAL": "Operativo",
+    "STATUS.DEGRADED": "Degradado (Fallo BD)",
+    "STATUS.OFFLINE": "Desconectado",
+    "STATUS.Operativo": "Operativo",
     "app.title": "Aula Mágica - LMS Primaria",
     "app.subtitle": "Plataforma Virtual de Primaria",
     "nav.home": "Inicio",
@@ -488,6 +492,10 @@ const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     "student.dropSending": "⏳ Enviando tu tarea..."
   },
   "en": {
+    "STATUS.OPERATIONAL": "Operational",
+    "STATUS.DEGRADED": "Degraded (DB Failure)",
+    "STATUS.OFFLINE": "Offline",
+    "STATUS.Operativo": "Operational",
     "app.title": "Magic Classroom - Primary LMS",
     "app.subtitle": "Primary Virtual Platform",
     "nav.home": "Home",
@@ -956,6 +964,10 @@ const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     "student.dropSending": "⏳ Sending your homework..."
   },
   "zh": {
+    "STATUS.OPERATIONAL": "正常运行",
+    "STATUS.DEGRADED": "降级运行 (数据库故障)",
+    "STATUS.OFFLINE": "离线",
+    "STATUS.Operativo": "正常运行",
     "app.title": "魔法教室 - 小学 LMS",
     "app.subtitle": "小学在线教育云平台",
     "nav.home": "首页",
@@ -1424,6 +1436,10 @@ const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     "student.dropSending": "⏳ 正在发送你的作业..."
   },
   "ja": {
+    "STATUS.OPERATIONAL": "稼働中",
+    "STATUS.DEGRADED": "性能低下 (DB障害)",
+    "STATUS.OFFLINE": "オフライン",
+    "STATUS.Operativo": "稼働中",
     "app.title": "魔法の教室 - 小学校 LMS",
     "app.subtitle": "小学校向けバーチャル学習プラットフォーム",
     "nav.home": "ホーム",
@@ -1892,6 +1908,10 @@ const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     "student.dropSending": "⏳ 宿題を送信中..."
   },
   "pt": {
+    "STATUS.OPERATIONAL": "Operacional",
+    "STATUS.DEGRADED": "Degradado (Falha no BD)",
+    "STATUS.OFFLINE": "Desconectado",
+    "STATUS.Operativo": "Operacional",
     "app.title": "Sala Mágica - LMS Primário",
     "app.subtitle": "Plataforma Virtual do Ensino Fundamental",
     "nav.home": "Início",
@@ -2363,6 +2383,20 @@ const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
 
 // Diccionario de frases exactas de la interfaz y componentes
 const PHRASES: Record<string, Record<SupportedLanguage, string>> = {
+  "Operativo": {
+    "es": "Operativo",
+    "en": "Operational",
+    "zh": "正常运行",
+    "ja": "稼働中",
+    "pt": "Operacional"
+  },
+  "Degradado (Fallo BD)": {
+    "es": "Degradado (Fallo BD)",
+    "en": "Degraded (DB Failure)",
+    "zh": "降级运行 (数据库故障)",
+    "ja": "性能低下 (DB障害)",
+    "pt": "Degradado (Falha no BD)"
+  },
   "LMS Primaria": {
     "es": "LMS Primaria",
     "en": "Primary LMS",

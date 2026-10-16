@@ -141,6 +141,14 @@ export class AdminDashboardComponent implements OnInit {
     });
   }
 
+  public getSystemStatusKey(status?: string): string {
+    if (!status) return 'STATUS.OPERATIONAL';
+    const s = status.toLowerCase();
+    if (s.includes('degradad') || s.includes('fallo')) return 'STATUS.DEGRADED';
+    if (s.includes('offline') || s.includes('desconectad')) return 'STATUS.OFFLINE';
+    return 'STATUS.OPERATIONAL';
+  }
+
   // --- Usuarios CRUD ---
   public loadUsers(): void {
     this.isLoadingUsers = true;
