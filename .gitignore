@@ -21,3 +21,26 @@ logs/
 # Node & Frontend
 node_modules/
 .angular/
+dist/
+frontend/dist/
+wwwroot/
+backend/LMS.API/wwwroot/
+
+# Compiled frontend bundle prevention in root
+/chunk-*.js
+/main-*.js
+/polyfills-*.js
+/styles-*.css
+/ngsw-worker.js
+/ngsw.json
+/safety-worker.js
+/service-worker.js
+/worker-basic.min.js
+/manifest.webmanifest
+/manifest.json
+/.nojekyll
+/index.html
+/404.html
+/icons/
+/assets/
+

@@ -104,7 +104,7 @@ Write-Host "  -> Found task in student dashboard: Title='$($studentTask.title)',
 # Student uploads assignment delivery (Multipart/form-data with .pdf)
 Write-Host "`n4. Testing Student Assignment Delivery..."
 $boundary = [System.Guid]::NewGuid().ToString()
-$filePath = "C:\Users\SNEIDER\Documents\LMS\backend\test_upload.pdf"
+$filePath = Join-Path $PSScriptRoot "test_upload.pdf"
 [System.IO.File]::WriteAllText($filePath, "%PDF-1.4`r`n%Dummy content for testing submission delivery`r`n%%EOF")
 
 $fileBytes = [System.IO.File]::ReadAllBytes($filePath)
@@ -138,6 +138,9 @@ $uploadParams = @{
 
 $uploadRes = Invoke-RestMethod @uploadParams
 Write-Host "  -> Student uploaded PDF delivery: $($uploadRes.message)"
+
+# Clean up temp file
+if (Test-Path $filePath) { Remove-Item $filePath -Force }
 
 # Teacher grades the submission
 $submissionsAfter = Call-Api -Method "GET" -Url "http://localhost:5000/api/teacher/submissions/$($contentRes.realId)" -Token $teacherToken
