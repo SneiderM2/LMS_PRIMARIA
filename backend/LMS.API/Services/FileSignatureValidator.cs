@@ -100,7 +100,8 @@ public static class FileSignatureValidator
             return fallback;
         }
 
-        var name = Path.GetFileName(fileName.Trim());
+        var raw = fileName.Trim().Replace('\\', '/');
+        var name = Path.GetFileName(raw);
         var cleaned = new string(name.Where(c => !char.IsControl(c)).ToArray()).Trim();
         cleaned = cleaned.Replace('/', '_').Replace('\\', '_');
 

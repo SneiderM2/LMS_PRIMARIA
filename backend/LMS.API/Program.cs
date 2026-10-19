@@ -88,7 +88,7 @@ var jwtSecretKey = FirstNonEmpty(
 
 if (string.IsNullOrWhiteSpace(jwtSecretKey)
     || jwtSecretKey.Length < 48
-    || jwtSecretKey.Contains("SuperSecretKey2026", StringComparison.OrdinalIgnoreCase))
+    || jwtSecretKey.Contains("SuperSecretKey", StringComparison.OrdinalIgnoreCase))
 {
     throw new InvalidOperationException(
         "Jwt:SecretKey es obligatorio, debe tener al menos 48 caracteres y no puede ser un valor " +
