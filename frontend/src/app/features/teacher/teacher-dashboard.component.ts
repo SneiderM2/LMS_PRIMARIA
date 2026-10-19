@@ -7,6 +7,7 @@ import { StudentStatus, SemaforoSummaryMetrics } from '../../core/models/semafor
 import { CreateContent, StudentSubmission } from '../../core/models/content.model';
 import { Course, TeacherStudent } from '../../core/models/user.model';
 import { ReportExportService } from '../../core/services/report-export.service';
+import { FileDownloadService } from '../../core/services/file-download.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { LanguageSelectorComponent } from '../../shared/components/language-selector/language-selector.component';
 
@@ -123,7 +124,8 @@ export class TeacherDashboardComponent implements OnInit {
   constructor(
     public authService: AuthService,
     private teacherService: TeacherService,
-    private reportService: ReportExportService
+    private reportService: ReportExportService,
+    private fileDownload: FileDownloadService
   ) {}
 
   ngOnInit(): void {
@@ -132,6 +134,17 @@ export class TeacherDashboardComponent implements OnInit {
     this.loadCourses();
     this.loadAllStudents();
     this.loadSemaforoData();
+  }
+
+  /**
+   * Descarga autenticada de la entrega (el endpoint /api/files exige JWT).
+   */
+  public downloadSubmission(submission: StudentSubmission): void {
+    if (!submission?.fileUrl) {
+      return;
+    }
+
+    this.fileDownload.save(submission.fileUrl, submission.originalFileName || 'entrega');
   }
 
   public switchTab(tab: 'activities' | 'semaforo' | 'students'): void {
@@ -568,19 +581,30 @@ export class TeacherDashboardComponent implements OnInit {
       return;
     }
 
+    const password = this.newStudent.password.trim();
+    if (password.length > 0 && password.length < 12) {
+      this.createStudentError = 'La contraseña debe tener al menos 12 caracteres, con letras y números.';
+      return;
+    }
+
     this.isCreatingStudent = true;
     this.createStudentError = null;
 
     this.teacherService.createStudent({
       username: this.newStudent.username.trim(),
       fullName: this.newStudent.fullName.trim(),
-      password: this.newStudent.password.trim() || '123456',
+      password,
       grade: this.newStudent.grade
     }).subscribe({
       next: (created) => {
         this.isCreatingStudent = false;
         this.showCreateStudentModal = false;
-        this.showToast(`¡Alumno ${created.fullName} registrado con éxito! 🎓`, 'success');
+
+        const message = created.temporaryPassword
+          ? `Alumno ${created.fullName} registrado. Contraseña temporal: ${created.temporaryPassword} — entrégala al acudiente.`
+          : `¡Alumno ${created.fullName} registrado con éxito! 🎓`;
+
+        this.showToast(message, 'success');
         this.loadAllStudents();
         this.loadAcademicMetrics();
       },

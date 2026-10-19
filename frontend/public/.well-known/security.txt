@@ -1,0 +1,6 @@
+Contact: mailto:seguridad@lmsprimaria.edu.co
+Expires: 2027-10-19T00:00:00.000Z
+Preferred-Languages: es, en
+Canonical: https://sneiderm2.github.io/LMS_PRIMARIA/.well-known/security.txt
+Policy: https://sneiderm2.github.io/LMS_PRIMARIA/privacidad.html
+Acknowledgments: https://sneiderm2.github.io/LMS_PRIMARIA/

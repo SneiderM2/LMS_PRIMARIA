@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using System.Text;
+using System.Text.RegularExpressions;
 using LMS.API.Data;
 using LMS.API.DTOs;
 using LMS.API.Entities;
 using LMS.API.Middleware;
+using LMS.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -18,12 +20,18 @@ public class AdminController : ControllerBase
     private readonly LMSDbContext _context;
     private readonly ILogger<AdminController> _logger;
     private readonly IWebHostEnvironment _env;
+    private readonly IConfiguration _configuration;
 
-    public AdminController(LMSDbContext context, ILogger<AdminController> logger, IWebHostEnvironment env)
+    public AdminController(
+        LMSDbContext context,
+        ILogger<AdminController> logger,
+        IWebHostEnvironment env,
+        IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
         _env = env;
+        _configuration = configuration;
     }
 
     [HttpGet("metrics")]
@@ -95,6 +103,7 @@ public class AdminController : ControllerBase
             .Include(u => u.Rol)
             .Include(u => u.Alumno)
                 .ThenInclude(a => a!.Grado)
+            .Where(u => u.AnonymizedAt == null)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(role) && !role.Equals("ALL", StringComparison.OrdinalIgnoreCase))
@@ -170,7 +179,24 @@ public class AdminController : ControllerBase
 
         if (rol == null) return BadRequest(new { message = "No se encontró el rol en el sistema." });
 
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword(string.IsNullOrWhiteSpace(dto.Password) ? "123456" : dto.Password);
+        var password = dto.Password?.Trim();
+        var generatedPassword = false;
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            password = PasswordPolicy.GenerateTemporaryPassword();
+            generatedPassword = true;
+        }
+        else
+        {
+            var passwordCheck = PasswordPolicy.Validate(password, cleanUsername, $"{dto.Nombre} {dto.Apellido}");
+            if (!passwordCheck.IsValid)
+            {
+                return BadRequest(new { code = "WEAK_PASSWORD", message = passwordCheck.Message });
+            }
+        }
+
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
         var avatarUrl = $"https://api.dicebear.com/7.x/bottts/svg?seed={Uri.EscapeDataString(cleanUsername)}";
 
         var usuario = new Usuario
@@ -215,7 +241,8 @@ public class AdminController : ControllerBase
             GradeLevel = gradeResult,
             Activo = usuario.Activo,
             AvatarUrl = usuario.AvatarUrl,
-            FechaCreacion = usuario.FechaCreacion
+            FechaCreacion = usuario.FechaCreacion,
+            TemporaryPassword = generatedPassword ? password : null
         };
 
         return CreatedAtAction(nameof(GetUsers), new { id = usuario.Id }, result);
@@ -229,6 +256,7 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateAdminUserDto dto)
     {
         var usuario = await _context.Usuarios
+            .Include(u => u.Rol)
             .Include(u => u.Alumno)
             .FirstOrDefaultAsync(u => u.Id == id);
 
@@ -239,14 +267,55 @@ public class AdminController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(dto.Password))
         {
-            usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            var passwordCheck = PasswordPolicy.Validate(dto.Password, usuario.Username, usuario.FullName);
+            if (!passwordCheck.IsValid)
+            {
+                return BadRequest(new { code = "WEAK_PASSWORD", message = passwordCheck.Message });
+            }
+
+            usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, workFactor: 12);
+
+            // Al cambiar la contraseña se invalidan las sesiones activas del usuario.
+            usuario.SessionToken = null;
+            usuario.AccessFailedCount = 0;
+            usuario.LockoutEnd = null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Role))
+        {
+            var roleName = dto.Role.Trim().ToUpperInvariant();
+            var targetRoleName = roleName.Contains("ADMIN")
+                ? "ADMINISTRADOR"
+                : roleName.Contains("DOCENTE") || roleName.Contains("TEACHER")
+                    ? "DOCENTE"
+                    : "ALUMNO";
+
+            var targetRole = await _context.Roles.FirstOrDefaultAsync(r => r.Nombre == targetRoleName);
+            if (targetRole == null)
+            {
+                return BadRequest(new { message = "El rol solicitado no existe." });
+            }
+
+            var currentlyAdmin = IsAdminRole(usuario.Rol?.Nombre);
+            if (currentlyAdmin && targetRoleName != "ADMINISTRADOR")
+            {
+                var activeAdmins = await _context.Usuarios
+                    .CountAsync(u => u.Activo && (u.Rol.Nombre == "ADMINISTRADOR" || u.Rol.Nombre == ".admin"));
+
+                if (activeAdmins <= 1)
+                {
+                    return BadRequest(new { message = "No es posible retirar el rol al último administrador activo." });
+                }
+            }
+
+            usuario.RolId = targetRole.Id;
         }
 
         // Actualizar grado de alumno si aplica
         if (usuario.Alumno != null && !string.IsNullOrWhiteSpace(dto.GradeLevel))
         {
             var rawGrade = dto.GradeLevel.Trim();
-            var gradeKey = rawGrade.Contains('°') ? rawGrade.Substring(0, rawGrade.IndexOf('°') + 1) : rawGrade;
+            var gradeKey = rawGrade.Contains('°') ? rawGrade[..(rawGrade.IndexOf('°') + 1)] : rawGrade;
             var grado = await _context.Grados.FirstOrDefaultAsync(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
             if (grado != null)
             {
@@ -256,6 +325,8 @@ public class AdminController : ControllerBase
 
         await _context.SaveChangesAsync();
         _logger.LogInformation("Usuario ID {Id} actualizado por administrador {Admin}", id, User.Identity?.Name);
+        await AuditAsync("Administración: Actualización de usuario",
+            $"Usuario {usuario.Username} (ID {usuario.Id}) actualizado. Cambio de contraseña: {!string.IsNullOrWhiteSpace(dto.Password)}.");
 
         return Ok(new { message = "Usuario actualizado exitosamente." });
     }
@@ -459,6 +530,9 @@ public class AdminController : ControllerBase
             sqlBuilder.AppendLine("-- LMS PRIMARIA - RESPALDO / BACKUP DE BASE DE DATOS");
             sqlBuilder.AppendLine($"-- FECHA DE EXTRACCIÓN (UTC): {timestamp:yyyy-MM-dd HH:mm:ss} UTC");
             sqlBuilder.AppendLine("-- MOTOR DE BASE DE DATOS: PostgreSQL (Supabase Cloud)");
+            sqlBuilder.AppendLine("-- ADVERTENCIA: este archivo contiene DATOS PERSONALES de menores de edad");
+            sqlBuilder.AppendLine("-- y hashes de contraseñas. Almacénelo cifrado, con acceso restringido y");
+            sqlBuilder.AppendLine("-- elimínelo según la política de retención (Ley 1581 de 2012, art. 17).");
             sqlBuilder.AppendLine("-- ====================================================================");
             sqlBuilder.AppendLine();
             sqlBuilder.AppendLine("SET statement_timeout = 0;");
@@ -548,6 +622,10 @@ public class AdminController : ControllerBase
 
             Response.Headers.Append("Content-Disposition", $"attachment; filename=\"{fileName}\"");
             Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+            Response.Headers.CacheControl = "no-store, no-cache, must-revalidate, private";
+
+            await AuditAsync("Administración: Descarga de respaldo de base de datos",
+                $"Archivo {fileName} ({sqlBytes.Length} bytes). Contiene datos personales: acceso restringido.");
 
             return File(sqlBytes, "application/sql", fileName);
         }
@@ -558,13 +636,49 @@ public class AdminController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Restauración de respaldo desde la interfaz.
+    /// Deshabilitada por defecto: ejecutar SQL arbitrario desde una carga HTTP es una
+    /// vulnerabilidad de ejecución remota sobre la base de datos (OWASP A03:2021).
+    /// El procedimiento recomendado es scripts/restaurar_backup.ps1 con psql y un rol
+    /// de base de datos de mínimo privilegio. Solo se habilita explícitamente en desarrollo.
+    /// </summary>
     [HttpPost("restore-backup")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> RestoreBackup(IFormFile file)
+    public async Task<IActionResult> RestoreBackup(IFormFile file, [FromForm] string? confirmation)
     {
+        if (!_configuration.GetValue<bool>("Features:EnableDatabaseRestore"))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                allowed = false,
+                message = "La restauración de la base de datos desde la interfaz está deshabilitada por seguridad. " +
+                          "Use el procedimiento documentado en docs/OPERACION_BACKUP.md (psql con un rol de mínimo privilegio)."
+            });
+        }
+
+        if (!_env.IsDevelopment() && !_configuration.GetValue<bool>("Features:AllowRestoreInProduction"))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                allowed = false,
+                message = "La restauración solo está permitida en desarrollo o con Features:AllowRestoreInProduction habilitado."
+            });
+        }
+
+        if (!string.Equals(confirmation?.Trim(), "RESTAURAR", StringComparison.Ordinal))
+        {
+            return BadRequest(new { message = "Debes escribir la palabra RESTAURAR para confirmar la operación." });
+        }
+
         if (file == null || file.Length == 0)
         {
             return BadRequest(new { message = "Debes seleccionar un archivo de copia de seguridad (.sql) válido." });
+        }
+
+        if (file.Length > 5 * 1024 * 1024)
+        {
+            return BadRequest(new { message = "El archivo de restauración no puede superar 5 MB." });
         }
 
         if (!file.FileName.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
@@ -585,6 +699,34 @@ public class AdminController : ControllerBase
                 return BadRequest(new { message = "El archivo SQL proporcionado está vacío." });
             }
 
+            // Bloqueo de sentencias propias de escalamiento o acceso al sistema operativo.
+            var blockedPatterns = new[]
+            {
+                @"\bCOPY\b[\s\S]{0,200}\bPROGRAM\b",
+                @"\bALTER\s+SYSTEM\b",
+                @"\bCREATE\s+(ROLE|USER)\b",
+                @"\bDROP\s+(DATABASE|ROLE)\b",
+                @"\bpg_read_file\b",
+                @"\bpg_ls_dir\b",
+                @"\blo_import\b",
+                @"\blo_export\b",
+                @"\bdblink\b"
+            };
+
+            foreach (var pattern in blockedPatterns)
+            {
+                if (Regex.IsMatch(sqlContent, pattern, RegexOptions.IgnoreCase))
+                {
+                    _logger.LogWarning("Restauración rechazada: el script contiene una sentencia bloqueada ({Pattern}).", pattern);
+                    await AuditAsync("Administración: Restauración rechazada", $"Sentencia bloqueada detectada: {pattern}", "WARNING");
+
+                    return BadRequest(new
+                    {
+                        message = "El script contiene sentencias no permitidas por la política de seguridad."
+                    });
+                }
+            }
+
             var conn = _context.Database.GetDbConnection();
             if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
 
@@ -593,6 +735,9 @@ public class AdminController : ControllerBase
             cmd.CommandText = sqlContent;
 
             await cmd.ExecuteNonQueryAsync();
+
+            await AuditAsync("Administración: Restauración de base de datos",
+                $"Archivo {file.FileName} ejecutado en entorno {_env.EnvironmentName}.", "WARNING");
 
             return Ok(new
             {
@@ -606,10 +751,66 @@ public class AdminController : ControllerBase
             _logger.LogError(ex, "Error al ejecutar la restauración del archivo SQL.");
             return StatusCode(StatusCodes.Status500InternalServerError, new
             {
-                message = "Ocurrió un error al ejecutar el script de restauración en PostgreSQL.",
-                detail = ex.Message
+                message = "Ocurrió un error al ejecutar el script de restauración en PostgreSQL."
             });
         }
+    }
+
+    /// <summary>
+    /// Resumen de cumplimiento para el responsable del tratamiento y auditorías.
+    /// GET: /api/admin/compliance
+    /// </summary>
+    [HttpGet("compliance")]
+    public async Task<IActionResult> GetComplianceSummary()
+    {
+        var policyVersion = _configuration["Privacy:PolicyVersion"] ?? "sin-configurar";
+
+        var totalUsers = await _context.Usuarios.CountAsync();
+        var activeUsers = await _context.Usuarios.CountAsync(u => u.Activo);
+        var consentedUsers = await _context.Usuarios.CountAsync(u => u.DataPolicyAccepted);
+        var currentConsentUsers = await _context.Usuarios
+            .CountAsync(u => u.DataPolicyAccepted && u.DataPolicyVersion == policyVersion);
+        var anonymizedUsers = await _context.Usuarios.CountAsync(u => u.AnonymizedAt != null);
+
+        var defaultAccounts = await _context.Usuarios
+            .Where(u => u.Username == "admin" || u.Username == "docente" || u.Username == "estudiante")
+            .Select(u => u.Username)
+            .ToListAsync();
+
+        var pendingConsent = totalUsers - currentConsentUsers;
+
+        return Ok(new
+        {
+            policyVersion,
+            generatedAt = DateTime.UtcNow,
+            users = new
+            {
+                total = totalUsers,
+                active = activeUsers,
+                anonymized = anonymizedUsers
+            },
+            consent = new
+            {
+                acceptedEver = consentedUsers,
+                acceptedCurrentVersion = currentConsentUsers,
+                pending = pendingConsent,
+                coveragePercentage = totalUsers == 0 ? 100m : Math.Round((decimal)currentConsentUsers / totalUsers * 100m, 1)
+            },
+            warnings = new[]
+            {
+                defaultAccounts.Count > 0
+                    ? $"Existen cuentas con identificadores por defecto: {string.Join(", ", defaultAccounts)}. Rote sus contraseñas."
+                    : null,
+                pendingConsent > 0
+                    ? $"{pendingConsent} usuario(s) no han aceptado la versión vigente de la política."
+                    : null
+            }.Where(w => w != null),
+            audit = new
+            {
+                retentionDays = _configuration.GetValue<int?>("Privacy:LogRetentionDays") ?? 90,
+                location = FileLogger.GetAuditLogPath()
+            }
+        });
     }
 
     /// <summary>
@@ -665,5 +866,37 @@ public class AdminController : ControllerBase
 
         var stream = new FileStream(auditPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         return File(stream, "text/plain", $"app-audit-{DateTime.UtcNow:yyyyMMdd-HHmm}.log");
+    }
+
+    private static bool IsAdminRole(string? roleName)
+        => roleName is not null
+           && (roleName.Equals("ADMINISTRADOR", StringComparison.OrdinalIgnoreCase)
+               || roleName.Equals(".admin", StringComparison.OrdinalIgnoreCase)
+               || roleName.Equals("Admin", StringComparison.OrdinalIgnoreCase));
+
+    private async Task AuditAsync(string action, string? details = null, string level = "AUDIT")
+    {
+        try
+        {
+            await FileLogger.WriteAuditAsync(new AuditLogEntry
+            {
+                Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                Level = level,
+                Method = HttpContext.Request.Method,
+                Path = HttpContext.Request.Path.ToString(),
+                StatusCode = HttpContext.Response.StatusCode,
+                ElapsedMs = 0,
+                Ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0",
+                UserId = User.Identity?.Name,
+                UserEmail = User.Identity?.Name?.Contains('@') == true ? User.Identity.Name : null,
+                UserRole = User.FindFirstValue(ClaimTypes.Role),
+                Action = action,
+                Details = details
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No fue posible registrar la auditoría administrativa.");
+        }
     }
 }

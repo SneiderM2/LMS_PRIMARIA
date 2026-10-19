@@ -8,17 +8,19 @@ import { SessionWarningModalComponent } from './shared/components/session-warnin
 import { AuthService } from './core/services/auth.service';
 import { SessionTimeoutService } from './core/services/session-timeout.service';
 import { ServerStatusService } from './core/services/server-status.service';
+import { ConsentPayload } from './core/models/user.model';
 import { TranslatePipe } from './shared/pipes/translate.pipe';
+import { environment } from '../environments/environment';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [
     CommonModule,
-    RouterOutlet, 
-    ThemeToggleComponent, 
+    RouterOutlet,
+    ThemeToggleComponent,
     LanguageSelectorComponent,
-    DataPolicyModalComponent, 
+    DataPolicyModalComponent,
     SessionWarningModalComponent,
     TranslatePipe
   ],
@@ -27,6 +29,8 @@ import { TranslatePipe } from './shared/pipes/translate.pipe';
 export class AppComponent implements OnInit {
   title = 'lms-primaria-frontend';
 
+  public policySubmitting = false;
+
   constructor(
     public authService: AuthService,
     public serverStatus: ServerStatusService,
@@ -34,7 +38,6 @@ export class AppComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Si el usuario ya está autenticado al cargar o refrescar la aplicación, iniciar monitoreo de inactividad
     if (this.authService.isAuthenticated()) {
       this.sessionTimeoutService.startMonitoring();
     }
@@ -42,15 +45,38 @@ export class AppComponent implements OnInit {
 
   public get showPolicyModal(): boolean {
     const user = this.authService.currentUser();
-    return !!user && user.dataPolicyAccepted === false;
+    if (!user) {
+      return false;
+    }
+
+    return user.dataPolicyAccepted === false || user.requiresPolicyAcceptance === true;
   }
 
-  public onPolicyAccepted(): void {
-    this.authService.acceptDataPolicy().subscribe({
+  public get requiresGuardian(): boolean {
+    const role = this.authService.currentUser()?.role;
+    return role === 'Student';
+  }
+
+  public get policyVersion(): string {
+    return environment.dataPolicyVersion;
+  }
+
+  public get policyUrl(): string {
+    return environment.dataPolicyUrl;
+  }
+
+  public onPolicyAccepted(payload: ConsentPayload): void {
+    this.policySubmitting = true;
+
+    this.authService.acceptDataPolicy(payload).subscribe({
       next: () => {
+        this.policySubmitting = false;
         this.sessionTimeoutService.startMonitoring();
       },
-      error: (err) => console.error('Error al registrar consentimiento:', err)
+      error: (err) => {
+        this.policySubmitting = false;
+        console.error('Error al registrar consentimiento:', err);
+      }
     });
   }
 }

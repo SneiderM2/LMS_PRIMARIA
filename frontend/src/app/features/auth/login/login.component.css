@@ -559,3 +559,53 @@
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.35; transform: scale(0.8); }
 }
+
+/* =========================================================
+   Cumplimiento Ley 1581 de 2012: contraseñas y consentimiento
+   ========================================================= */
+.field-hint {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.76rem;
+  color: var(--text-muted, #64748b);
+}
+
+.guardian-register-box {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.guardian-register-box .section-label {
+  color: #92400e;
+  margin-bottom: 0.5rem;
+}
+
+.policy-check-register {
+  margin: 0.5rem 0 1rem;
+  font-size: 0.84rem;
+}
+
+.policy-check-inline {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  cursor: pointer;
+  line-height: 1.45;
+}
+
+.policy-check-inline input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  accent-color: #0284c7;
+}
+
+.policy-link-inline {
+  color: #1d4ed8;
+  font-weight: 700;
+  text-decoration: underline;
+}

@@ -597,9 +597,9 @@
 
             <div class="submission-file-row">
               <span class="submitted-date">{{ 'teacher.submittedAt' | translate }} {{ sub.submittedAt | date:'dd/MM/yyyy, hh:mm a' }}</span>
-              <a *ngIf="sub.fileUrl" [href]="sub.fileUrl" target="_blank" class="btn-download-file">
+              <button *ngIf="sub.fileUrl" type="button" class="btn-download-file" (click)="downloadSubmission(sub)">
                 {{ 'teacher.download' | translate }} <strong>{{ sub.originalFileName }}</strong>
-              </a>
+              </button>
             </div>
 
             <!-- Feedback y Calificación Existente -->
@@ -817,7 +817,9 @@
             </div>
             <div class="form-group col">
               <label>{{ 'teacher.studentPassLabel' | translate }}</label>
-              <input type="password" [(ngModel)]="newStudent.password" name="sPass" class="form-input" placeholder="123456" />
+              <input type="password" [(ngModel)]="newStudent.password" name="sPass" class="form-input"
+                minlength="12" maxlength="128" placeholder="Mínimo 12 caracteres (opcional)"
+                autocomplete="new-password" />
             </div>
           </div>
           <div class="modal-actions">

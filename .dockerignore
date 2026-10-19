@@ -1,0 +1,19 @@
+# Contexto mínimo para la imagen: nunca copiar secretos ni artefactos locales
+.git
+.gitignore
+.github
+.vscode
+docs
+scripts
+database
+**/bin
+**/obj
+**/node_modules
+**/.angular
+frontend/dist
+frontend/node_modules
+backend/LMS.API/appsettings.Local.json
+backend/LMS.API/App_Data
+**/logs
+*.md
+*.log

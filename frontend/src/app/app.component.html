@@ -14,10 +14,15 @@
 <app-language-selector></app-language-selector>
 <app-theme-toggle></app-theme-toggle>
 
-<!-- Modal Obligatorio de Política de Tratamiento de Datos Personales (Sprint 4) -->
-<app-data-policy-modal 
-  [visible]="showPolicyModal" 
-  (accepted)="onPolicyAccepted()">
+<!-- Modal Obligatorio de Política de Tratamiento de Datos Personales (Ley 1581 de 2012) -->
+<app-data-policy-modal
+  [visible]="showPolicyModal"
+  [userRole]="authService.currentUser()?.role || null"
+  [policyVersion]="policyVersion"
+  [policyUrl]="policyUrl"
+  [requiresGuardian]="requiresGuardian"
+  [submitting]="policySubmitting"
+  (accepted)="onPolicyAccepted($event)">
 </app-data-policy-modal>
 
 <!-- Modal de Advertencia por Inactividad de Sesión (2.5 min aviso / 5 min cierre) -->

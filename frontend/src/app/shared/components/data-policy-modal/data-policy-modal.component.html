@@ -1,11 +1,14 @@
-<div class="policy-backdrop" *ngIf="visible">
+<div class="policy-backdrop" *ngIf="visible" role="dialog" aria-modal="true" aria-labelledby="policy-title">
   <div class="policy-card animate-pop">
     <div class="policy-header">
-      <div class="policy-badge">
+      <div class="policy-badge" aria-hidden="true">
         <span class="policy-icon">📜</span>
       </div>
-      <h2 class="policy-title">{{ 'policy.title' | translate }}</h2>
+      <h2 id="policy-title" class="policy-title">{{ 'policy.title' | translate }}</h2>
       <p class="policy-subtitle">{{ 'policy.subtitle' | translate }}</p>
+      <p class="policy-version">
+        Versión {{ policyVersion }} · Ley 1581 de 2012 y Decreto 1074 de 2015
+      </p>
     </div>
 
     <div class="policy-body">
@@ -15,7 +18,7 @@
 
       <div class="policy-clauses">
         <div class="clause-item">
-          <span class="clause-icon">🎯</span>
+          <span class="clause-icon" aria-hidden="true">🎯</span>
           <div class="clause-text">
             <strong>{{ 'policy.clause1Title' | translate }}</strong>
             <p>{{ 'policy.clause1Desc' | translate }}</p>
@@ -23,7 +26,7 @@
         </div>
 
         <div class="clause-item">
-          <span class="clause-icon">🛡️</span>
+          <span class="clause-icon" aria-hidden="true">🛡️</span>
           <div class="clause-text">
             <strong>{{ 'policy.clause2Title' | translate }}</strong>
             <p>{{ 'policy.clause2Desc' | translate }}</p>
@@ -31,7 +34,7 @@
         </div>
 
         <div class="clause-item">
-          <span class="clause-icon">🚫</span>
+          <span class="clause-icon" aria-hidden="true">🚫</span>
           <div class="clause-text">
             <strong>{{ 'policy.clause3Title' | translate }}</strong>
             <p>{{ 'policy.clause3Desc' | translate }}</p>
@@ -39,7 +42,7 @@
         </div>
 
         <div class="clause-item">
-          <span class="clause-icon">📝</span>
+          <span class="clause-icon" aria-hidden="true">📝</span>
           <div class="clause-text">
             <strong>{{ 'policy.clause4Title' | translate }}</strong>
             <p>{{ 'policy.clause4Desc' | translate }}</p>
@@ -47,9 +50,59 @@
         </div>
       </div>
 
+      <div class="policy-rights">
+        <strong>Tus derechos como titular</strong>
+        <ul>
+          <li>Conocer, actualizar y rectificar tus datos personales.</li>
+          <li>Solicitar prueba de la autorización y ser informado sobre su uso.</li>
+          <li>Presentar quejas ante la SIC o solicitar la supresión cuando proceda.</li>
+          <li>Revocar la autorización para finalidades no esenciales y descargar una copia de tus datos.</li>
+        </ul>
+        <a [href]="policyUrl" target="_blank" rel="noopener noreferrer" class="policy-link">
+          Leer la política completa y el aviso de privacidad
+        </a>
+      </div>
+
+      <div class="guardian-box" *ngIf="requiresGuardian">
+        <strong>Autorización del acudiente (menor de edad)</strong>
+        <p>
+          Por tratarse de un estudiante menor de edad, la autorización debe otorgarla su
+          padre, madre o representante legal (Ley 1581 de 2012, art. 7; Ley 1098 de 2006).
+        </p>
+
+        <label class="guardian-label" for="guardianName">Nombre completo del acudiente</label>
+        <input
+          id="guardianName"
+          type="text"
+          class="form-input guardian-input"
+          [(ngModel)]="guardianFullName"
+          name="guardianFullName"
+          maxlength="150"
+          autocomplete="name"
+          placeholder="Nombres y apellidos del acudiente" />
+
+        <label class="guardian-label" for="guardianDocument">Documento del acudiente (opcional)</label>
+        <input
+          id="guardianDocument"
+          type="text"
+          class="form-input guardian-input"
+          [(ngModel)]="guardianDocument"
+          name="guardianDocument"
+          maxlength="30"
+          inputmode="numeric"
+          placeholder="Se almacena enmascarado" />
+
+        <label class="guardian-check">
+          <input type="checkbox" [(ngModel)]="guardianAuthorization" name="guardianAuthorization" />
+          <span>Declaro ser el padre, madre o acudiente y autorizo el tratamiento de los datos del menor.</span>
+        </label>
+      </div>
+
+      <p class="policy-error" role="alert" *ngIf="errorMessage">{{ errorMessage }}</p>
+
       <div class="consent-box">
         <label class="consent-checkbox-label">
-          <input type="checkbox" [(ngModel)]="consentGiven" [disabled]="isSubmitting" />
+          <input type="checkbox" [(ngModel)]="consentGiven" [disabled]="submitting" name="consentGiven" />
           <span class="consent-text">
             {{ 'policy.consentText' | translate }}
           </span>
@@ -58,13 +111,13 @@
     </div>
 
     <div class="policy-footer">
-      <button 
-        type="button" 
-        class="btn-accept" 
-        [disabled]="!consentGiven || isSubmitting" 
+      <button
+        type="button"
+        class="btn-accept"
+        [disabled]="!consentGiven || submitting"
         (click)="onAccept()">
-        <span *ngIf="!isSubmitting">{{ 'policy.btnAccept' | translate }}</span>
-        <span *ngIf="isSubmitting">{{ 'policy.btnSaving' | translate }}</span>
+        <span *ngIf="!submitting">{{ 'policy.btnAccept' | translate }}</span>
+        <span *ngIf="submitting">{{ 'policy.btnSaving' | translate }}</span>
       </button>
     </div>
   </div>

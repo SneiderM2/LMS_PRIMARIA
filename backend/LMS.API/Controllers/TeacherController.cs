@@ -5,6 +5,7 @@ using LMS.API.Entities;
 using LMS.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace LMS.API.Controllers;
@@ -26,6 +27,47 @@ public class TeacherController : ControllerBase
         _context = context;
         _semaforoService = semaforoService;
         _fileStorage = fileStorage;
+    }
+
+    /// <summary>
+    /// Usuario autenticado con su rol (para validar pertenencia de cursos y evitar IDOR).
+    /// </summary>
+    private async Task<Usuario?> GetCurrentUserAsync()
+    {
+        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return null;
+        }
+
+        return await _context.Usuarios
+            .Include(u => u.Rol)
+            .FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
+    }
+
+    private static bool IsAdmin(string? roleName)
+        => roleName is not null
+           && (roleName.Equals("ADMINISTRADOR", StringComparison.OrdinalIgnoreCase)
+               || roleName.Equals(".admin", StringComparison.OrdinalIgnoreCase)
+               || roleName.Equals("Admin", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Un docente solo puede gestionar cursos que tiene asignados; un administrador, cualquiera.
+    /// </summary>
+    private async Task<bool> CanManageCourseAsync(int courseId)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null)
+        {
+            return false;
+        }
+
+        if (IsAdmin(user.Rol?.Nombre))
+        {
+            return true;
+        }
+
+        return await _context.Cursos.AnyAsync(c => c.Id == courseId && c.DocenteId == user.Id);
     }
 
     /// <summary>
@@ -119,7 +161,23 @@ public class TeacherController : ControllerBase
             await _context.SaveChangesAsync();
         }
 
-        var password = string.IsNullOrWhiteSpace(dto.Password) ? "123456" : dto.Password.Trim();
+        var password = dto.Password?.Trim();
+        var generatedPassword = false;
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            password = PasswordPolicy.GenerateTemporaryPassword();
+            generatedPassword = true;
+        }
+        else
+        {
+            var passwordCheck = PasswordPolicy.Validate(password, cleanUsername, dto.FullName);
+            if (!passwordCheck.IsValid)
+            {
+                return BadRequest(new { code = "WEAK_PASSWORD", message = passwordCheck.Message });
+            }
+        }
+
         var parts = dto.FullName.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
         var firstName = parts.Length > 0 ? parts[0] : cleanUsername;
         var lastName = parts.Length > 1 ? parts[1] : "";
@@ -128,7 +186,7 @@ public class TeacherController : ControllerBase
         var nuevoUsuario = new Usuario
         {
             Username = cleanUsername,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
             RolId = alumnoRol.Id,
             Nombre = firstName,
             Apellido = lastName,
@@ -156,7 +214,8 @@ public class TeacherController : ControllerBase
             Grade = grado.Nombre,
             AvatarUrl = avatarUrl,
             CreatedAt = nuevoUsuario.FechaCreacion,
-            EnrolledCourses = new List<EnrolledCourseSummaryDto>()
+            EnrolledCourses = new List<EnrolledCourseSummaryDto>(),
+            TemporaryPassword = generatedPassword ? password : null
         };
 
         return CreatedAtAction(nameof(GetAllStudents), new { id = nuevoUsuario.Id }, resultDto);
@@ -175,6 +234,17 @@ public class TeacherController : ControllerBase
         if (curso == null)
         {
             return NotFound(new { message = "El curso o materia especificado no existe." });
+        }
+
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null) return Unauthorized();
+
+        if (!IsAdmin(currentUser.Rol?.Nombre) && curso.DocenteId != currentUser.Id)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "Solo puedes matricular estudiantes en los cursos que tienes asignados."
+            });
         }
 
         // Buscar alumno por ID numérico o por username (carnet)
@@ -576,15 +646,30 @@ public class TeacherController : ControllerBase
     /// </summary>
     [HttpPost("upload-resource")]
     [Consumes("multipart/form-data")]
+    [EnableRateLimiting("uploads")]
     public async Task<IActionResult> UploadResource(IFormFile file)
     {
-        var (success, fileUrl, originalName, error) = await _fileStorage.SaveFileAsync(file, "resources");
-        if (!success)
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null) return Unauthorized();
+
+        var stored = await _fileStorage.SaveFileAsync(
+            file,
+            "resources",
+            currentUser.Id,
+            currentUser.Rol?.Nombre ?? "DOCENTE");
+
+        if (!stored.Success)
         {
-            return BadRequest(new { message = error });
+            return BadRequest(new { message = stored.ErrorMessage });
         }
 
-        return Ok(new { fileUrl, originalName });
+        return Ok(new
+        {
+            fileUrl = stored.Url,
+            originalName = stored.OriginalName,
+            sha256 = stored.Sha256,
+            size = stored.Size
+        });
     }
 
     /// <summary>
@@ -594,16 +679,27 @@ public class TeacherController : ControllerBase
     [ProducesResponseType(typeof(List<StudentSubmissionDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAssignmentSubmissions(string assignmentId)
     {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null) return Unauthorized();
+
+        if (!int.TryParse(assignmentId, out var taskId) || taskId <= 0)
+        {
+            return BadRequest(new { message = "Identificador de tarea no válido." });
+        }
+
         var query = _context.Entregas
             .Include(e => e.Alumno)
                 .ThenInclude(a => a.Usuario)
             .Include(e => e.Archivos)
             .Include(e => e.Tarea)
+                .ThenInclude(t => t.Curso)
+            .Where(e => e.TareaId == taskId)
             .AsQueryable();
 
-        if (int.TryParse(assignmentId, out var taskId) && taskId > 0)
+        if (!IsAdmin(currentUser.Rol?.Nombre))
         {
-            query = query.Where(e => e.TareaId == taskId);
+            // Un docente solo puede consultar entregas de sus propios cursos.
+            query = query.Where(e => e.Tarea.Curso.DocenteId == currentUser.Id);
         }
 
         var submissions = await query
@@ -639,15 +735,35 @@ public class TeacherController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GradeSubmission(int submissionId, [FromBody] GradeSubmissionDto dto)
     {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null) return Unauthorized();
+
         var entrega = await _context.Entregas
             .Include(e => e.Alumno)
                 .ThenInclude(a => a.Usuario)
             .Include(e => e.Tarea)
+                .ThenInclude(t => t.Curso)
             .FirstOrDefaultAsync(e => e.Id == submissionId);
 
         if (entrega == null)
         {
             return NotFound(new { message = "Entrega no encontrada." });
+        }
+
+        if (!IsAdmin(currentUser.Rol?.Nombre) && entrega.Tarea.Curso.DocenteId != currentUser.Id)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "Solo puedes calificar entregas de los cursos que tienes asignados."
+            });
+        }
+
+        if (dto.Grade < 0 || dto.Grade > entrega.Tarea.PuntajeMaximo)
+        {
+            return BadRequest(new
+            {
+                message = $"La nota debe estar entre 0 y {entrega.Tarea.PuntajeMaximo:0.##}."
+            });
         }
 
         entrega.Calificacion = dto.Grade;
@@ -676,6 +792,14 @@ public class TeacherController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UnenrollStudent(int courseId, [FromBody] EnrollStudentDto dto)
     {
+        if (!await CanManageCourseAsync(courseId))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "Solo puedes desmatricular estudiantes de los cursos que tienes asignados."
+            });
+        }
+
         Alumno? alumno = null;
         if (int.TryParse(dto.StudentId, out var parsedId))
         {
@@ -717,6 +841,14 @@ public class TeacherController : ControllerBase
     {
         var curso = await _context.Cursos.FindAsync(courseId);
         if (curso == null) return NotFound(new { message = "Curso no encontrado." });
+
+        if (!await CanManageCourseAsync(courseId))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "Solo puedes editar los cursos que tienes asignados."
+            });
+        }
 
         curso.Nombre = dto.Nombre.Trim();
         curso.Grupo = dto.Grupo.Trim().ToUpperInvariant();
@@ -895,6 +1027,11 @@ public class TeacherController : ControllerBase
             var material = await _context.Materiales.FindAsync(id);
             if (material == null) return NotFound(new { message = "Material no encontrado." });
 
+            if (!await CanManageCourseAsync(material.CursoId))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "No puedes editar materiales de cursos ajenos." });
+            }
+
             material.Titulo = dto.Title.Trim();
             material.Descripcion = dto.Description?.Trim();
             if (!string.IsNullOrWhiteSpace(dto.ResourceUrl))
@@ -908,6 +1045,16 @@ public class TeacherController : ControllerBase
         {
             var tarea = await _context.Tareas.FindAsync(id);
             if (tarea == null) return NotFound(new { message = "Tarea no encontrada." });
+
+            if (!await CanManageCourseAsync(tarea.CursoId))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "No puedes editar tareas de cursos ajenos." });
+            }
+
+            if (dto.MaxScore.HasValue && (dto.MaxScore.Value <= 0 || dto.MaxScore.Value > 1000))
+            {
+                return BadRequest(new { message = "El puntaje máximo debe estar entre 0.01 y 1000." });
+            }
 
             tarea.Titulo = dto.Title.Trim();
             tarea.Descripcion = dto.Description?.Trim();
@@ -933,6 +1080,11 @@ public class TeacherController : ControllerBase
             var material = await _context.Materiales.FindAsync(id);
             if (material == null) return NotFound(new { message = "Material no encontrado." });
 
+            if (!await CanManageCourseAsync(material.CursoId))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "No puedes archivar materiales de cursos ajenos." });
+            }
+
             material.Activo = !material.Activo;
             await _context.SaveChangesAsync();
             return Ok(new { message = material.Activo ? "Material activado." : "Material archivado.", isActive = material.Activo });
@@ -941,6 +1093,11 @@ public class TeacherController : ControllerBase
         {
             var tarea = await _context.Tareas.FindAsync(id);
             if (tarea == null) return NotFound(new { message = "Tarea no encontrada." });
+
+            if (!await CanManageCourseAsync(tarea.CursoId))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "No puedes archivar tareas de cursos ajenos." });
+            }
 
             tarea.Activo = !tarea.Activo;
             await _context.SaveChangesAsync();

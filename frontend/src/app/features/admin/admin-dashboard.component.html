@@ -88,7 +88,7 @@
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
             <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" [title]="'admin.restoreBackup' | translate">
+          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" title="Restauración deshabilitada por seguridad. Use docs/OPERACION_BACKUP.md." [title]="'admin.restoreBackup' | translate">
             <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
           <button class="btn btn-secondary" (click)="goToTeacherView()">
@@ -327,7 +327,7 @@
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
             <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" [title]="'admin.restoreBackup' | translate">
+          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" title="Restauración deshabilitada por seguridad. Use docs/OPERACION_BACKUP.md." [title]="'admin.restoreBackup' | translate">
             <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
         </div>
@@ -467,7 +467,7 @@
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
             <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" [title]="'admin.restoreBackup' | translate">
+          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" title="Restauración deshabilitada por seguridad. Use docs/OPERACION_BACKUP.md." [title]="'admin.restoreBackup' | translate">
             <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
         </div>
@@ -487,7 +487,7 @@
             <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
               <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
             </button>
-            <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isRestoringBackup" [title]="'admin.restoreBackup' | translate">
+            <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" title="Restauración deshabilitada por seguridad. Use docs/OPERACION_BACKUP.md." [title]="'admin.restoreBackup' | translate">
               <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
             </button>
           </div>
@@ -555,7 +555,12 @@
 
           <div class="form-group">
             <label>{{ 'admin.formPassword' | translate }}</label>
-            <input type="password" [(ngModel)]="newUser.password" name="password" class="form-input" [placeholder]="'admin.formPasswordPlaceholder' | translate" />
+            <input type="password" [(ngModel)]="newUser.password" name="password" class="form-input"
+              minlength="12" maxlength="128" autocomplete="new-password"
+              [placeholder]="'admin.formPasswordPlaceholder' | translate" />
+            <small style="display:block; margin-top:0.3rem; font-size:0.76rem; color:#64748b;">
+              Mínimo 12 caracteres con letras y números. Si se deja vacío, el sistema genera una contraseña temporal.
+            </small>
           </div>
 
           <div class="modal-actions">
@@ -605,7 +610,9 @@
 
           <div class="form-group">
             <label>{{ 'admin.formResetPassword' | translate }}</label>
-            <input type="password" [(ngModel)]="editUserForm.password" name="ePass" class="form-input" [placeholder]="'admin.formResetPasswordPlaceholder' | translate" />
+            <input type="password" [(ngModel)]="editUserForm.password" name="ePass" class="form-input"
+              minlength="12" maxlength="128" autocomplete="new-password"
+              [placeholder]="'admin.formResetPasswordPlaceholder' | translate" />
           </div>
 
           <div class="modal-actions">

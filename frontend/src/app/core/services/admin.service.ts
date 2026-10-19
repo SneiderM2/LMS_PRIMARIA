@@ -22,6 +22,7 @@ export interface AdminUser {
   activo: boolean;
   avatarUrl?: string;
   fechaCreacion: string;
+  temporaryPassword?: string | null;
 }
 
 export interface CreateAdminUserDto {

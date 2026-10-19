@@ -1,9 +1,9 @@
 @echo off
-title LMS Primaria - Iniciar Base de Datos y Backend .NET
+title LMS Primaria - Iniciar Backend .NET 8
 color 0B
 
 echo =====================================================================
-echo           [LMS PRIMARIA] - SERVIDOR BACKEND .NET 10
+echo           [LMS PRIMARIA] - SERVIDOR BACKEND .NET 8
 echo =====================================================================
 echo.
 
@@ -14,7 +14,7 @@ if exist "C:\Program Files\dotnet\dotnet.exe" (
 )
 dotnet --version > nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] .NET 10 SDK no esta instalado o no se encuentra en el PATH.
+    echo [ERROR] .NET SDK no esta instalado o no se encuentra en el PATH.
     pause
     exit /b 1
 ) else (
@@ -23,23 +23,23 @@ if %ERRORLEVEL% NEQ 0 (
 )
 echo.
 
-:: 2. Comprobar / Iniciar Servicio MySQL
-echo [2/3] Comprobando servicio de MySQL (MySQL80)...
-net start MySQL80 > nul 2>&1
-if %ERRORLEVEL% EQU 0 (
-    echo [OK] Servicio MySQL 'MySQL80' iniciado y listo.
+:: 2. Verificar configuracion local de secretos
+echo [2/3] Comprobando configuracion local...
+if exist "%~dp0..\backend\LMS.API\appsettings.Local.json" (
+    echo [OK] appsettings.Local.json encontrado.
 ) else (
-    echo [AVISO] Si el servicio ya esta corriendo o requiere permisos de Admin,
-    echo         asegurate de que MySQL este activo en el puerto 3306.
-    echo         Puedes iniciarlo desde MySQL Workbench o el Panel de Servicios de Windows.
+    echo [AVISO] No existe appsettings.Local.json.
+    echo         Copia appsettings.Example.json y completa la cadena de conexion
+    echo         y las claves (ver SETUP_SECRETS.md). Tambien puedes usar variables
+    echo         de entorno: ConnectionStrings__DefaultConnection y Jwt__SecretKey.
 )
 echo.
 
 :: 3. Ejecutar la API
 echo [3/3] Compilando y ejecutando LMS.API...
 echo.
-echo  - API Backend:     http://localhost:5000
-echo  - Scalar API Docs: http://localhost:5000/scalar/v1
+echo  - API Backend:  http://localhost:5000
+echo  - Swagger Docs: http://localhost:5000/swagger  (solo Development)
 echo.
 cd /d "%~dp0..\backend\LMS.API"
 set "ASPNETCORE_ENVIRONMENT=Development"

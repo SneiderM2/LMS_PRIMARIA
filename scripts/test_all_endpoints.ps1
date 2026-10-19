@@ -1,108 +1,177 @@
+#requires -Version 5.1
+<#
+.SYNOPSIS
+    Prueba funcional de extremo a extremo de la API de LMS Primaria (entorno local).
+
+.DESCRIPTION
+    Requiere que el backend esté en ejecución en modo Development con
+    Recaptcha:AllowDevBypass=true (el token DEV_TEST_TOKEN se usa solo en desarrollo).
+
+    Credenciales administrativas:
+      $env:LMS_ADMIN_USER      (por defecto: admin)
+      $env:LMS_ADMIN_PASSWORD  (por defecto: admin123 — cámbiela en producción)
+
+    Código de invitación docente:
+      $env:LMS_TEACHER_INVITE  (por defecto: DOCENTE-LMS-2026)
+#>
+param(
+    [string]$BaseUrl = "http://localhost:5000"
+)
+
 $ErrorActionPreference = 'Stop'
+$base = $BaseUrl.TrimEnd('/')
+
+$adminUser = if ($env:LMS_ADMIN_USER) { $env:LMS_ADMIN_USER } else { "admin" }
+$adminPass = if ($env:LMS_ADMIN_PASSWORD) { $env:LMS_ADMIN_PASSWORD } else { "admin123" }
+$teacherInvite = if ($env:LMS_TEACHER_INVITE) { $env:LMS_TEACHER_INVITE } else { "DOCENTE-LMS-2026" }
+$policyVersion = "2026-10-19"
+
+if (-not $env:LMS_ADMIN_PASSWORD) {
+    Write-Warning "Usando contraseña administrativa por defecto. Defina LMS_ADMIN_PASSWORD para entornos reales."
+}
 
 function Call-Api {
     param(
         [string]$Method,
-        [string]$Url,
-        [string]$Body = $null,
+        [string]$Path,
+        $Body = $null,
         [string]$Token = $null
     )
+
     $headers = @{}
     if ($Token) {
         $headers["Authorization"] = "Bearer $Token"
     }
-    
+
     $params = @{
-        Uri = $Url
-        Method = $Method
+        Uri         = "$base$Path"
+        Method      = $Method
+        Headers     = $headers
         ContentType = "application/json; charset=utf-8"
-        Headers = $headers
-    }
-    if ($Body) {
-        $params["Body"] = [System.Text.Encoding]::UTF8.GetBytes($Body)
     }
 
-    return Invoke-RestMethod @params
+    if ($null -ne $Body) {
+        $params["Body"] = [System.Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 8 -Compress))
+    }
+
+    try {
+        return Invoke-RestMethod @params
+    }
+    catch {
+        $status = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
+        throw "Error HTTP $status en $Method $Path. $($_.ErrorDetails.Message)"
+    }
 }
 
 $suffix = (Get-Random -Minimum 1000 -Maximum 9999).ToString()
 
 Write-Host "========================================="
-Write-Host "1. Testing ADMIN Registration & Endpoints"
+Write-Host "1. Autenticación del ADMINISTRADOR"
 Write-Host "========================================="
-$adminId = "admin_$suffix"
-$adminBody = '{"id":"' + $adminId + '","fullName":"Administrador Auditor","role":"Admin","password":"Password123","captchaToken":"DEV_TEST_TOKEN"}'
-$adminAuth = Call-Api -Method "POST" -Url "http://localhost:5000/api/auth/register" -Body $adminBody
-Write-Host "  -> Admin registered: $($adminAuth.user.fullName) ($($adminAuth.user.id)) [Role: $($adminAuth.user.role)]"
+$adminAuth = Call-Api -Method POST -Path "/api/auth/login" -Body @{
+    id           = $adminUser
+    password     = $adminPass
+    captchaToken = "DEV_TEST_TOKEN"
+}
+Write-Host "  -> Sesión admin iniciada: $($adminAuth.user.fullName) [Rol: $($adminAuth.user.role)]"
 $adminToken = $adminAuth.token
 
-# List Admin Courses
-$courses = Call-Api -Method "GET" -Url "http://localhost:5000/api/admin/courses" -Token $adminToken
-Write-Host "  -> Initial Admin courses count: $($courses.Count)"
+$courses = Call-Api -Method GET -Path "/api/admin/courses" -Token $adminToken
+Write-Host "  -> Cursos iniciales: $($courses.Count)"
 
-# Create a Course via Admin
-$newCourse = '{"nombre":"Robotica y Logica ' + $suffix + '","grupo":"5-B","descripcion":"Taller institucional de algoritmos","grado":"5°"}'
-$createdCourse = Call-Api -Method "POST" -Url "http://localhost:5000/api/admin/courses" -Body $newCourse -Token $adminToken
-Write-Host "  -> Created Admin Course: ID=$($createdCourse.id), Name=$($createdCourse.nombre), Grado=$($createdCourse.grado)"
+$createdCourse = Call-Api -Method POST -Path "/api/admin/courses" -Token $adminToken -Body @{
+    nombre      = "Robotica y Logica $suffix"
+    grupo       = "5-B"
+    descripcion = "Taller institucional de algoritmos"
+    grado       = "5°"
+}
+Write-Host "  -> Curso creado: ID=$($createdCourse.id), Nombre=$($createdCourse.nombre)"
 
-# Update the Course via Admin
-$updateCourse = '{"nombre":"Robotica Avanzada ' + $suffix + '","grupo":"5-B","descripcion":"Actualizado para pruebas","grado":"5°"}'
-$updatedRes = Call-Api -Method "PUT" -Url "http://localhost:5000/api/admin/courses/$($createdCourse.id)" -Body $updateCourse -Token $adminToken
-Write-Host "  -> Course updated successfully: $($updatedRes.message)"
+$updatedRes = Call-Api -Method PUT -Path "/api/admin/courses/$($createdCourse.id)" -Token $adminToken -Body @{
+    nombre      = "Robotica Avanzada $suffix"
+    grupo       = "5-B"
+    descripcion = "Actualizado para pruebas"
+    grado       = "5°"
+}
+Write-Host "  -> Curso actualizado: $($updatedRes.message)"
 
-# Toggle Course Status via Admin
-$toggleRes = Call-Api -Method "PATCH" -Url "http://localhost:5000/api/admin/courses/$($createdCourse.id)/toggle-status" -Token $adminToken
-Write-Host "  -> Course status toggled: $($toggleRes.message) (Activo: $($toggleRes.activo))"
+$toggleRes = Call-Api -Method PATCH -Path "/api/admin/courses/$($createdCourse.id)/toggle-status" -Token $adminToken
+Write-Host "  -> Estado del curso alternado: $($toggleRes.message)"
 
 Write-Host "`n=========================================="
-Write-Host "2. Testing TEACHER Registration & Endpoints"
+Write-Host "2. Registro y endpoints del DOCENTE"
 Write-Host "=========================================="
 $teacherId = "prof_$suffix"
-$teacherBody = '{"id":"' + $teacherId + '","fullName":"Profe Laura Hernandez","role":"Teacher","password":"Password123","captchaToken":"DEV_TEST_TOKEN"}'
-$teacherAuth = Call-Api -Method "POST" -Url "http://localhost:5000/api/auth/register" -Body $teacherBody
-Write-Host "  -> Teacher registered: $($teacherAuth.user.fullName) ($($teacherAuth.user.id)) [Role: $($teacherAuth.user.role)]"
+$teacherAuth = Call-Api -Method POST -Path "/api/auth/register" -Body @{
+    id                   = $teacherId
+    fullName             = "Profe Laura Hernandez"
+    role                 = "Teacher"
+    password             = "DocenteSeguro2026x"
+    teacherInviteCode    = $teacherInvite
+    acceptDataPolicy     = $true
+    dataPolicyVersion    = $policyVersion
+    captchaToken         = "DEV_TEST_TOKEN"
+}
+Write-Host "  -> Docente registrado: $($teacherAuth.user.fullName) [$($teacherAuth.user.role)]"
 $teacherToken = $teacherAuth.token
-
-# Assign this teacher to the course created earlier (using teacher's internal ID)
 $teacherInternalId = $teacherAuth.user.internalId
-$assignBody = '{"nombre":"Robotica Avanzada ' + $suffix + '","grupo":"5-B","descripcion":"Con docente asignado","grado":"5°","docenteId":' + $teacherInternalId + '}'
-$assignRes = Call-Api -Method "PUT" -Url "http://localhost:5000/api/admin/courses/$($createdCourse.id)" -Body $assignBody -Token $adminToken
-Write-Host "  -> Teacher assigned to course via Admin: $($assignRes.message)"
 
-# Reactivate course so it shows on dashboards
-$toggleBack = Call-Api -Method "PATCH" -Url "http://localhost:5000/api/admin/courses/$($createdCourse.id)/toggle-status" -Token $adminToken
-Write-Host "  -> Course reactivated: $($toggleBack.activo)"
+$assignRes = Call-Api -Method PUT -Path "/api/admin/courses/$($createdCourse.id)" -Token $adminToken -Body @{
+    nombre      = "Robotica Avanzada $suffix"
+    grupo       = "5-B"
+    descripcion = "Con docente asignado"
+    grado       = "5°"
+    docenteId   = $teacherInternalId
+}
+Write-Host "  -> Docente asignado al curso: $($assignRes.message)"
 
-# Teacher creates educational activity/content (TASK)
-$contentBody = '{"title":"Reto 1: Introduccion a Variables","description":"Crear programa de saludo","type":"Assignment","subject":"Robotica Avanzada ' + $suffix + '","gradeLevel":"5°","dueDate":"2026-10-30T23:59:59"}'
-$contentRes = Call-Api -Method "POST" -Url "http://localhost:5000/api/teacher/contents" -Body $contentBody -Token $teacherToken
-Write-Host "  -> Teacher created task content: ID=$($contentRes.id), Title=$($contentRes.title), RealId=$($contentRes.realId), Type=$($contentRes.type)"
+$toggleBack = Call-Api -Method PATCH -Path "/api/admin/courses/$($createdCourse.id)/toggle-status" -Token $adminToken
+Write-Host "  -> Curso reactivado: $($toggleBack.activo)"
 
-# Teacher views submissions
-$submissions = Call-Api -Method "GET" -Url "http://localhost:5000/api/teacher/submissions/$($contentRes.realId)" -Token $teacherToken
-Write-Host "  -> Submissions fetched for task $($contentRes.realId): $($submissions.Count) initial"
+$contentRes = Call-Api -Method POST -Path "/api/teacher/contents" -Token $teacherToken -Body @{
+    title       = "Reto 1: Introduccion a Variables"
+    description = "Crear programa de saludo"
+    type        = "Assignment"
+    subject     = "Robotica Avanzada $suffix"
+    gradeLevel  = "5°"
+    dueDate     = "2026-10-30T23:59:59"
+}
+Write-Host "  -> Tarea creada: ID=$($contentRes.id), Título=$($contentRes.title)"
+
+$submissions = Call-Api -Method GET -Path "/api/teacher/submissions/$($contentRes.realId)" -Token $teacherToken
+Write-Host "  -> Entregas iniciales: $($submissions.Count)"
 
 Write-Host "`n=========================================="
-Write-Host "3. Testing STUDENT Registration & Endpoints"
+Write-Host "3. Registro y endpoints del ESTUDIANTE"
 Write-Host "=========================================="
 $studentId = "est_$suffix"
-$studentBody = '{"id":"' + $studentId + '","fullName":"Pepito Perez","role":"Student","grade":"5°","password":"Password123","captchaToken":"DEV_TEST_TOKEN"}'
-$studentAuth = Call-Api -Method "POST" -Url "http://localhost:5000/api/auth/register" -Body $studentBody
-Write-Host "  -> Student registered: $($studentAuth.user.fullName) ($($studentAuth.user.id)) [Role: $($studentAuth.user.role)]"
+$studentAuth = Call-Api -Method POST -Path "/api/auth/register" -Body @{
+    id                   = $studentId
+    fullName             = "Pepito Perez"
+    role                 = "Student"
+    grade                = "5°"
+    password             = "EstudianteSeguro2026x"
+    guardianFullName     = "Maria Perez Acudiente"
+    guardianDocument     = "1029384756"
+    guardianAuthorization = $true
+    acceptDataPolicy     = $true
+    dataPolicyVersion    = $policyVersion
+    captchaToken         = "DEV_TEST_TOKEN"
+}
+Write-Host "  -> Estudiante registrado: $($studentAuth.user.fullName) [$($studentAuth.user.role)]"
 $studentToken = $studentAuth.token
 
-# Student enrolls in the course via teacher enrollment endpoint
-$enrollRes = Call-Api -Method "POST" -Url "http://localhost:5000/api/teacher/courses/$($createdCourse.id)/enroll" -Body ('{"studentId":"' + $studentId + '"}') -Token $teacherToken
-Write-Host "  -> Student enrolled in course: $($enrollRes.message)"
+$enrollRes = Call-Api -Method POST -Path "/api/teacher/courses/$($createdCourse.id)/enroll" -Token $teacherToken -Body @{
+    studentId = $studentId
+}
+Write-Host "  -> Estudiante matriculado: $($enrollRes.message)"
 
-# Student loads dashboard
-$studentDash = Call-Api -Method "GET" -Url "http://localhost:5000/api/student/dashboard" -Token $studentToken
-Write-Host "  -> Student dashboard items: $($studentDash.Count)"
+$studentDash = Call-Api -Method GET -Path "/api/student/dashboard" -Token $studentToken
+Write-Host "  -> Elementos en el panel del estudiante: $($studentDash.Count)"
 $studentTask = $studentDash | Where-Object { $_.realId -eq $contentRes.realId }
-Write-Host "  -> Found task in student dashboard: Title='$($studentTask.title)', HasSubmitted=$($studentTask.hasSubmitted)"
+Write-Host "  -> Tarea visible: '$($studentTask.title)', Entregada=$($studentTask.hasSubmitted)"
 
-# Student uploads assignment delivery (Multipart/form-data with .pdf)
-Write-Host "`n4. Testing Student Assignment Delivery..."
+Write-Host "`n4. Entrega de la tarea (multipart con PDF válido)..."
 $boundary = [System.Guid]::NewGuid().ToString()
 $filePath = Join-Path $PSScriptRoot "test_upload.pdf"
 [System.IO.File]::WriteAllText($filePath, "%PDF-1.4`r`n%Dummy content for testing submission delivery`r`n%%EOF")
@@ -117,10 +186,6 @@ $bodyLines = (
     '',
     "$($contentRes.realId)",
     "--$boundary",
-    'Content-Disposition: form-data; name="Comments"',
-    '',
-    "Mi solucion en PDF para el reto 1",
-    "--$boundary",
     'Content-Disposition: form-data; name="File"; filename="tarea_pepito.pdf"',
     'Content-Type: application/pdf',
     '',
@@ -128,37 +193,31 @@ $bodyLines = (
     "--$boundary--"
 ) -join $LF
 
-$uploadParams = @{
-    Uri = "http://localhost:5000/api/student/upload-assignment"
-    Method = "POST"
-    ContentType = "multipart/form-data; boundary=$boundary"
-    Headers = @{ Authorization = "Bearer $studentToken" }
-    Body = [System.Text.Encoding]::GetEncoding("iso-8859-1").GetBytes($bodyLines)
-}
+$uploadRes = Invoke-RestMethod `
+    -Uri "$base/api/student/upload-assignment" `
+    -Method POST `
+    -ContentType "multipart/form-data; boundary=$boundary" `
+    -Headers @{ Authorization = "Bearer $studentToken" } `
+    -Body ([System.Text.Encoding]::GetEncoding("iso-8859-1").GetBytes($bodyLines))
 
-$uploadRes = Invoke-RestMethod @uploadParams
-Write-Host "  -> Student uploaded PDF delivery: $($uploadRes.message)"
+Write-Host "  -> Entrega registrada: $($uploadRes.message)"
+Write-Host "  -> Archivo protegido: $($uploadRes.submission.fileUrl)"
 
-# Clean up temp file
 if (Test-Path $filePath) { Remove-Item $filePath -Force }
 
-# Teacher grades the submission
-$submissionsAfter = Call-Api -Method "GET" -Url "http://localhost:5000/api/teacher/submissions/$($contentRes.realId)" -Token $teacherToken
-Write-Host "  -> Teacher sees $($submissionsAfter.Count) submissions! Submission ID: $($submissionsAfter[0].submissionId)"
+$submissionsAfter = Call-Api -Method GET -Path "/api/teacher/submissions/$($contentRes.realId)" -Token $teacherToken
+Write-Host "  -> Entregas visibles para el docente: $($submissionsAfter.Count)"
 
-$gradeBody = '{"grade":98,"feedback":"Excelente trabajo y desarrollo impecable con diagramas."}'
-$gradeRes = Call-Api -Method "POST" -Url "http://localhost:5000/api/teacher/submissions/$($submissionsAfter[0].submissionId)/grade" -Body $gradeBody -Token $teacherToken
-Write-Host "  -> Teacher graded submission: $($gradeRes.message), New Status: $($gradeRes.status)"
+$gradeRes = Call-Api -Method POST -Path "/api/teacher/submissions/$($submissionsAfter[0].submissionId)/grade" -Token $teacherToken -Body @{
+    grade    = 98
+    feedback = "Excelente trabajo y desarrollo impecable con diagramas."
+}
+Write-Host "  -> Calificación registrada: $($gradeRes.message), Estado: $($gradeRes.status)"
 
-# Student re-checks dashboard to confirm grade and feedback
-$studentDashAfter = Call-Api -Method "GET" -Url "http://localhost:5000/api/student/dashboard" -Token $studentToken
+$studentDashAfter = Call-Api -Method GET -Path "/api/student/dashboard" -Token $studentToken
 $gradedTask = $studentDashAfter | Where-Object { $_.realId -eq $contentRes.realId }
-Write-Host "  -> Student verified graded task:"
-Write-Host "     HasSubmitted: $($gradedTask.hasSubmitted)"
-Write-Host "     Calificacion: $($gradedTask.mySubmission.grade)"
-Write-Host "     Estado:       $($gradedTask.mySubmission.status)"
-Write-Host "     Feedback:     '$($gradedTask.mySubmission.feedback)'"
+Write-Host "  -> Verificación del estudiante: nota=$($gradedTask.mySubmission.grade), estado=$($gradedTask.mySubmission.status)"
 
 Write-Host "`n=========================================================="
-Write-Host ">>> ALL SYSTEM ENDPOINTS & WORKFLOWS VERIFIED 100%! <<<"
+Write-Host ">>> FLUJO FUNCIONAL VERIFICADO <<<"
 Write-Host "=========================================================="

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using LMS.API.Data;
 using LMS.API.DTOs;
 using Microsoft.AspNetCore.Authorization;
@@ -24,6 +25,37 @@ public class ContentsController : ControllerBase
     {
         var result = new List<ContentDto>();
 
+        // Principio de minimización: un estudiante solo ve contenidos de su grado o de
+        // los cursos en los que está matriculado (no todo el colegio).
+        var role = User.FindFirstValue(ClaimTypes.Role);
+        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        int? studentGradeId = null;
+        List<int>? enrolledCourseIds = null;
+
+        if (string.Equals(role, "Student", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                return Unauthorized();
+            }
+
+            var student = await _context.Alumnos
+                .Include(a => a.Inscripciones)
+                .FirstOrDefaultAsync(a => a.Usuario.Username.ToLower() == username.ToLower());
+
+            if (student == null)
+            {
+                return Forbid();
+            }
+
+            studentGradeId = student.GradoId;
+            enrolledCourseIds = student.Inscripciones
+                .Where(i => i.Estado == "ACTIVA")
+                .Select(i => i.CursoId)
+                .ToList();
+        }
+
         // 1. Tareas
         var tareasQuery = _context.Tareas
             .Include(t => t.Curso)
@@ -32,6 +64,13 @@ public class ContentsController : ControllerBase
                 .ThenInclude(c => c.Docente)
             .Where(t => t.Activo)
             .AsQueryable();
+
+        if (studentGradeId.HasValue)
+        {
+            tareasQuery = tareasQuery.Where(t =>
+                t.Curso.GradoId == studentGradeId.Value
+                || (enrolledCourseIds != null && enrolledCourseIds.Contains(t.CursoId)));
+        }
 
         if (!string.IsNullOrWhiteSpace(gradeLevel))
         {
@@ -70,6 +109,13 @@ public class ContentsController : ControllerBase
                 .ThenInclude(c => c.Docente)
             .Where(m => m.Activo)
             .AsQueryable();
+
+        if (studentGradeId.HasValue)
+        {
+            materialesQuery = materialesQuery.Where(m =>
+                m.Curso.GradoId == studentGradeId.Value
+                || (enrolledCourseIds != null && enrolledCourseIds.Contains(m.CursoId)));
+        }
 
         if (!string.IsNullOrWhiteSpace(gradeLevel))
         {

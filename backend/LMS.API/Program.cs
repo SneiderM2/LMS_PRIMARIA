@@ -1,81 +1,46 @@
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.RateLimiting;
+using LMS.API.Configuration;
 using LMS.API.Data;
 using LMS.API.Middleware;
 using LMS.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
-// Compatibilidad universal de DateTime con PostgreSQL en Supabase
+// Compatibilidad de DateTime con PostgreSQL en Supabase.
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Configuración de PostgreSQL (Supabase) y Entity Framework Core
-var rawConnectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? builder.Configuration["DATABASE_URL"]
-    ?? "Host=aws-0-us-east-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.rjvsbjjmlmvcihfgbiaz;Password=Sneider0124;SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Minimum Pool Size=2;Maximum Pool Size=15;Connection Idle Lifetime=300;Keepalive=30;Tcp Keepalive=true;";
+// ---------------------------------------------------------------------------
+// 1. Configuración
+//    appsettings.Local.json NO se versiona (secretos de desarrollo).
+//    En producción se usan variables de entorno, que tienen prioridad.
+// ---------------------------------------------------------------------------
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+builder.Configuration.AddEnvironmentVariables();
 
-var connectionString = rawConnectionString;
-if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
-    connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
+static string? FirstNonEmpty(params string?[] values)
+    => values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
+var rawConnectionString = FirstNonEmpty(
+    Environment.GetEnvironmentVariable("DATABASE_URL"),
+    builder.Configuration.GetConnectionString("DefaultConnection"),
+    builder.Configuration["DATABASE_URL"]);
+
+if (string.IsNullOrWhiteSpace(rawConnectionString))
 {
-    var normalizedUri = connectionString.Replace("[Sneider0124]", "Sneider0124");
-    try
-    {
-        var uri = new Uri(normalizedUri);
-        var userInfo = uri.UserInfo.Split(':');
-        var user = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : "postgres";
-        var pass = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
-        var host = uri.Host;
-        var port = uri.Port > 0 ? uri.Port : 5432;
-        var db = uri.AbsolutePath.TrimStart('/');
-        if (string.IsNullOrWhiteSpace(db)) db = "postgres";
-
-        if (host.EndsWith(".supabase.co", StringComparison.OrdinalIgnoreCase))
-        {
-            var projectRef = "rjvsbjjmlmvcihfgbiaz";
-            if (host.StartsWith("db.", StringComparison.OrdinalIgnoreCase))
-            {
-                var parts = host.Split('.');
-                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
-                {
-                    projectRef = parts[1];
-                }
-            }
-
-            host = "aws-0-us-east-1.pooler.supabase.com";
-            port = 5432;
-            if (!user.Contains('.'))
-            {
-                user = $"postgres.{projectRef}";
-            }
-        }
-        else if (host.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase))
-        {
-            port = 5432;
-            if (!user.Contains('.'))
-            {
-                user = $"{user}.rjvsbjjmlmvcihfgbiaz";
-            }
-        }
-
-        connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Minimum Pool Size=2;Maximum Pool Size=15;Connection Idle Lifetime=300;Keepalive=30;Tcp Keepalive=true;";
-    }
-    catch
-    {
-        connectionString = normalizedUri;
-    }
+    throw new InvalidOperationException(
+        "No se configuró la cadena de conexión. Defina ConnectionStrings__DefaultConnection " +
+        "o DATABASE_URL (o appsettings.Local.json en desarrollo). Consulte SETUP_SECRETS.md.");
 }
-else
-{
-    if (connectionString.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase))
-    {
-        connectionString = System.Text.RegularExpressions.Regex.Replace(connectionString, @"Port=\d+", "Port=5432", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-    }
-}
+
+var connectionString = NormalizeConnectionString(rawConnectionString, builder.Configuration);
 
 builder.Services.AddDbContext<LMSDbContext>(options =>
     options.UseNpgsql(connectionString, npgsqlOptions =>
@@ -84,17 +49,52 @@ builder.Services.AddDbContext<LMSDbContext>(options =>
         npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null);
     }));
 
-// 2. Inyección de Dependencias
+// ---------------------------------------------------------------------------
+// 2. Opciones de cumplimiento y almacenamiento
+// ---------------------------------------------------------------------------
+builder.Services.Configure<PrivacyOptions>(builder.Configuration.GetSection(PrivacyOptions.SectionName));
+builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName));
+builder.Services.Configure<RegistrationOptions>(builder.Configuration.GetSection(RegistrationOptions.SectionName));
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 30 * 1024 * 1024;
+});
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 32 * 1024 * 1024;
+    options.AddServerHeader = false;
+});
+
+// ---------------------------------------------------------------------------
+// 3. Inyección de dependencias
+// ---------------------------------------------------------------------------
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ISemaforoService, SemaforoService>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+builder.Services.AddScoped<ConsentService>();
 builder.Services.AddHttpClient<ICaptchaService, GoogleRecaptchaService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(4);
 });
 
-// 3. Autenticación JWT
-var jwtSecretKey = builder.Configuration["Jwt:SecretKey"] ?? "LmsPrimarySchoolSuperSecretKey2026!@#$%^&*()_+";
+// ---------------------------------------------------------------------------
+// 4. Autenticación JWT — sin claves por defecto ni secretos embebidos
+// ---------------------------------------------------------------------------
+var jwtSecretKey = FirstNonEmpty(
+    Environment.GetEnvironmentVariable("JWT_SECRET"),
+    builder.Configuration["Jwt:SecretKey"]);
+
+if (string.IsNullOrWhiteSpace(jwtSecretKey)
+    || jwtSecretKey.Length < 48
+    || jwtSecretKey.Contains("SuperSecretKey2026", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException(
+        "Jwt:SecretKey es obligatorio, debe tener al menos 48 caracteres y no puede ser un valor " +
+        "conocido o de ejemplo. Configúrelo con la variable de entorno Jwt__SecretKey. Consulte SETUP_SECRETS.md.");
+}
+
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "LMS.API";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "LMS.Client";
 
@@ -105,8 +105,8 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false;
-    options.SaveToken = true;
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+    options.SaveToken = false;
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -116,41 +116,142 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey)),
         ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero
+        RequireExpirationTime = true,
+        RequireSignedTokens = true,
+        ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
+        ClockSkew = TimeSpan.FromSeconds(30),
+        NameClaimType = System.Security.Claims.ClaimTypes.Name,
+        RoleClaimType = System.Security.Claims.ClaimTypes.Role
     };
 });
 
-// 4. Políticas de Autorización
+// ---------------------------------------------------------------------------
+// 5. Autorización por roles canónicos
+// ---------------------------------------------------------------------------
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin", "ADMINISTRADOR", ".admin", "admin"));
-    options.AddPolicy("RequireTeacher", policy => policy.RequireRole("Teacher", "DOCENTE", "Admin", "ADMINISTRADOR", ".admin"));
-    options.AddPolicy("RequireStudent", policy => policy.RequireRole("Student", "ALUMNO"));
+    options.AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("RequireTeacher", policy => policy.RequireRole("Teacher", "Admin"));
+    options.AddPolicy("RequireStudent", policy => policy.RequireRole("Student"));
 });
 
-// 5. Configuración de CORS
+// ---------------------------------------------------------------------------
+// 6. CORS — lista blanca explícita (se elimina el comodín anterior)
+// ---------------------------------------------------------------------------
+var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                        ?? Array.Empty<string>();
+
+var environmentOrigins = (Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS") ?? string.Empty)
+    .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+var allowedOrigins = configuredOrigins
+    .Concat(environmentOrigins)
+    .Select(origin => origin?.Trim().TrimEnd('/'))
+    .Where(origin => !string.IsNullOrWhiteSpace(origin)
+                     && origin != "*"
+                     && Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+                     && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
+    .Select(origin => origin!)
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
+if (allowedOrigins.Length == 0)
+{
+    throw new InvalidOperationException(
+        "Debe configurar al menos un origen permitido en Cors:AllowedOrigins o CORS_ALLOWED_ORIGINS.");
+}
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAngularDev", policy =>
+    options.AddPolicy("FrontendPolicy", policy =>
     {
-        policy.WithOrigins(
-            "https://sneiderm2.github.io",
-            "https://sneiderm2.github.io/LMS_PRIMARIA",
-            "http://localhost:4200",
-            "http://localhost:5000",
-            "http://127.0.0.1:4200"
-        )
-        .SetIsOriginAllowed(origin => true)
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials();
+        policy.WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .WithExposedHeaders("Content-Disposition", "X-Trace-Id");
     });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Limitación de solicitudes (fuerza bruta, abuso de API y de subidas)
+// ---------------------------------------------------------------------------
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        if (context.HttpContext.Response.HasStarted)
+        {
+            return;
+        }
+
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json; charset=utf-8";
+        context.HttpContext.Response.Headers.RetryAfter = "60";
+
+        await context.HttpContext.Response.WriteAsync(
+            "{\"message\":\"Demasiadas solicitudes. Espera un momento e inténtalo de nuevo.\"}",
+            cancellationToken);
+    };
+
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientKey(httpContext), _ => new FixedWindowRateLimiterOptions
+        {
+            // Compartido por la red de la institución (NAT): suficiente para varias aulas,
+            // mientras el bloqueo por cuenta frena la fuerza bruta dirigida.
+            PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
+
+    options.AddPolicy("uploads", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientKey(httpContext), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromHours(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientKey(httpContext), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 600,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
+});
+
+// ---------------------------------------------------------------------------
+// 8. Cabeceras de proxy (Render / Nginx)
+// ---------------------------------------------------------------------------
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+    options.ForwardLimit = 2;
+});
+
+// ---------------------------------------------------------------------------
+// 9. HSTS
+// ---------------------------------------------------------------------------
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(365);
+    options.IncludeSubDomains = true;
+    options.Preload = true;
 });
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// 6. Swagger / OpenAPI
+// ---------------------------------------------------------------------------
+// 10. Swagger (solo desarrollo; en producción no se expone la superficie de API)
+// ---------------------------------------------------------------------------
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -188,19 +289,21 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-
-// 7. Logs (solo I/O local, no bloquea red)
+// ---------------------------------------------------------------------------
+// 11. Logs (I/O local, no bloquea la red)
+// ---------------------------------------------------------------------------
 var logsPath = Path.Combine(AppContext.BaseDirectory, "logs");
-try { Directory.CreateDirectory(logsPath); } catch { logsPath = Path.Combine(Path.GetTempPath(), "lms-logs"); Directory.CreateDirectory(logsPath); }
+try { Directory.CreateDirectory(logsPath); }
+catch { logsPath = Path.Combine(Path.GetTempPath(), "lms-logs"); Directory.CreateDirectory(logsPath); }
 FileLogger.SetLogDirectory(logsPath);
 
-// 8. Inicialización de BD en Supabase — se ejecuta DESPUÉS de que Kestrel empieza a escuchar.
-//    Esto evita que el health-check de Render falle por timeout durante el arranque.
+// ---------------------------------------------------------------------------
+// 12. Inicialización de BD después de que Kestrel empieza a escuchar
+// ---------------------------------------------------------------------------
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     _ = Task.Run(async () =>
     {
-        // Dar 200 ms para que el servidor esté 100% operativo antes de tocar la BD
         await Task.Delay(200);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25));
@@ -208,23 +311,31 @@ app.Lifetime.ApplicationStarted.Register(() =>
         try
         {
             var context = scope.ServiceProvider.GetRequiredService<LMSDbContext>();
-            await DbInitializer.SeedAsync(context);
-            app.Logger.LogInformation("✅ Base de datos PostgreSQL (Supabase) inicializada correctamente (post-startup).");
+            var initializer = new DbInitializer(
+                context,
+                scope.ServiceProvider.GetRequiredService<IConfiguration>(),
+                app.Environment,
+                scope.ServiceProvider.GetRequiredService<ILogger<DbInitializer>>());
+
+            await initializer.SeedAsync();
+            app.Logger.LogInformation("Base de datos PostgreSQL (Supabase) inicializada correctamente.");
         }
         catch (OperationCanceledException)
         {
-            app.Logger.LogWarning("⚠️  DbInitializer cancelado por timeout (25 s). El servidor sigue operando con normalidad.");
+            app.Logger.LogWarning("DbInitializer cancelado por timeout (25 s). El servidor sigue operando.");
         }
         catch (Exception ex)
         {
-            // NO relanzar — un error de semilla no debe tumbar el servidor
-            app.Logger.LogError(ex, "⚠️  Error no crítico en inicialización de BD (post-startup). El servidor continúa en línea.");
+            // Un error de semilla no debe tumbar el servidor.
+            app.Logger.LogError(ex, "Error no crítico en la inicialización de BD (post-startup).");
         }
     });
 });
 
-
-// 9. Middlewares
+// ---------------------------------------------------------------------------
+// 13. Pipeline HTTP
+// ---------------------------------------------------------------------------
+app.UseForwardedHeaders();
 app.UseGlobalExceptionHandler();
 app.UseSecurityHeaders();
 app.UseRequestLogging();
@@ -239,41 +350,140 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
 app.UseHttpsRedirection();
-app.UseStaticFiles();
 
 app.UseRouting();
-app.UseCors("AllowAngularDev");
+app.UseCors("FrontendPolicy");
+app.UseRateLimiter();
 
 app.UseAuthentication();
-app.UseSingleSessionValidation(); // Middleware de Sesión Única
+app.UseSingleSessionValidation();
 app.UseAuthorization();
 
-app.MapGet("/api/ping", () => Results.Ok(new 
-{ 
-    status = "healthy", 
+// ---------------------------------------------------------------------------
+// 14. Endpoints de salud (sin filtrar detalles internos)
+// ---------------------------------------------------------------------------
+app.MapGet("/api/ping", () => Results.Ok(new
+{
+    status = "healthy",
     message = "LMS Primary School API is active and ready.",
-    timestamp = DateTime.UtcNow 
-}));
+    timestamp = DateTime.UtcNow
+})).AllowAnonymous();
 
-app.MapGet("/api/health", async (LMSDbContext context) =>
+app.MapGet("/api/health/live", () => Results.Ok(new
+{
+    status = "alive",
+    timestamp = DateTime.UtcNow
+})).AllowAnonymous();
+
+app.MapGet("/api/health", async (LMSDbContext context, ILogger<Program> logger) =>
 {
     try
     {
         var canConnect = await context.Database.CanConnectAsync();
-        return Results.Ok(new 
-        { 
+
+        return Results.Ok(new
+        {
             status = canConnect ? "healthy" : "degraded",
             database = canConnect ? "connected" : "error",
-            timestamp = DateTime.UtcNow 
+            timestamp = DateTime.UtcNow
         });
     }
     catch (Exception ex)
     {
-        return Results.Json(new { status = "error", message = ex.Message }, statusCode: 503);
+        logger.LogError(ex, "Fallo en la verificación de salud de la base de datos.");
+        return Results.Json(new { status = "error" }, statusCode: StatusCodes.Status503ServiceUnavailable);
     }
-});
+}).AllowAnonymous();
 
 app.MapControllers();
 
 app.Run();
+
+// ---------------------------------------------------------------------------
+// Utilidades locales
+// ---------------------------------------------------------------------------
+static string ClientKey(HttpContext context)
+    => context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+static string NormalizeConnectionString(string raw, IConfiguration configuration)
+{
+    var trustCertificate = configuration.GetValue<bool?>("Database:TrustServerCertificate") ?? false;
+
+    if (raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)
+        || raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
+    {
+        var uri = new Uri(raw);
+        var userInfo = uri.UserInfo.Split(':', 2);
+        var user = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : "postgres";
+        var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
+        var host = uri.Host;
+        var port = uri.Port > 0 ? uri.Port : 5432;
+        var database = uri.AbsolutePath.TrimStart('/');
+        if (string.IsNullOrWhiteSpace(database)) database = "postgres";
+
+        var projectRef = configuration["Supabase:ProjectRef"];
+
+        if (host.EndsWith(".supabase.co", StringComparison.OrdinalIgnoreCase))
+        {
+            if (host.StartsWith("db.", StringComparison.OrdinalIgnoreCase))
+            {
+                var parts = host.Split('.');
+                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
+                {
+                    projectRef ??= parts[1];
+                }
+            }
+
+            host = configuration["Supabase:PoolerHost"] ?? "aws-0-us-east-1.pooler.supabase.com";
+            port = 5432;
+
+            if (!user.Contains('.') && !string.IsNullOrWhiteSpace(projectRef))
+            {
+                user = $"postgres.{projectRef}";
+            }
+        }
+        else if (host.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase))
+        {
+            port = 5432;
+
+            if (!user.Contains('.') && !string.IsNullOrWhiteSpace(projectRef))
+            {
+                user = $"{user}.{projectRef}";
+            }
+        }
+
+        return $"Host={host};Port={port};Database={database};Username={user};Password={password};" +
+               $"SSL Mode=Require;Trust Server Certificate={trustCertificate.ToString().ToLowerInvariant()};" +
+               "Pooling=true;Minimum Pool Size=2;Maximum Pool Size=15;Connection Idle Lifetime=300;" +
+               "Keepalive=30;Tcp Keepalive=true;";
+    }
+
+    // Cadena ADO.NET: forzar TLS válido salvo configuración explícita.
+    if (!Regex.IsMatch(raw, @"\bSSL\s*Mode\b", RegexOptions.IgnoreCase))
+    {
+        raw += ";SSL Mode=Require;";
+    }
+
+    if (!Regex.IsMatch(raw, @"\bTrust\s+Server\s+Certificate\b", RegexOptions.IgnoreCase))
+    {
+        raw += $"Trust Server Certificate={trustCertificate.ToString().ToLowerInvariant()};";
+    }
+    else if (!trustCertificate)
+    {
+        raw = Regex.Replace(raw, @"Trust\s+Server\s+Certificate\s*=\s*true", "Trust Server Certificate=false",
+            RegexOptions.IgnoreCase);
+    }
+
+    return raw;
+}
+
+/// <summary>Punto de entrada expuesto para pruebas de integración.</summary>
+public partial class Program
+{
+}

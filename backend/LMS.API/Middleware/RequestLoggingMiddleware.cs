@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace LMS.API.Middleware;
 
@@ -176,7 +177,7 @@ public class RequestLoggingMiddleware
 
         var method  = ctx.Request.Method;
         var path    = ctx.Request.Path.Value ?? string.Empty;
-        var qs      = ctx.Request.QueryString.Value ?? string.Empty;
+        var qs      = RedactQueryString(path, ctx.Request.QueryString.Value ?? string.Empty);
 
         // ── Claims del usuario autenticado ────────────────────────────────────
         var user = ctx.User;
@@ -545,9 +546,9 @@ public class RequestLoggingMiddleware
     {
         var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0";
         var method = ctx.Request.Method;
-        var path = ctx.Request.Path + ctx.Request.QueryString;
+        var path = SafeRequestPath(ctx);
         var status = ctx.Response.StatusCode;
-        var userAgent = ctx.Request.Headers.UserAgent.ToString();
+        var userAgent = Truncate(ctx.Request.Headers.UserAgent.ToString(), 200);
         var userId = ctx.User.Identity?.IsAuthenticated == true
             ? ctx.User.FindFirst("sub")?.Value ?? ctx.User.Identity.Name ?? "-"
             : "-";
@@ -559,7 +560,7 @@ public class RequestLoggingMiddleware
     {
         var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0";
         var method = ctx.Request.Method;
-        var path = ctx.Request.Path + ctx.Request.QueryString;
+        var path = SafeRequestPath(ctx);
         var status = ctx.Response.StatusCode;
 
         return $"[{time:yyyy-MM-dd HH:mm:ss}] [HTTP-{status}] {ip} | {method} {path} | {elapsedMs}ms";
@@ -569,9 +570,51 @@ public class RequestLoggingMiddleware
     {
         var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0";
         var method = ctx.Request.Method;
-        var path = ctx.Request.Path + ctx.Request.QueryString;
+        var path = SafeRequestPath(ctx);
 
         return $"[{time:yyyy-MM-dd HH:mm:ss}] [EXCEPTION] {ip} | {method} {path} | {elapsedMs}ms | {ex.GetType().Name}: {ex.Message}\n    StackTrace: {ex.StackTrace}";
+    }
+
+    private static readonly Regex SensitiveQueryPattern = new(
+        @"(?i)\b(token|access_token|refresh_token|idtoken|password|clave|contrasena|contraseña|secret|authorization|captcha|captchatoken)=([^&]*)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Evita registrar credenciales o identificadores sensibles en los logs.
+    /// Los endpoints de autenticación no registran query string.
+    /// </summary>
+    private static string RedactQueryString(string path, string queryString)
+    {
+        if (string.IsNullOrWhiteSpace(queryString))
+        {
+            return string.Empty;
+        }
+
+        if (path.Contains("/auth/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/privacy/", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        var redacted = SensitiveQueryPattern.Replace(queryString, "$1=***");
+        return Truncate(redacted, 300);
+    }
+
+    private static string SafeRequestPath(HttpContext ctx)
+    {
+        var path = ctx.Request.Path.Value ?? string.Empty;
+        var qs = RedactQueryString(path, ctx.Request.QueryString.Value ?? string.Empty);
+        return path + qs;
+    }
+
+    private static string Truncate(string? value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Length <= max ? value : value[..max];
     }
 }
 

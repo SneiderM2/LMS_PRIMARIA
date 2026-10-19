@@ -17,11 +17,16 @@ namespace LMS.API.Controllers;
 public class SystemFilesController : ControllerBase
 {
     private readonly IWebHostEnvironment _env;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<SystemFilesController> _logger;
 
-    public SystemFilesController(IWebHostEnvironment env, ILogger<SystemFilesController> logger)
+    public SystemFilesController(
+        IWebHostEnvironment env,
+        IConfiguration configuration,
+        ILogger<SystemFilesController> logger)
     {
         _env = env;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -249,8 +254,33 @@ public class SystemFilesController : ControllerBase
             return BadRequest(new { message = "Nombre de archivo no válido." });
         }
 
+        // La auditoría no debe poder borrarse desde la aplicación: solo se reinician
+        // logs operativos y únicamente en desarrollo o con habilitación explícita.
+        var allowedOperationalLogs = new[] { "access.log", "error.log", "app.log" };
+        if (!allowedOperationalLogs.Contains(safeFileName, StringComparer.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message = "Solo se pueden reiniciar los logs operativos (access.log, error.log, app.log). La auditoría conserva su integridad."
+            });
+        }
+
+        if (!_env.IsDevelopment() && !_configuration.GetValue<bool>("Features:AllowLogPurge"))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "El borrado de logs está deshabilitado en producción (integridad de la auditoría). Configure Features:AllowLogPurge solo con justificación."
+            });
+        }
+
         var logsDir = GetLogsDirectory();
-        var fullPath = Path.Combine(logsDir, safeFileName);
+        var fullPath = Path.GetFullPath(Path.Combine(logsDir, safeFileName));
+        var normalizedRoot = Path.GetFullPath(logsDir).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+        if (!fullPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "Ruta de archivo no válida." });
+        }
 
         if (!System.IO.File.Exists(fullPath))
         {
@@ -260,6 +290,28 @@ public class SystemFilesController : ControllerBase
         await System.IO.File.WriteAllTextAsync(fullPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [INFO] Archivo de log reiniciado por administrador: {User.Identity?.Name}\n");
 
         _logger.LogWarning("Auditoría: Log '{LogName}' vaciado por administrador {User}", safeFileName, User.Identity?.Name);
+
+        try
+        {
+            await FileLogger.WriteAuditAsync(new AuditLogEntry
+            {
+                Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                Level = "WARNING",
+                Method = HttpContext.Request.Method,
+                Path = HttpContext.Request.Path.ToString(),
+                StatusCode = StatusCodes.Status200OK,
+                ElapsedMs = 0,
+                Ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0",
+                UserId = User.Identity?.Name,
+                UserRole = User.FindFirstValue(ClaimTypes.Role),
+                Action = "Auditoría: Reinicio de archivo de log operativo",
+                Details = $"Archivo: {safeFileName}"
+            });
+        }
+        catch
+        {
+            // No interrumpir la operación por un fallo de auditoría.
+        }
 
         return Ok(new { message = $"El archivo '{safeFileName}' ha sido reiniciado.", fileName = safeFileName });
     }

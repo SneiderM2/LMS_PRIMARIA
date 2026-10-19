@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace LMS.API.DTOs;
 
 // ==========================================
@@ -112,25 +114,51 @@ public class AdminUserDto
     public bool Activo { get; set; }
     public string? AvatarUrl { get; set; }
     public DateTime FechaCreacion { get; set; }
+
+    /// <summary>Contraseña temporal generada por el servidor (se devuelve una sola vez).</summary>
+    public string? TemporaryPassword { get; set; }
 }
 
 public class CreateAdminUserDto
 {
+    [Required(ErrorMessage = "El documento o carnet es obligatorio.")]
+    [MaxLength(100)]
+    [RegularExpression(@"^[A-Za-z0-9._@-]{3,100}$",
+        ErrorMessage = "El documento o carnet solo puede contener letras, números, punto, guion, guion bajo y @.")]
     public string Username { get; set; } = string.Empty;
+
+    /// <summary>Opcional. Si se omite, el servidor genera una contraseña temporal fuerte.</summary>
+    [MaxLength(128)]
     public string Password { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "El nombre es obligatorio.")]
+    [MaxLength(100)]
     public string Nombre { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "El apellido es obligatorio.")]
+    [MaxLength(100)]
     public string Apellido { get; set; } = string.Empty;
+
+    [Required]
     public string Role { get; set; } = "Student"; // "Student" | "Teacher" | "Admin"
+
     public string? GradeLevel { get; set; } // Opcional, para estudiantes
 }
 
 public class UpdateAdminUserDto
 {
+    [MaxLength(100)]
     public string Nombre { get; set; } = string.Empty;
+
+    [MaxLength(100)]
     public string Apellido { get; set; } = string.Empty;
+
     public string? Role { get; set; }
     public string? GradeLevel { get; set; }
-    public string? Password { get; set; } // Opcional para reset de contraseña
+
+    /// <summary>Opcional. Si se envía, debe cumplir la política de contraseñas.</summary>
+    [MaxLength(128)]
+    public string? Password { get; set; }
 }
 
 public class AdminCourseDto

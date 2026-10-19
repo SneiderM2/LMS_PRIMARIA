@@ -169,6 +169,39 @@
           </div>
         </div>
 
+        <!-- Código de invitación docente -->
+        <div *ngIf="regRole === 'Teacher'" class="form-group">
+          <label for="regTeacherCode">
+            <span class="label-icon">🔑</span> Código de invitación institucional
+          </label>
+          <div class="input-box">
+            <input id="regTeacherCode" type="text" name="regTeacherCode" [(ngModel)]="regTeacherCode"
+              placeholder="Solicítalo a la coordinación académica" autocomplete="off" />
+          </div>
+        </div>
+
+        <!-- Autorización del acudiente (menores de edad) -->
+        <div *ngIf="regRole === 'Student'" class="form-group guardian-register-box">
+          <label class="section-label">
+            <span class="label-icon">👨‍👩‍👧</span> Autorización del padre, madre o acudiente
+          </label>
+
+          <div class="input-box">
+            <input type="text" name="regGuardianName" [(ngModel)]="regGuardianName"
+              placeholder="Nombre completo del acudiente" maxlength="150" autocomplete="name" />
+          </div>
+
+          <div class="input-box" style="margin-top: 0.5rem;">
+            <input type="text" name="regGuardianDocument" [(ngModel)]="regGuardianDocument"
+              placeholder="Documento del acudiente (opcional, se almacena enmascarado)" maxlength="30" inputmode="numeric" />
+          </div>
+
+          <label class="policy-check-inline">
+            <input type="checkbox" name="regGuardianAuth" [(ngModel)]="regGuardianAuth" />
+            <span>Declaro ser el acudiente y autorizo el tratamiento de los datos del menor (Ley 1581 de 2012, art. 7).</span>
+          </label>
+        </div>
+
         <!-- Contraseña y Confirmación -->
         <div class="form-row-2">
           <div class="form-group">
@@ -177,8 +210,9 @@
             </label>
             <div class="input-box">
               <input id="regPassword" type="password" name="regPassword" [(ngModel)]="regPassword"
-                [placeholder]="'login.regPasswordPlaceholder' | translate" required />
+                [placeholder]="'login.regPasswordPlaceholder' | translate" minlength="12" maxlength="128" required />
             </div>
+            <small class="field-hint">Mínimo 12 caracteres, con letras y números.</small>
           </div>
 
           <div class="form-group">
@@ -187,9 +221,21 @@
             </label>
             <div class="input-box">
               <input id="regConfirmPassword" type="password" name="regConfirmPassword" [(ngModel)]="regConfirmPassword"
-                [placeholder]="'login.regConfirmPasswordPlaceholder' | translate" required />
+                [placeholder]="'login.regConfirmPasswordPlaceholder' | translate" maxlength="128" required />
             </div>
           </div>
+        </div>
+
+        <!-- Aceptación de política de tratamiento de datos -->
+        <div class="policy-check-register">
+          <label class="policy-check-inline">
+            <input type="checkbox" name="regAcceptPolicy" [(ngModel)]="regAcceptPolicy" />
+            <span>
+              He leído y acepto la
+              <a [href]="policyUrl" target="_blank" rel="noopener noreferrer" class="policy-link-inline">política de tratamiento de datos personales</a>
+              (versión {{ policyVersion }}).
+            </span>
+          </label>
         </div>
 
         <!-- Widget de verificación de seguridad CAPTCHA para Registro -->

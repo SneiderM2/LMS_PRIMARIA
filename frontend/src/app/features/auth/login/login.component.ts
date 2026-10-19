@@ -42,6 +42,14 @@ export class LoginComponent implements OnInit, AfterViewInit {
   public regRole: UserRole = 'Student';
   public regGrade = '1°';
   public regHoneypot = '';
+  public regTeacherCode = '';
+  public regGuardianName = '';
+  public regGuardianDocument = '';
+  public regGuardianAuth = false;
+  public regAcceptPolicy = false;
+
+  public readonly policyVersion = environment.dataPolicyVersion;
+  public readonly policyUrl = environment.dataPolicyUrl;
 
   public isLoading = false;
   public errorMessage: string | null = null;
@@ -100,7 +108,11 @@ export class LoginComponent implements OnInit, AfterViewInit {
   }
 
   private initRecaptcha(): void {
-    const siteKey = environment.recaptchaSiteKey || '6LcMQNgtAAAAADA_qovyBzaHt_EDrKEMxTyCeqXo';
+    const siteKey = environment.recaptchaSiteKey;
+    if (!siteKey) {
+      console.warn('[reCAPTCHA] No hay site key configurada; el registro y el login no estarán disponibles.');
+      return;
+    }
 
     // Esperar a que el SDK de Google reCAPTCHA esté listo
     const checkGrecaptcha = setInterval(() => {
@@ -163,8 +175,8 @@ export class LoginComponent implements OnInit, AfterViewInit {
       if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
         clearInterval(checkGoogle);
         try {
-          const clientId = '782910394812-sampleclientidforexample.apps.googleusercontent.com';
-          if (clientId && !clientId.includes('sampleclientidforexample')) {
+          const clientId = environment.googleClientId;
+          if (clientId) {
             google.accounts.id.initialize({
               client_id: clientId,
               callback: (res: any) => this.handleGoogleCredential(res.credential)
@@ -294,7 +306,7 @@ export class LoginComponent implements OnInit, AfterViewInit {
             this.errorMessage = serverMessage || 'Identificación escolar o contraseña incorrecta. ¡Inténtalo de nuevo!';
             break;
           case 423:
-            this.errorMessage = serverMessage || '🔒 Tu cuenta ha sido bloqueada temporalmente. Intenta de nuevo en 10 minutos.';
+            this.errorMessage = serverMessage || '🔒 Tu cuenta ha sido bloqueada temporalmente por seguridad. Intenta de nuevo en 15 minutos.';
             break;
           case 503:
             this.errorMessage = '🔌 El servicio de autenticación no está disponible en este momento. Intenta de nuevo en unos segundos.';
@@ -349,13 +361,30 @@ export class LoginComponent implements OnInit, AfterViewInit {
       return;
     }
 
-    if (this.regPassword.length < 4) {
-      this.errorMessage = 'La contraseña debe tener al menos 4 caracteres 🔒';
+    if (this.regPassword.length < 12) {
+      this.errorMessage = 'La contraseña debe tener al menos 12 caracteres, combinando letras y números 🔒';
       return;
     }
 
     if (this.regPassword !== this.regConfirmPassword) {
       this.errorMessage = 'Las contraseñas no coinciden. Verifícalas por favor ❌';
+      return;
+    }
+
+    if (this.regRole === 'Teacher' && !this.regTeacherCode.trim()) {
+      this.errorMessage = 'El registro de docentes requiere el código de invitación institucional 🔑';
+      return;
+    }
+
+    if (this.regRole === 'Student') {
+      if (!this.regGuardianAuth || this.regGuardianName.trim().length < 5) {
+        this.errorMessage = 'Para registrar a un menor de edad se requiere el nombre del acudiente y su autorización (Ley 1581 de 2012, art. 7).';
+        return;
+      }
+    }
+
+    if (!this.regAcceptPolicy) {
+      this.errorMessage = 'Debes aceptar la política de tratamiento de datos personales para crear la cuenta.';
       return;
     }
 
@@ -375,6 +404,12 @@ export class LoginComponent implements OnInit, AfterViewInit {
       password: this.regPassword,
       role: this.regRole,
       grade: this.regRole === 'Student' ? this.regGrade : undefined,
+      teacherInviteCode: this.regRole === 'Teacher' ? this.regTeacherCode.trim() : undefined,
+      guardianFullName: this.regRole === 'Student' ? this.regGuardianName.trim() : undefined,
+      guardianDocument: this.regRole === 'Student' ? this.regGuardianDocument.trim() : undefined,
+      guardianAuthorization: this.regRole === 'Student' ? this.regGuardianAuth : false,
+      acceptDataPolicy: true,
+      dataPolicyVersion: environment.dataPolicyVersion,
       honeypotTrap: this.regHoneypot,
       captchaToken: this.captchaToken
     }).subscribe({

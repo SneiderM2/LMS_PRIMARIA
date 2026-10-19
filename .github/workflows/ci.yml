@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (.NET 8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restaurar dependencias
+        run: dotnet restore backend/LMS.API/LMS.API.csproj
+
+      - name: Compilar en Release
+        run: dotnet build backend/LMS.API/LMS.API.csproj -c Release --no-restore
+
+      - name: Pruebas unitarias
+        run: dotnet test backend/LMS.API.Tests/LMS.API.Tests.csproj -c Release --nologo
+
+      - name: Revisar paquetes vulnerables
+        continue-on-error: true
+        run: dotnet list backend/LMS.API/LMS.API.csproj package --vulnerable --include-transitive
+
+  frontend:
+    name: Frontend (Angular 18)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar para producción
+        run: npm run build
+
+      - name: Auditar dependencias de producción
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
+  secrets:
+    name: Verificar ausencia de secretos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Buscar patrones de secretos en el código actual
+        run: |
+          set -e
+          if grep -RInE "Sneider0124|SuperSecretKey2026|6LcMQNgtAAAAAMLE|postgres\.[a-z0-9]+:[^@\"']+@" \
+            --include="*.json" --include="*.cs" --include="*.ts" --include="*.yml" \
+            --exclude-dir=node_modules --exclude-dir=bin --exclude-dir=obj --exclude-dir=dist \
+            --exclude="appsettings.Local.json" --exclude="appsettings.Example.json" .; then
+            echo "::error::Se encontraron posibles secretos versionados. Revisa el resultado anterior."
+            exit 1
+          fi
+          echo "No se detectaron secretos conocidos en el código actual."
+
+      - name: Advertir si el historial contiene archivos de secretos
+        run: |
+          if git log --all --name-only --pretty=format: | grep -q "appsettings.Local.json"; then
+            echo "::warning::appsettings.Local.json aparece en el historial de Git. Rota las credenciales."
+          else
+            echo "appsettings.Local.json no aparece en el historial."
+          fi

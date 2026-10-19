@@ -9,6 +9,8 @@ export interface User {
   lastLoginDate?: string | Date;
   avatarUrl: string;
   dataPolicyAccepted?: boolean;
+  dataPolicyVersion?: string;
+  requiresPolicyAcceptance?: boolean;
 }
 
 export interface LoginRequest {
@@ -24,6 +26,12 @@ export interface RegisterRequest {
   password: string;
   role: UserRole;
   grade?: string;
+  teacherInviteCode?: string;
+  guardianFullName?: string;
+  guardianDocument?: string;
+  guardianAuthorization?: boolean;
+  acceptDataPolicy: boolean;
+  dataPolicyVersion?: string;
   honeypotTrap?: string;
   captchaToken?: string;
 }
@@ -33,6 +41,14 @@ export interface LoginResponse {
   expiration: string;
   user: User;
   requiresPolicyAcceptance?: boolean;
+  dataPolicyVersion?: string;
+}
+
+export interface ConsentPayload {
+  version: string;
+  guardianFullName?: string;
+  guardianDocument?: string;
+  guardianAuthorization?: boolean;
 }
 
 export interface TeacherStudent {
@@ -48,6 +64,7 @@ export interface TeacherStudent {
     group: string;
     status: string;
   }[];
+  temporaryPassword?: string | null;
 }
 
 export interface Course {

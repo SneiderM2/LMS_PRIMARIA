@@ -18,6 +18,17 @@
 logs/
 *.log
 
+# Secretos y datos locales (NUNCA versionar)
+backend/LMS.API/appsettings.Local.json
+backend/LMS.API/App_Data/
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+secrets/
+id_rsa*
+
 # Node & Frontend
 node_modules/
 .angular/
@@ -26,7 +37,12 @@ frontend/dist/
 wwwroot/
 backend/LMS.API/wwwroot/
 
-# Compiled frontend bundle prevention in root
+# Pruebas y cobertura
+coverage/
+TestResults/
+*.trx
+
+# Compilados de frontend en la raíz (GitHub Pages)
 /chunk-*.js
 /main-*.js
 /polyfills-*.js
@@ -43,4 +59,3 @@ backend/LMS.API/wwwroot/
 /404.html
 /icons/
 /assets/
-

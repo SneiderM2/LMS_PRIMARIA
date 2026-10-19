@@ -69,10 +69,14 @@ public class LMSDbContext : DbContext
             entity.Property(u => u.FechaCreacion).HasColumnName("fecha_creacion").HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(u => u.DataPolicyAccepted).HasColumnName("data_policy_accepted").HasDefaultValue(false);
             entity.Property(u => u.DataPolicyAcceptedAt).HasColumnName("data_policy_accepted_at");
+            entity.Property(u => u.DataPolicyVersion).HasColumnName("data_policy_version").HasMaxLength(20);
+            entity.Property(u => u.DataPolicyEvidence).HasColumnName("data_policy_evidence").HasColumnType("text");
             entity.Property(u => u.AccessFailedCount).HasColumnName("access_failed_count").HasDefaultValue(0);
             entity.Property(u => u.LockoutEnd).HasColumnName("lockout_end");
             entity.Property(u => u.SessionToken).HasColumnName("session_token").HasMaxLength(255);
             entity.Property(u => u.LastLoginAt).HasColumnName("last_login_at");
+            entity.Property(u => u.DeletedAt).HasColumnName("deleted_at");
+            entity.Property(u => u.AnonymizedAt).HasColumnName("anonymized_at");
 
             entity.HasIndex(u => u.Username)
                   .IsUnique()

@@ -1,11 +1,14 @@
 using System.Security.Claims;
+using LMS.API.Configuration;
 using LMS.API.Data;
 using LMS.API.DTOs;
 using LMS.API.Entities;
 using LMS.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LMS.API.Controllers;
 
@@ -16,11 +19,16 @@ public class StudentController : ControllerBase
 {
     private readonly LMSDbContext _context;
     private readonly IFileStorageService _fileStorage;
+    private readonly StorageOptions _storageOptions;
 
-    public StudentController(LMSDbContext context, IFileStorageService fileStorage)
+    public StudentController(
+        LMSDbContext context,
+        IFileStorageService fileStorage,
+        IOptions<StorageOptions> storageOptions)
     {
         _context = context;
         _fileStorage = fileStorage;
+        _storageOptions = storageOptions.Value;
     }
 
     /// <summary>
@@ -151,6 +159,7 @@ public class StudentController : ControllerBase
     /// </summary>
     [HttpPost("upload-assignment")]
     [Consumes("multipart/form-data")]
+    [EnableRateLimiting("uploads")]
     [ProducesResponseType(typeof(UploadResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UploadAssignment([FromForm] UploadAssignmentDto request)
@@ -170,43 +179,63 @@ public class StudentController : ControllerBase
             return NotFound("Estudiante no encontrado.");
         }
 
-        var studentFullName = !string.IsNullOrWhiteSpace(student.Usuario.FullName) 
-            ? student.Usuario.FullName 
+        var studentFullName = !string.IsNullOrWhiteSpace(student.Usuario.FullName)
+            ? student.Usuario.FullName
             : student.Usuario.Username;
 
-        // Guardar archivo físico
-        var (success, fileUrl, originalName, error) = await _fileStorage.SaveFileAsync(request.File, "submissions");
-        if (!success)
+        // 1. Validar la tarea y la pertenencia del estudiante ANTES de guardar el archivo
+        //    (evita IDOR y archivos huérfanos).
+        var cleanAssignmentId = (request.AssignmentId ?? string.Empty).Replace("task-", string.Empty).Trim();
+        if (!int.TryParse(cleanAssignmentId, out var taskId) || taskId <= 0)
         {
-            return BadRequest(new { message = error });
+            return BadRequest(new { message = "Identificador de tarea no válido." });
         }
 
-        // Buscar la tarea por ID específico
-        Tarea? tarea = null;
-        if (!string.IsNullOrWhiteSpace(request.AssignmentId))
+        var enrolledCourseIds = await _context.Inscripciones
+            .Where(i => i.AlumnoId == student.UsuarioId && i.Estado == "ACTIVA")
+            .Select(i => i.CursoId)
+            .ToListAsync();
+
+        var tarea = await _context.Tareas
+            .Include(t => t.Curso)
+            .FirstOrDefaultAsync(t => t.Id == taskId
+                                      && t.Activo
+                                      && (t.Curso.GradoId == student.GradoId
+                                          || enrolledCourseIds.Contains(t.CursoId)));
+
+        if (tarea == null)
         {
-            var cleanId = request.AssignmentId.Replace("task-", "").Trim();
-            if (int.TryParse(cleanId, out var parsedTaskId))
+            return StatusCode(StatusCodes.Status403Forbidden, new
             {
-                tarea = await _context.Tareas.FirstOrDefaultAsync(t => t.Id == parsedTaskId);
-            }
+                message = "La tarea no existe, está inactiva o no pertenece a los cursos en los que estás matriculado."
+            });
         }
 
-        // Fallback si no fue encontrada por ID
-        if (tarea == null)
-        {
-            tarea = await _context.Tareas.FirstOrDefaultAsync(t => t.Activo)
-                        ?? await _context.Tareas.OrderByDescending(t => t.Id).FirstOrDefaultAsync();
-        }
-
-        if (tarea == null)
-        {
-            return BadRequest(new { message = "No hay tareas activas disponibles para entrega en este momento." });
-        }
-
+        // 2. Localizar la entrega existente y limitar el número de archivos.
         var entrega = await _context.Entregas
             .Include(e => e.Archivos)
             .FirstOrDefaultAsync(e => e.TareaId == tarea.Id && e.AlumnoId == student.UsuarioId);
+
+        var maxFiles = Math.Clamp(_storageOptions.MaxFilesPerSubmission, 1, 20);
+        if (entrega != null && entrega.Archivos.Count >= maxFiles)
+        {
+            return BadRequest(new
+            {
+                message = $"Ya alcanzaste el máximo de {maxFiles} archivos para esta entrega."
+            });
+        }
+
+        // 3. Guardar el archivo en almacenamiento privado con validación de firma real.
+        var stored = await _fileStorage.SaveFileAsync(
+            request.File,
+            "submissions",
+            student.UsuarioId,
+            "ALUMNO");
+
+        if (!stored.Success)
+        {
+            return BadRequest(new { message = stored.ErrorMessage });
+        }
 
         if (entrega == null)
         {
@@ -229,11 +258,11 @@ public class StudentController : ControllerBase
         var archivo = new ArchivoEntrega
         {
             EntregaId = entrega.Id,
-            NombreOriginal = originalName,
-            NombreArchivo = Path.GetFileName(fileUrl),
-            RutaArchivo = fileUrl,
-            TipoMime = request.File.ContentType ?? "application/octet-stream",
-            TamanoBytes = (ulong)request.File.Length,
+            NombreOriginal = stored.OriginalName,
+            NombreArchivo = Path.GetFileName(stored.StorageKey),
+            RutaArchivo = stored.Url,
+            TipoMime = stored.ContentType,
+            TamanoBytes = (ulong)stored.Size,
             FechaSubida = DateTime.UtcNow
         };
         _context.ArchivosEntrega.Add(archivo);
@@ -251,8 +280,8 @@ public class StudentController : ControllerBase
                 StudentId = student.Usuario.Username,
                 StudentName = studentFullName,
                 StudentAvatarUrl = student.Usuario.AvatarUrl,
-                FileUrl = fileUrl,
-                OriginalFileName = originalName,
+                FileUrl = stored.Url,
+                OriginalFileName = stored.OriginalName,
                 SubmittedAt = entrega.FechaEntrega,
                 Status = entrega.Estado
             }

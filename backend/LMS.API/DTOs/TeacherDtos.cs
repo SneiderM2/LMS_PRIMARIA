@@ -5,11 +5,17 @@ namespace LMS.API.DTOs;
 public class CreateStudentDto
 {
     [Required(ErrorMessage = "El Documento o Carnet es obligatorio")]
+    [MaxLength(100)]
+    [RegularExpression(@"^[A-Za-z0-9._@-]{3,100}$",
+        ErrorMessage = "El documento o carnet solo puede contener letras, números, punto, guion, guion bajo y @.")]
     public string Username { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "El Nombre Completo es obligatorio")]
+    [MaxLength(150)]
     public string FullName { get; set; } = string.Empty;
 
+    /// <summary>Opcional. Si se omite, el servidor genera una contraseña temporal fuerte.</summary>
+    [MaxLength(128)]
     public string? Password { get; set; }
 
     [Required(ErrorMessage = "El Grado escolar es obligatorio")]
@@ -34,6 +40,9 @@ public class TeacherStudentDto
     public string AvatarUrl { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public List<EnrolledCourseSummaryDto> EnrolledCourses { get; set; } = new();
+
+    /// <summary>Contraseña temporal generada por el servidor (se devuelve una sola vez).</summary>
+    public string? TemporaryPassword { get; set; }
 }
 
 public class EnrolledCourseSummaryDto

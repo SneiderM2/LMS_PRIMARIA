@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { StudentService, StudentMetrics, StudentCoursesCatalog } from '../../core/services/student.service';
 import { AuthService } from '../../core/services/auth.service';
+import { FileDownloadService } from '../../core/services/file-download.service';
 import { Content } from '../../core/models/content.model';
 import { FileDropZoneComponent } from './components/file-drop-zone/file-drop-zone.component';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
@@ -55,7 +56,8 @@ export class StudentDashboardComponent implements OnInit {
 
   constructor(
     public authService: AuthService,
-    private studentService: StudentService
+    private studentService: StudentService,
+    private fileDownload: FileDownloadService
   ) {}
 
   ngOnInit(): void {
@@ -179,7 +181,7 @@ export class StudentDashboardComponent implements OnInit {
 
   public openMedia(url?: string): void {
     if (url) {
-      window.open(url, '_blank');
+      this.fileDownload.openInNewTab(url);
     }
   }
 

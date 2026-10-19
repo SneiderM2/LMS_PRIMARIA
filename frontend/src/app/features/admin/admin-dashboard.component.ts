@@ -281,6 +281,12 @@ export class AdminDashboardComponent implements OnInit {
       return;
     }
 
+    const password = (this.newUser.password || '').trim();
+    if (password.length > 0 && password.length < 12) {
+      this.createUserError = 'La contraseña debe tener al menos 12 caracteres, combinando letras y números.';
+      return;
+    }
+
     this.isCreatingUser = true;
     this.createUserError = null;
 
@@ -288,7 +294,12 @@ export class AdminDashboardComponent implements OnInit {
       next: (created) => {
         this.isCreatingUser = false;
         this.closeCreateUserModal();
-        this.showToast(`Usuario ${created.fullName} registrado correctamente. 🎉`, 'success');
+
+        const message = created.temporaryPassword
+          ? `Usuario ${created.fullName} creado. Contraseña temporal: ${created.temporaryPassword} — entrégala de forma segura.`
+          : `Usuario ${created.fullName} registrado correctamente. 🎉`;
+
+        this.showToast(message, 'success');
         this.loadUsers();
         this.loadMetrics();
       },

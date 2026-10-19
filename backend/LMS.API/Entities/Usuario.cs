@@ -15,14 +15,21 @@ public class Usuario
     public bool Activo { get; set; } = true;
     public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
 
-    // Sprint 4: Política de tratamiento de datos y protección contra fuerza bruta
+    // Política de tratamiento de datos (Ley 1581 de 2012) y protección contra fuerza bruta
     public bool DataPolicyAccepted { get; set; } = false;
     public DateTime? DataPolicyAcceptedAt { get; set; }
+    public string? DataPolicyVersion { get; set; }
+    /// <summary>Evidencia de consentimiento firmada (JSON + HMAC-SHA256).</summary>
+    public string? DataPolicyEvidence { get; set; }
     public int AccessFailedCount { get; set; } = 0;
     public DateTime? LockoutEnd { get; set; }
     // Control de sesión única / Prevención de doble sesión
     public string? SessionToken { get; set; }
     public DateTime? LastLoginAt { get; set; }
+
+    // Derechos de supresión y anonimización (Ley 1581 de 2012, art. 8)
+    public DateTime? DeletedAt { get; set; }
+    public DateTime? AnonymizedAt { get; set; }
 
     // Propiedad calculada
     public string FullName => $"{Nombre} {Apellido}".Trim();

@@ -6,7 +6,17 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>LMS.API</RootNamespace>
+    <UserSecretsId>lms-primaria-api-secrets</UserSecretsId>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- El archivo de secretos locales nunca debe publicarse ni copiarse a la imagen -->
+    <Content Update="appsettings.Local.json" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings.Example.json" CopyToPublishDirectory="Never" />
+    <None Update="appsettings.Local.json" CopyToOutputDirectory="Never" Condition="'$(Configuration)' == 'Release'" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Seguridad y autenticación -->

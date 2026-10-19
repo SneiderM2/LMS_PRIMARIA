@@ -1,8 +1,8 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap, catchError, throwError } from 'rxjs';
-import { LoginRequest, LoginResponse, RegisterRequest, User, UserRole } from '../models/user.model';
+import { Observable, tap, catchError } from 'rxjs';
+import { ConsentPayload, LoginRequest, LoginResponse, RegisterRequest, User, UserRole } from '../models/user.model';
 import { environment } from '../../../environments/environment';
 
 export interface ActiveSessionInfo {
@@ -29,55 +29,32 @@ export class AuthService {
 
   /**
    * Precalentamiento del backend (Wake-up ping).
-   * Despierta el servidor en Render en segundo plano mientras el usuario escribe sus credenciales,
-   * garantizando que el login se procese de forma inmediata cuando haga clic en "Ingresar".
+   * Despierta el servidor en Render en segundo plano mientras el usuario escribe sus credenciales.
+   * No se consultan endpoints de diagnóstico (fueron retirados por seguridad).
    */
   public warmup(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/ping`).pipe(
-      catchError(() => this.http.get<any>(`${this.apiUrl}/auth/diagnostic`))
+      catchError(() => this.http.get<any>(`${this.apiUrl}/health/live`))
     );
   }
 
-  /**
-   * Intenta iniciar sesión.
-   * @param credentials Datos de login
-   * @param forceLogin Si true, cierra la sesión activa en otro dispositivo
-   */
   public login(credentials: LoginRequest, forceLogin = false): Observable<LoginResponse> {
     const body = { ...credentials, forceLogin };
     return this.http.post<LoginResponse>(`${this.apiUrl}/auth/login`, body).pipe(
-      tap(response => {
-        this.saveAuthData(response.token, response.user);
-        this.currentUser.set(response.user);
-        this.redirectByRole(response.user.role);
-      })
+      tap(response => this.handleAuthResponse(response))
     );
   }
 
   public register(data: RegisterRequest): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.apiUrl}/auth/register`, data).pipe(
-      tap(response => {
-        this.saveAuthData(response.token, response.user);
-        this.currentUser.set(response.user);
-        this.redirectByRole(response.user.role);
-      })
+      tap(response => this.handleAuthResponse(response))
     );
   }
 
-  /**
-   * Intenta iniciar sesión con Google.
-   * @param idToken Token de identidad de Google
-   * @param honeypotTrap Valor del honeypot (debe estar vacío)
-   * @param forceLogin Si true, cierra la sesión activa en otro dispositivo
-   */
   public loginWithGoogle(idToken: string, honeypotTrap?: string, forceLogin = false): Observable<LoginResponse> {
     const body = { idToken, honeypotTrap, forceLogin };
     return this.http.post<LoginResponse>(`${this.apiUrl}/auth/google-login`, body).pipe(
-      tap(response => {
-        this.saveAuthData(response.token, response.user);
-        this.currentUser.set(response.user);
-        this.redirectByRole(response.user.role);
-      })
+      tap(response => this.handleAuthResponse(response))
     );
   }
 
@@ -85,12 +62,28 @@ export class AuthService {
     return this.loginWithGoogle(idToken);
   }
 
-  public acceptDataPolicy(): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/auth/accept-data-policy`, { accepted: true }).pipe(
+  /**
+   * Registra la aceptación de la política con evidencia (versión, acudiente si aplica).
+   */
+  public acceptDataPolicy(payload?: Partial<ConsentPayload>): Observable<any> {
+    const body = {
+      accepted: true,
+      version: payload?.version || environment.dataPolicyVersion,
+      guardianFullName: payload?.guardianFullName,
+      guardianDocument: payload?.guardianDocument,
+      guardianAuthorization: payload?.guardianAuthorization === true
+    };
+
+    return this.http.post<any>(`${this.apiUrl}/privacy/consent`, body).pipe(
       tap(() => {
         const user = this.currentUser();
         if (user) {
-          const updated = { ...user, dataPolicyAccepted: true };
+          const updated: User = {
+            ...user,
+            dataPolicyAccepted: true,
+            dataPolicyVersion: body.version,
+            requiresPolicyAcceptance: false
+          };
           this.currentUser.set(updated);
           localStorage.setItem(this.USER_KEY, JSON.stringify(updated));
         }
@@ -100,7 +93,6 @@ export class AuthService {
 
   /**
    * Polling ligero / Validación: verifica que la sesión actual siga siendo válida en el servidor.
-   * @param skipInterceptorRedirect Si true, evita que el interceptor ejecute redirección automática para permitir manejo del guard
    */
   public validateSession(skipInterceptorRedirect = false): Observable<{ valid: boolean }> {
     const headers: { [key: string]: string } = {};
@@ -122,7 +114,6 @@ export class AuthService {
   }
 
   public logout(): void {
-    // Intentar notificar al servidor (best-effort, sin bloquear)
     const token = this.getToken();
     if (token) {
       this.http.post(`${this.apiUrl}/auth/logout`, {}).subscribe({ error: () => {} });
@@ -131,10 +122,28 @@ export class AuthService {
     this.router.navigate(['/login']);
   }
 
+  /**
+   * Devuelve el token solo si existe y no ha expirado. Un token vencido se descarta.
+   */
   public getToken(): string | null {
-    return localStorage.getItem(this.TOKEN_KEY) || 
-           localStorage.getItem('token') || 
-           localStorage.getItem('access_token');
+    const token = localStorage.getItem(this.TOKEN_KEY)
+      || localStorage.getItem('token')
+      || localStorage.getItem('access_token');
+
+    if (!token) {
+      return null;
+    }
+
+    if (this.isTokenExpired(token)) {
+      this.clearSessionData();
+      return null;
+    }
+
+    return token;
+  }
+
+  public hasValidSession(): boolean {
+    return !!this.currentUser() && !!this.getToken();
   }
 
   public redirectByRole(role: UserRole): void {
@@ -146,11 +155,24 @@ export class AuthService {
         this.router.navigate(['/dashboard/student']);
         break;
       case 'Admin':
+      case '.admin':
         this.router.navigate(['/dashboard/admin']);
         break;
       default:
         this.router.navigate(['/login']);
     }
+  }
+
+  private handleAuthResponse(response: LoginResponse): void {
+    const user: User = {
+      ...response.user,
+      requiresPolicyAcceptance: response.requiresPolicyAcceptance ?? response.user.requiresPolicyAcceptance ?? false,
+      dataPolicyVersion: response.dataPolicyVersion ?? response.user.dataPolicyVersion
+    };
+
+    this.saveAuthData(response.token, user);
+    this.currentUser.set(user);
+    this.redirectByRole(user.role);
   }
 
   private saveAuthData(token: string, user: User): void {
@@ -165,6 +187,27 @@ export class AuthService {
       return JSON.parse(userJson) as User;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Decodifica el payload JWT sin validar la firma (la firma la valida el backend).
+   * Se usa únicamente para descartar tokens expirados en el cliente.
+   */
+  private isTokenExpired(token: string): boolean {
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) {
+        return true;
+      }
+
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+      const payload = JSON.parse(atob(padded));
+
+      return typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now();
+    } catch {
+      return true;
     }
   }
 }

@@ -1,128 +1,73 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Google.Apis.Auth;
+using LMS.API.Configuration;
 using LMS.API.Data;
 using LMS.API.DTOs;
 using LMS.API.Entities;
+using LMS.API.Middleware;
 using LMS.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LMS.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
+    private const int MaxFailedAttempts = 5;
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
     private readonly LMSDbContext _context;
     private readonly ITokenService _tokenService;
     private readonly ICaptchaService _captchaService;
+    private readonly ConsentService _consent;
     private readonly IConfiguration _configuration;
+    private readonly PrivacyOptions _privacy;
+    private readonly RegistrationOptions _registration;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
-        LMSDbContext context, 
+        LMSDbContext context,
         ITokenService tokenService,
         ICaptchaService captchaService,
+        ConsentService consent,
         IConfiguration configuration,
+        IOptions<PrivacyOptions> privacy,
+        IOptions<RegistrationOptions> registration,
         ILogger<AuthController> logger)
     {
         _context = context;
         _tokenService = tokenService;
         _captchaService = captchaService;
+        _consent = consent;
         _configuration = configuration;
+        _privacy = privacy.Value;
+        _registration = registration.Value;
         _logger = logger;
     }
 
-    [HttpGet("diagnostic")]
-    public async Task<IActionResult> Diagnostic()
-    {
-        try
-        {
-            var canConnect = await _context.Database.CanConnectAsync();
-            var totalUsers = await _context.Usuarios.CountAsync();
-            var roles = await _context.Roles.Select(r => r.Nombre).ToListAsync();
-            var conn = _context.Database.GetDbConnection();
-            var host = conn.DataSource;
-
-            return Ok(new
-            {
-                status = "OK",
-                databaseCanConnect = canConnect,
-                totalUsers = totalUsers,
-                roles = roles,
-                databaseHost = host,
-                timestamp = DateTime.UtcNow
-            });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
-            {
-                status = "DATABASE_ERROR",
-                errorType = ex.GetType().FullName,
-                errorMessage = ex.Message,
-                innerError = ex.InnerException?.Message,
-                timestamp = DateTime.UtcNow
-            });
-        }
-    }
-
     /// <summary>
-    /// Restablece y garantiza la creación de cuentas de prueba oficiales (admin, docente, estudiante)
-    /// </summary>
-    [HttpPost("seed-users")]
-    public async Task<IActionResult> SeedUsers()
-    {
-        try
-        {
-            await DbInitializer.SeedAsync(_context);
-            var users = await _context.Usuarios
-                .Where(u => u.Username == "admin" || u.Username == "docente" || u.Username == "estudiante")
-                .Select(u => new { u.Id, u.Username, u.FullName, u.Activo })
-                .ToListAsync();
-
-            return Ok(new
-            {
-                message = "Cuentas estándar sembradas y verificadas con éxito.",
-                users = users,
-                credentials = new[]
-                {
-                    new { role = "Administrador", username = "admin", password = "admin123" },
-                    new { role = "Docente", username = "docente", password = "docente123" },
-                    new { role = "Estudiante", username = "estudiante", password = "estudiante123" }
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sembrando usuarios");
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
-            {
-                message = "Error al sembrar usuarios",
-                detail = ex.Message
-            });
-        }
-    }
-
-    /// <summary>
-    /// Registro público de usuarios (Estudiante, Docente o Administrador) desde el portal
+    /// Registro público. Solo permite estudiantes (con autorización de acudiente) y docentes
+    /// con código de invitación institucional. Nunca crea administradores.
     /// </summary>
     [HttpPost("register")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(LoginResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
     {
-        // 1. Detección Honeypot: Si el campo señuelo viene diligenciado, es un bot de spam
+        // Honeypot: respuesta genérica, sin emitir sesión.
         if (!string.IsNullOrEmpty(request.HoneypotTrap))
         {
-            _logger.LogWarning("Intento de registro automatizado detectado por honeypot.");
-            return Ok(new LoginResponseDto
-            {
-                Token = "fake-token-honeypot",
-                Expiration = DateTime.UtcNow.AddMinutes(5),
-                User = new UserDto { Id = "bot", FullName = "Bot Deflected" }
-            });
+            _logger.LogWarning("Registro automatizado detectado por honeypot.");
+            return BadRequest(new { message = "No fue posible completar el registro. Verifica los datos e intenta de nuevo." });
         }
 
         if (!ModelState.IsValid)
@@ -132,36 +77,81 @@ public class AuthController : ControllerBase
 
         try
         {
-            // Verificación de seguridad reCAPTCHA
-            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
-            var isCaptchaValid = await _captchaService.VerifyTokenAsync(request.CaptchaToken, clientIp);
-            if (!isCaptchaValid)
+            var clientIp = ClientIp;
+            if (!await _captchaService.VerifyTokenAsync(request.CaptchaToken, clientIp))
             {
-                return BadRequest(new { message = "La verificación de reCAPTCHA falló o el token ha expirado. Por favor inténtalo de nuevo." });
+                return BadRequest(new { message = "La verificación de seguridad (reCAPTCHA) falló o expiró. Inténtalo de nuevo." });
+            }
+
+            var targetRoleName = ResolveSelfRegistrationRole(request.Role);
+            if (targetRoleName == null)
+            {
+                return BadRequest(new { message = "El registro público no permite crear cuentas administrativas." });
+            }
+
+            if (targetRoleName == "DOCENTE" && !IsValidTeacherInviteCode(request.TeacherInviteCode))
+            {
+                return BadRequest(new
+                {
+                    message = "El registro de docentes requiere un código de invitación institucional válido."
+                });
+            }
+
+            if (targetRoleName == "ALUMNO" && !_registration.AllowPublicStudentRegistration)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = "El registro público de estudiantes está deshabilitado. Contacta a tu institución."
+                });
+            }
+
+            // Consentimiento informado (Ley 1581 de 2012, arts. 4 y 9).
+            if (!request.AcceptDataPolicy)
+            {
+                return BadRequest(new
+                {
+                    code = "POLICY_REQUIRED",
+                    message = "Debes aceptar la política de tratamiento de datos personales para registrarte."
+                });
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.DataPolicyVersion)
+                && !string.Equals(request.DataPolicyVersion, _privacy.PolicyVersion, StringComparison.Ordinal))
+            {
+                return Conflict(new
+                {
+                    code = "POLICY_VERSION_CHANGED",
+                    message = "La política de tratamiento cambió. Recarga la página y vuelve a leerla.",
+                    currentVersion = _privacy.PolicyVersion
+                });
+            }
+
+            var guardianRequired = _privacy.RequireGuardianConsentForMinors && targetRoleName == "ALUMNO";
+            if (guardianRequired
+                && (!request.GuardianAuthorization
+                    || string.IsNullOrWhiteSpace(request.GuardianFullName)
+                    || request.GuardianFullName.Trim().Length < 5))
+            {
+                return BadRequest(new
+                {
+                    code = "GUARDIAN_CONSENT_REQUIRED",
+                    message = "Para registrar a un menor de edad se requiere el nombre y la autorización del padre, madre o acudiente (Ley 1581 de 2012, art. 7)."
+                });
+            }
+
+            var passwordCheck = PasswordPolicy.Validate(request.Password, request.Id, request.FullName);
+            if (!passwordCheck.IsValid)
+            {
+                return BadRequest(new { code = "WEAK_PASSWORD", message = passwordCheck.Message });
             }
 
             var cleanUsername = request.Id.Trim();
-            var existingUser = await _context.Usuarios
+            var exists = await _context.Usuarios
                 .AnyAsync(u => u.Username.ToLower() == cleanUsername.ToLower());
 
-            if (existingUser)
+            if (exists)
             {
                 return BadRequest(new { message = "El documento o carnet escolar ya se encuentra registrado." });
-            }
-
-            var reqRole = request.Role.Trim().ToUpperInvariant();
-            string targetRoleName = "ALUMNO";
-            if (reqRole.Contains("ADMIN") || reqRole == "ADMINISTRADOR")
-            {
-                targetRoleName = "ADMINISTRADOR";
-            }
-            else if (reqRole.Contains("TEACHER") || reqRole.Contains("DOCENTE") || reqRole.Contains("PROF"))
-            {
-                targetRoleName = "DOCENTE";
-            }
-            else
-            {
-                targetRoleName = "ALUMNO";
             }
 
             var rol = await _context.Roles.FirstOrDefaultAsync(r => r.Nombre == targetRoleName);
@@ -174,21 +164,22 @@ public class AuthController : ControllerBase
 
             var fullNameParts = request.FullName.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
             var firstName = fullNameParts.Length > 0 ? fullNameParts[0] : cleanUsername;
-            var lastName = fullNameParts.Length > 1 ? fullNameParts[1] : "";
+            var lastName = fullNameParts.Length > 1 ? fullNameParts[1] : string.Empty;
             var avatarUrl = $"https://api.dicebear.com/7.x/bottts/svg?seed={Uri.EscapeDataString(cleanUsername)}";
 
-            var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
             var nuevoUsuario = new Usuario
             {
                 RolId = rol.Id,
                 Username = cleanUsername,
-                PasswordHash = passwordHash,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12),
                 Nombre = firstName,
                 Apellido = lastName,
                 AvatarUrl = avatarUrl,
                 Activo = true,
                 FechaCreacion = DateTime.UtcNow,
-                DataPolicyAccepted = false,
+                DataPolicyAccepted = true,
+                DataPolicyAcceptedAt = DateTime.UtcNow,
+                DataPolicyVersion = _privacy.PolicyVersion,
                 AccessFailedCount = 0,
                 SessionToken = Guid.NewGuid().ToString("N")
             };
@@ -196,11 +187,20 @@ public class AuthController : ControllerBase
             _context.Usuarios.Add(nuevoUsuario);
             await _context.SaveChangesAsync();
 
+            // La evidencia se firma una vez asignado el Id interno.
+            nuevoUsuario.DataPolicyEvidence = _consent.BuildEvidence(
+                nuevoUsuario,
+                "registration",
+                clientIp,
+                Request.Headers.UserAgent.ToString(),
+                request.GuardianFullName,
+                request.GuardianDocument);
+
             string? gradoNombre = null;
             if (targetRoleName == "ALUMNO")
             {
                 var rawGrade = request.Grade?.Trim() ?? "1°";
-                var gradeKey = rawGrade.Contains('°') ? rawGrade.Substring(0, rawGrade.IndexOf('°') + 1) : rawGrade;
+                var gradeKey = rawGrade.Contains('°') ? rawGrade[..(rawGrade.IndexOf('°') + 1)] : rawGrade;
 
                 var grado = await _context.Grados.FirstOrDefaultAsync(g => g.Nombre == gradeKey || g.Nombre == rawGrade)
                             ?? await _context.Grados.FirstOrDefaultAsync(g => g.Nombre.StartsWith("1"))
@@ -215,38 +215,38 @@ public class AuthController : ControllerBase
 
                 gradoNombre = grado.Nombre;
 
-                var alumno = new Alumno
+                _context.Alumnos.Add(new Alumno
                 {
                     UsuarioId = nuevoUsuario.Id,
                     GradoId = grado.Id
-                };
-                _context.Alumnos.Add(alumno);
+                });
             }
 
             await _context.SaveChangesAsync();
             nuevoUsuario.Rol = rol;
 
-            var isNewUserAdmin = string.Equals(targetRoleName, ".admin", StringComparison.OrdinalIgnoreCase) ||
-                                 string.Equals(targetRoleName, "ADMINISTRADOR", StringComparison.OrdinalIgnoreCase) ||
-                                 string.Equals(targetRoleName, "Admin", StringComparison.OrdinalIgnoreCase);
-
             var (token, expiration) = _tokenService.GenerateToken(
-                nuevoUsuario, 
-                nuevoUsuario.FullName, 
-                rol.Nombre, 
-                gradoNombre, 
+                nuevoUsuario,
+                nuevoUsuario.FullName,
+                rol.Nombre,
+                gradoNombre,
                 avatarUrl);
+
+            await AuditAsync(nuevoUsuario, "Autenticación: Registro de cuenta",
+                $"Rol: {targetRoleName}; grado: {gradoNombre ?? "N/A"}; política: {_privacy.PolicyVersion}.");
 
             var userDto = new UserDto
             {
                 Id = nuevoUsuario.Username,
                 InternalId = nuevoUsuario.Id,
                 FullName = nuevoUsuario.FullName,
-                Role = isNewUserAdmin ? "Admin" : targetRoleName == "DOCENTE" ? "Teacher" : "Student",
+                Role = rol.Nombre == "DOCENTE" ? "Teacher" : "Student",
                 GradeLevel = gradoNombre,
                 LastLoginDate = DateTime.UtcNow,
                 AvatarUrl = avatarUrl,
-                DataPolicyAccepted = false
+                DataPolicyAccepted = true,
+                DataPolicyVersion = _privacy.PolicyVersion,
+                RequiresPolicyAcceptance = false
             };
 
             return CreatedAtAction(nameof(GetCurrentUser), new LoginResponseDto
@@ -254,31 +254,27 @@ public class AuthController : ControllerBase
                 Token = token,
                 Expiration = expiration,
                 User = userDto,
-                RequiresPolicyAcceptance = true
+                RequiresPolicyAcceptance = false,
+                DataPolicyVersion = _privacy.PolicyVersion
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error al registrar usuario {Id}", request.Id);
+            _logger.LogError(ex, "Error al registrar usuario.");
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new
             {
-                message = "No fue posible registrar la cuenta en este momento. Intenta de nuevo en unos segundos.",
-                detail = ex.Message
+                message = "No fue posible registrar la cuenta en este momento. Intenta de nuevo en unos segundos."
             });
         }
     }
 
     [HttpPost("login")]
+    [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     {
         if (!string.IsNullOrEmpty(request.HoneypotTrap))
         {
-            return Ok(new LoginResponseDto
-            {
-                Token = "fake-token-honeypot",
-                Expiration = DateTime.UtcNow.AddMinutes(5),
-                User = new UserDto { Id = "bot", FullName = "Bot Intercepted" }
-            });
+            return Unauthorized(new { message = "Identificación o contraseña incorrecta." });
         }
 
         if (!ModelState.IsValid)
@@ -288,53 +284,59 @@ public class AuthController : ControllerBase
 
         try
         {
-            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
-            var isCaptchaValid = await _captchaService.VerifyTokenAsync(request.CaptchaToken, clientIp);
-            if (!isCaptchaValid)
+            var clientIp = ClientIp;
+            if (!await _captchaService.VerifyTokenAsync(request.CaptchaToken, clientIp))
             {
-                return BadRequest(new { message = "La verificación de reCAPTCHA falló o el token ha expirado." });
+                return BadRequest(new { message = "La verificación de seguridad (reCAPTCHA) falló o expiró." });
             }
 
             var cleanUsername = request.Id.Trim();
             var user = await _context.Usuarios
                 .Include(u => u.Rol)
                 .Include(u => u.Alumno)
-                .ThenInclude(a => a!.Grado)
-                .FirstOrDefaultAsync(u => u.Username.ToLower() == cleanUsername.ToLower() && u.Activo);
+                    .ThenInclude(a => a!.Grado)
+                .FirstOrDefaultAsync(u => u.Username.ToLower() == cleanUsername.ToLower());
 
-            if (user == null)
+            // Respuesta uniforme: no se revela si el usuario existe o está inactivo.
+            if (user == null || !user.Activo)
             {
-                return Unauthorized(new { message = "Identificación escolar o contraseña incorrecta." });
+                await AuditAsync(user, "Autenticación: Intento de login fallido", $"Identificador inexistente o inactivo: {cleanUsername}", "WARNING");
+                return Unauthorized(new { message = "Identificación o contraseña incorrecta." });
             }
 
             if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
             {
-                var remaining = user.LockoutEnd.Value - DateTime.UtcNow;
-                var remainingMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
+                var minutes = Math.Max(1, (int)Math.Ceiling((user.LockoutEnd.Value - DateTime.UtcNow).TotalMinutes));
+                await AuditAsync(user, "Autenticación: Login bloqueado por intentos fallidos", null, "WARNING");
                 return StatusCode(StatusCodes.Status423Locked, new
                 {
-                    message = $"Tu cuenta está bloqueada temporalmente. Espera {remainingMinutes} minuto(s)."
+                    message = $"La cuenta está bloqueada temporalmente por seguridad. Intenta de nuevo en {minutes} minuto(s)."
                 });
             }
 
             if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 user.AccessFailedCount++;
-                if (user.AccessFailedCount >= 5)
+
+                if (user.AccessFailedCount >= MaxFailedAttempts)
                 {
-                    user.LockoutEnd = DateTime.UtcNow.AddMinutes(10);
+                    user.LockoutEnd = DateTime.UtcNow.Add(LockoutDuration);
+                    user.AccessFailedCount = 0;
                     await _context.SaveChangesAsync();
+                    await AuditAsync(user, "Autenticación: Cuenta bloqueada por fuerza bruta",
+                        $"Bloqueo de {LockoutDuration.TotalMinutes} minutos.", "WARNING");
+
                     return StatusCode(StatusCodes.Status423Locked, new
                     {
-                        message = "Has alcanzado el límite de 5 intentos. Tu cuenta ha sido bloqueada por 10 minutos."
+                        message = "Se alcanzó el límite de intentos. La cuenta estará bloqueada temporalmente por 15 minutos."
                     });
                 }
 
                 await _context.SaveChangesAsync();
-                return Unauthorized(new
-                {
-                    message = $"Identificación o contraseña incorrecta. Te quedan {5 - user.AccessFailedCount} intento(s)."
-                });
+                await AuditAsync(user, "Autenticación: Contraseña incorrecta",
+                    $"Intento fallido {user.AccessFailedCount} de {MaxFailedAttempts}.", "WARNING");
+
+                return Unauthorized(new { message = "Identificación o contraseña incorrecta." });
             }
 
             user.AccessFailedCount = 0;
@@ -343,28 +345,24 @@ public class AuthController : ControllerBase
             user.LastLoginAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            var fullName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName : user.Username;
+            var fullName = string.IsNullOrWhiteSpace(user.FullName) ? user.Username : user.FullName;
             var gradeName = user.Alumno?.Grado?.Nombre;
-            var avatar = user.AvatarUrl ?? $"https://api.dicebear.com/7.x/bottts/svg?seed={user.Username}";
+            var avatar = user.AvatarUrl ?? $"https://api.dicebear.com/7.x/bottts/svg?seed={Uri.EscapeDataString(user.Username)}";
 
-            var (token, expiration) = _tokenService.GenerateToken(
-                user, 
-                fullName, 
-                user.Rol.Nombre, 
-                gradeName, 
-                avatar);
+            var (token, expiration) = _tokenService.GenerateToken(user, fullName, user.Rol.Nombre, gradeName, avatar);
 
-            var isAdministrator = string.Equals(user.Rol.Nombre, ".admin", StringComparison.OrdinalIgnoreCase) ||
-                                 string.Equals(user.Rol.Nombre, "ADMINISTRADOR", StringComparison.OrdinalIgnoreCase) ||
-                                 string.Equals(user.Rol.Nombre, "Admin", StringComparison.OrdinalIgnoreCase);
+            var roleStr = TokenService.NormalizeRole(user.Rol.Nombre);
+            var requiresPolicy = !_consent.IsCurrent(user);
 
-            var roleStr = isAdministrator ? "Admin" : user.Rol.Nombre == "DOCENTE" ? "Teacher" : "Student";
+            await AuditAsync(user, "Autenticación: Inicio de sesión exitoso",
+                $"Rol: {user.Rol.Nombre}; requiere aceptación de política: {requiresPolicy}.");
 
             return Ok(new LoginResponseDto
             {
                 Token = token,
                 Expiration = expiration,
-                RequiresPolicyAcceptance = !user.DataPolicyAccepted,
+                RequiresPolicyAcceptance = requiresPolicy,
+                DataPolicyVersion = _privacy.PolicyVersion,
                 User = new UserDto
                 {
                     Id = user.Username,
@@ -374,46 +372,95 @@ public class AuthController : ControllerBase
                     GradeLevel = gradeName,
                     LastLoginDate = DateTime.UtcNow,
                     AvatarUrl = avatar,
-                    DataPolicyAccepted = user.DataPolicyAccepted
+                    DataPolicyAccepted = user.DataPolicyAccepted,
+                    DataPolicyVersion = user.DataPolicyVersion,
+                    RequiresPolicyAcceptance = requiresPolicy
                 }
             });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error en login");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error interno del servidor.", detail = ex.Message });
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error interno del servidor." });
         }
     }
 
     /// <summary>
-    /// Aceptación formal de la política institucional de tratamiento de datos personales
+    /// Aceptación de la política con evidencia (compatibilidad con el flujo anterior).
     /// </summary>
     [Authorize]
     [HttpPost("accept-data-policy")]
     public async Task<IActionResult> AcceptDataPolicy([FromBody] AcceptDataPolicyDto dto)
     {
-        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(username)) return Unauthorized();
+        if (!dto.Accepted)
+        {
+            return BadRequest(new { message = "Debes aceptar la política de tratamiento de datos para continuar." });
+        }
 
-        var user = await _context.Usuarios.FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
-        if (user == null) return NotFound(new { message = "Usuario no encontrado." });
+        if (!string.IsNullOrWhiteSpace(dto.Version)
+            && !string.Equals(dto.Version, _privacy.PolicyVersion, StringComparison.Ordinal))
+        {
+            return Conflict(new { message = "La versión de la política cambió.", currentVersion = _privacy.PolicyVersion });
+        }
+
+        var user = await GetCurrentUserAsync(includeStudent: true);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        var isStudent = user.Alumno != null
+                        || string.Equals(user.Rol?.Nombre, "ALUMNO", StringComparison.OrdinalIgnoreCase);
+
+        if (_privacy.RequireGuardianConsentForMinors && isStudent)
+        {
+            if (!dto.GuardianAuthorization
+                || string.IsNullOrWhiteSpace(dto.GuardianFullName)
+                || dto.GuardianFullName.Trim().Length < 5)
+            {
+                return BadRequest(new
+                {
+                    code = "GUARDIAN_CONSENT_REQUIRED",
+                    message = "Para estudiantes menores de edad se requiere la autorización del padre, madre o acudiente."
+                });
+            }
+        }
 
         user.DataPolicyAccepted = true;
         user.DataPolicyAcceptedAt = DateTime.UtcNow;
+        user.DataPolicyVersion = _privacy.PolicyVersion;
+        user.DataPolicyEvidence = _consent.BuildEvidence(
+            user,
+            "login-modal",
+            ClientIp,
+            Request.Headers.UserAgent.ToString(),
+            dto.GuardianFullName,
+            dto.GuardianDocument);
+
         await _context.SaveChangesAsync();
 
-        return Ok(new { message = "Política de tratamiento de datos aceptada exitosamente.", acceptedAt = user.DataPolicyAcceptedAt });
+        await AuditAsync(user, "Privacidad: Aceptación de política de tratamiento de datos",
+            $"Versión {_privacy.PolicyVersion}.");
+
+        return Ok(new
+        {
+            message = "Política de tratamiento de datos aceptada exitosamente.",
+            acceptedAt = user.DataPolicyAcceptedAt,
+            version = user.DataPolicyVersion
+        });
     }
 
     /// <summary>
-    /// Autenticación alternativa con Google Identity (OAuth 2.0 / Google Sign-In)
+    /// Autenticación con Google Identity. Exige validación criptográfica real del ID token
+    /// y una cuenta institucional previamente registrada.
     /// </summary>
     [HttpPost("google-login")]
+    [AllowAnonymous]
     public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginDto dto)
     {
         if (!string.IsNullOrEmpty(dto.HoneypotTrap))
         {
-            return Ok(new { token = "fake-token-honeypot" });
+            return Unauthorized(new { message = "No fue posible iniciar sesión con Google." });
         }
 
         if (string.IsNullOrWhiteSpace(dto.IdToken))
@@ -421,138 +468,91 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = "Token de autenticación de Google no proporcionado." });
         }
 
-        string email = "";
-        string name = "";
-        string picture = "";
+        var googleClientId = _configuration["Authentication:Google:ClientId"];
+        if (string.IsNullOrWhiteSpace(googleClientId) || googleClientId.Contains("sampleclientidforexample", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Intento de login con Google sin ClientId configurado.");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = "El inicio de sesión con Google no está disponible en este momento."
+            });
+        }
 
+        GoogleJsonWebSignature.Payload payload;
         try
         {
-            var googleClientId = _configuration["Authentication:Google:ClientId"];
-            GoogleJsonWebSignature.Payload? payload = null;
-
-            if (!string.IsNullOrWhiteSpace(googleClientId) && !googleClientId.Contains("sampleclientidforexample"))
+            payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken, new GoogleJsonWebSignature.ValidationSettings
             {
-                var validationSettings = new GoogleJsonWebSignature.ValidationSettings
-                {
-                    Audience = new[] { googleClientId }
-                };
-                payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken, validationSettings);
-            }
-            else
-            {
-                try
-                {
-                    payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken);
-                }
-                catch
-                {
-                    var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-                    var jwtToken = handler.ReadJwtToken(dto.IdToken);
-                    var emailClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "email" || c.Type == ClaimTypes.Email);
-                    var nameClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "name" || c.Type == ClaimTypes.Name);
-                    var picClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "picture");
-
-                    if (emailClaim == null)
-                    {
-                        return BadRequest(new { message = "El token de Google no contiene una cuenta de correo válida." });
-                    }
-
-                    email = emailClaim.Value;
-                    name = nameClaim?.Value ?? email.Split('@')[0];
-                    picture = picClaim?.Value ?? $"https://api.dicebear.com/7.x/bottts/svg?seed={email}";
-                }
-            }
-
-            if (payload != null)
-            {
-                email = payload.Email;
-                name = payload.Name ?? $"{payload.GivenName} {payload.FamilyName}".Trim();
-                if (string.IsNullOrWhiteSpace(name)) name = email.Split('@')[0];
-                picture = payload.Picture ?? $"https://api.dicebear.com/7.x/bottts/svg?seed={email}";
-            }
+                Audience = new[] { googleClientId }
+            });
         }
         catch (InvalidJwtException ex)
         {
-            _logger.LogWarning(ex, "Token de Google inválido criptográficamente");
-            return Unauthorized(new { message = "Token de Google inválido o caducado.", detail = ex.Message });
+            _logger.LogWarning(ex, "ID token de Google inválido.");
+            return Unauthorized(new { message = "Token de Google inválido o caducado." });
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Token de Google no procesable");
+            _logger.LogWarning(ex, "Token de Google no procesable.");
             return BadRequest(new { message = "Token de Google no procesable." });
         }
 
+        if (string.IsNullOrWhiteSpace(payload.Email) || payload.EmailVerified != true)
+        {
+            return Unauthorized(new { message = "La cuenta de Google no tiene un correo verificado." });
+        }
+
+        var email = payload.Email.Trim();
         var user = await _context.Usuarios
             .Include(u => u.Rol)
             .Include(u => u.Alumno)
                 .ThenInclude(a => a!.Grado)
             .FirstOrDefaultAsync(u => u.Username.ToLower() == email.ToLower());
 
-        if (user != null)
-        {
-            if (!user.Activo)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, new 
-                { 
-                    message = "Esta cuenta ha sido desactivada por un administrador escolar." 
-                });
-            }
-        }
-
         if (user == null)
         {
-            var rolAlumno = await _context.Roles.FirstOrDefaultAsync(r => r.Nombre == "ALUMNO")
-                            ?? await _context.Roles.FirstOrDefaultAsync();
-
-            var primerGrado = await _context.Grados.FirstOrDefaultAsync();
-
-            var nameParts = name.Split(' ', 2);
-            user = new Usuario
+            await AuditAsync(null, "Autenticación: Login Google con cuenta no registrada", email, "WARNING");
+            return StatusCode(StatusCodes.Status403Forbidden, new
             {
-                Username = email,
-                Nombre = nameParts.Length > 0 ? nameParts[0] : name,
-                Apellido = nameParts.Length > 1 ? nameParts[1] : "",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
-                RolId = rolAlumno?.Id ?? 4,
-                AvatarUrl = picture,
-                Activo = true,
-                FechaCreacion = DateTime.UtcNow,
-                DataPolicyAccepted = false
-            };
+                code = "ACCOUNT_NOT_REGISTERED",
+                message = "No existe una cuenta institucional asociada a este correo. Regístrate con la autorización de tu acudiente o contacta a la institución."
+            });
+        }
 
-            _context.Usuarios.Add(user);
-            await _context.SaveChangesAsync();
-
-            if (primerGrado != null)
+        if (!user.Activo)
+        {
+            await AuditAsync(user, "Autenticación: Login Google de cuenta inactiva", null, "WARNING");
+            return StatusCode(StatusCodes.Status403Forbidden, new
             {
-                _context.Alumnos.Add(new Alumno { UsuarioId = user.Id, GradoId = primerGrado.Id });
-                await _context.SaveChangesAsync();
-            }
-
-            user.Rol = rolAlumno!;
+                message = "Esta cuenta ha sido desactivada por un administrador escolar."
+            });
         }
 
         user.SessionToken = Guid.NewGuid().ToString("N");
         user.LastLoginAt = DateTime.UtcNow;
+        user.AccessFailedCount = 0;
+        user.LockoutEnd = null;
         await _context.SaveChangesAsync();
 
         var (token, expiration) = _tokenService.GenerateToken(
-            user, 
-            user.FullName, 
-            user.Rol?.Nombre ?? "ALUMNO", 
-            user.Alumno?.Grado?.Nombre, 
+            user,
+            user.FullName,
+            user.Rol?.Nombre ?? "ALUMNO",
+            user.Alumno?.Grado?.Nombre,
             user.AvatarUrl);
 
-        var isAdministrator = string.Equals(user.Rol?.Nombre, ".admin", StringComparison.OrdinalIgnoreCase) ||
-                              string.Equals(user.Rol?.Nombre, "ADMINISTRADOR", StringComparison.OrdinalIgnoreCase);
+        var roleStr = TokenService.NormalizeRole(user.Rol?.Nombre);
+        var requiresPolicy = !_consent.IsCurrent(user);
 
-        var roleStr = isAdministrator ? "Admin" : user.Rol?.Nombre == "DOCENTE" ? "Teacher" : "Student";
+        await AuditAsync(user, "Autenticación: Inicio de sesión con Google",
+            $"Correo verificado; requiere política: {requiresPolicy}.");
 
         return Ok(new LoginResponseDto
         {
             Token = token,
             Expiration = expiration,
-            RequiresPolicyAcceptance = !user.DataPolicyAccepted,
+            RequiresPolicyAcceptance = requiresPolicy,
+            DataPolicyVersion = _privacy.PolicyVersion,
             User = new UserDto
             {
                 Id = user.Username,
@@ -561,57 +561,40 @@ public class AuthController : ControllerBase
                 Role = roleStr,
                 GradeLevel = user.Alumno?.Grado?.Nombre,
                 LastLoginDate = DateTime.UtcNow,
-                AvatarUrl = user.AvatarUrl ?? picture,
-                DataPolicyAccepted = user.DataPolicyAccepted
+                AvatarUrl = user.AvatarUrl ?? $"https://api.dicebear.com/7.x/bottts/svg?seed={Uri.EscapeDataString(user.Username)}",
+                DataPolicyAccepted = user.DataPolicyAccepted,
+                DataPolicyVersion = user.DataPolicyVersion,
+                RequiresPolicyAcceptance = requiresPolicy
             }
         });
     }
 
-    /// <summary>
-    /// Retorna los datos del usuario autenticado en sesión
-    /// </summary>
     [Authorize]
     [HttpGet("me")]
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetCurrentUser()
     {
-        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(username))
+        var user = await GetCurrentUserAsync(includeStudent: true);
+        if (user == null)
         {
             return Unauthorized();
         }
 
-        var user = await _context.Usuarios
-            .Include(u => u.Rol)
-            .Include(u => u.Alumno)
-                .ThenInclude(a => a!.Grado)
-            .FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
-
-        if (user == null)
-        {
-            return NotFound();
-        }
-
-        var fullName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName : user.Username;
-        var gradeName = user.Alumno?.Grado?.Nombre;
-        var avatar = user.AvatarUrl ?? $"https://api.dicebear.com/7.x/bottts/svg?seed={user.Username}";
-
-        var isAdministrator = string.Equals(user.Rol.Nombre, ".admin", StringComparison.OrdinalIgnoreCase) ||
-                              string.Equals(user.Rol.Nombre, "ADMINISTRADOR", StringComparison.OrdinalIgnoreCase) ||
-                              string.Equals(user.Rol.Nombre, "Admin", StringComparison.OrdinalIgnoreCase);
-
-        var roleStr = isAdministrator ? "Admin" : user.Rol.Nombre == "DOCENTE" ? "Teacher" : "Student";
+        var roleStr = TokenService.NormalizeRole(user.Rol?.Nombre);
+        var requiresPolicy = !_consent.IsCurrent(user);
 
         return Ok(new UserDto
         {
             Id = user.Username,
             InternalId = user.Id,
-            FullName = fullName,
+            FullName = string.IsNullOrWhiteSpace(user.FullName) ? user.Username : user.FullName,
             Role = roleStr,
-            GradeLevel = gradeName,
-            LastLoginDate = DateTime.UtcNow,
-            AvatarUrl = avatar,
-            DataPolicyAccepted = user.DataPolicyAccepted
+            GradeLevel = user.Alumno?.Grado?.Nombre,
+            LastLoginDate = user.LastLoginAt,
+            AvatarUrl = user.AvatarUrl ?? $"https://api.dicebear.com/7.x/bottts/svg?seed={Uri.EscapeDataString(user.Username)}",
+            DataPolicyAccepted = user.DataPolicyAccepted,
+            DataPolicyVersion = user.DataPolicyVersion,
+            RequiresPolicyAcceptance = requiresPolicy
         });
     }
 
@@ -619,17 +602,15 @@ public class AuthController : ControllerBase
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
-        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!string.IsNullOrEmpty(username))
+        var user = await GetCurrentUserAsync(includeStudent: false);
+        if (user != null)
         {
-            var user = await _context.Usuarios.FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
-            if (user != null)
-            {
-                user.SessionToken = null;
-                user.LastLoginAt = null;
-                await _context.SaveChangesAsync();
-            }
+            user.SessionToken = null;
+            user.LastLoginAt = null;
+            await _context.SaveChangesAsync();
+            await AuditAsync(user, "Autenticación: Cierre de sesión");
         }
+
         return Ok(new { message = "Sesión cerrada correctamente." });
     }
 
@@ -641,11 +622,13 @@ public class AuthController : ControllerBase
         var tokenSession = User.FindFirst("session_token")?.Value;
 
         if (string.IsNullOrEmpty(username))
+        {
             return Unauthorized(new { code = "DUPLICATE_SESSION", message = "Sesión inválida." });
+        }
 
         var dbSessionToken = await _context.Usuarios
             .AsNoTracking()
-            .Where(u => u.Username.ToLower() == username.ToLower())
+            .Where(u => u.Username.ToLower() == username.ToLower() && u.Activo)
             .Select(u => u.SessionToken)
             .FirstOrDefaultAsync();
 
@@ -659,5 +642,88 @@ public class AuthController : ControllerBase
         }
 
         return Ok(new { valid = true });
+    }
+
+    private async Task<Usuario?> GetCurrentUserAsync(bool includeStudent)
+    {
+        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return null;
+        }
+
+        var query = _context.Usuarios.Include(u => u.Rol).AsQueryable();
+
+        if (includeStudent)
+        {
+            query = query
+                .Include(u => u.Alumno)
+                    .ThenInclude(a => a!.Grado);
+        }
+
+        return await query.FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
+    }
+
+    private string? ClientIp => HttpContext.Connection.RemoteIpAddress?.ToString();
+
+    /// <summary>
+    /// Determina el rol permitido en auto-registro. Devuelve null para roles administrativos.
+    /// </summary>
+    private static string? ResolveSelfRegistrationRole(string? requestedRole)
+    {
+        var role = (requestedRole ?? "Student").Trim().ToUpperInvariant();
+
+        if (role.Contains("ADMIN"))
+        {
+            return null;
+        }
+
+        if (role.Contains("TEACHER") || role.Contains("DOCENTE") || role.Contains("PROF"))
+        {
+            return "DOCENTE";
+        }
+
+        return "ALUMNO";
+    }
+
+    private bool IsValidTeacherInviteCode(string? providedCode)
+    {
+        var expected = _registration.TeacherInviteCode;
+        if (string.IsNullOrWhiteSpace(expected) || string.IsNullOrWhiteSpace(providedCode))
+        {
+            return false;
+        }
+
+        var provided = Encoding.UTF8.GetBytes(providedCode.Trim());
+        var expectedBytes = Encoding.UTF8.GetBytes(expected);
+
+        return provided.Length == expectedBytes.Length
+               && CryptographicOperations.FixedTimeEquals(provided, expectedBytes);
+    }
+
+    private async Task AuditAsync(Usuario? user, string action, string? details = null, string level = "AUDIT")
+    {
+        try
+        {
+            await FileLogger.WriteAuditAsync(new AuditLogEntry
+            {
+                Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                Level = level,
+                Method = HttpContext.Request.Method,
+                Path = HttpContext.Request.Path.ToString(),
+                StatusCode = HttpContext.Response.StatusCode,
+                ElapsedMs = 0,
+                Ip = ClientIp ?? "0.0.0.0",
+                UserId = user?.Username,
+                UserEmail = user is not null && user.Username.Contains('@') ? user.Username : null,
+                UserRole = user?.Rol?.Nombre,
+                Action = action,
+                Details = details
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No fue posible registrar la auditoría de autenticación.");
+        }
     }
 }
