@@ -67,6 +67,12 @@ builder.WebHost.ConfigureKestrel(options =>
     options.AddServerHeader = false;
 });
 
+var renderPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(renderPort))
+{
+    builder.WebHost.UseUrls($"http://+:{renderPort}");
+}
+
 // ---------------------------------------------------------------------------
 // 3. Inyección de dependencias
 // ---------------------------------------------------------------------------

@@ -19,13 +19,7 @@ RUN dotnet publish "LMS.API.csproj" -c Release -o /app/publish /p:UseAppHost=fal
 # ==========================================
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
-
-# Ejecutar como usuario sin privilegios (principio de mínimo privilegio)
-RUN adduser --disabled-password --gecos "" --home /app appuser \
-    && mkdir -p /app/logs /app/App_Data/uploads \
-    && chown -R appuser:appuser /app
-
-COPY --from=build --chown=appuser:appuser /app/publish .
+COPY --from=build /app/publish .
 
 ENV ASPNETCORE_HTTP_PORTS=8080
 ENV ASPNETCORE_URLS=http://+:8080
@@ -34,6 +28,5 @@ ENV DOTNET_NOLOGO=1
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
 
 EXPOSE 8080
-USER appuser
 
 ENTRYPOINT ["dotnet", "LMS.API.dll"]
