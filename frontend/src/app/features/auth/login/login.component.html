@@ -77,6 +77,29 @@
         <!-- Widget de verificación de seguridad CAPTCHA -->
         <div class="captcha-wrapper">
           <div id="recaptcha-container" class="recaptcha-box"></div>
+
+          <!-- Indicador de verificación activa en modo desarrollo -->
+          <div *ngIf="isDevCaptchaActive" class="captcha-dev-badge">
+            <span class="badge-icon">⚡</span>
+            <span>Verificación local activa (Modo Desarrollo)</span>
+          </div>
+
+          <!-- Aviso si reCAPTCHA fue bloqueado por adblockers o fallo de red -->
+          <div *ngIf="captchaLoadError && !captchaToken" class="captcha-fallback-notice">
+            <span class="fallback-icon">🛡️</span>
+            <div class="fallback-text">
+              <strong>Verificación de seguridad</strong>
+              <p *ngIf="isProduction">
+                No se pudo cargar Google reCAPTCHA. Si usas un bloqueador de anuncios (AdBlock, Brave Shields), por favor desactívalo para este sitio y recarga la página.
+              </p>
+              <p *ngIf="!isProduction">
+                Modo desarrollo local: puedes continuar con la verificación interna escolar.
+              </p>
+            </div>
+            <button *ngIf="!isProduction" type="button" class="btn-dev-bypass" (click)="bypassCaptchaDev()">
+              ⚡ Activar verificación local
+            </button>
+          </div>
         </div>
 
         <button type="submit" class="btn btn-primary btn-lg btn-block" [disabled]="isLoading">
@@ -241,6 +264,29 @@
         <!-- Widget de verificación de seguridad CAPTCHA para Registro -->
         <div class="captcha-wrapper">
           <div id="recaptcha-reg-container" class="recaptcha-box"></div>
+
+          <!-- Indicador de verificación activa en modo desarrollo -->
+          <div *ngIf="isDevCaptchaActive" class="captcha-dev-badge">
+            <span class="badge-icon">⚡</span>
+            <span>Verificación local activa (Modo Desarrollo)</span>
+          </div>
+
+          <!-- Aviso si reCAPTCHA fue bloqueado por adblockers o fallo de red -->
+          <div *ngIf="captchaLoadError && !captchaToken" class="captcha-fallback-notice">
+            <span class="fallback-icon">🛡️</span>
+            <div class="fallback-text">
+              <strong>Verificación de seguridad</strong>
+              <p *ngIf="isProduction">
+                No se pudo cargar Google reCAPTCHA. Si usas un bloqueador de anuncios (AdBlock, Brave Shields), por favor desactívalo para este sitio y recarga la página.
+              </p>
+              <p *ngIf="!isProduction">
+                Modo desarrollo local: puedes continuar con la verificación interna escolar.
+              </p>
+            </div>
+            <button *ngIf="!isProduction" type="button" class="btn-dev-bypass" (click)="bypassCaptchaDev()">
+              ⚡ Activar verificación local
+            </button>
+          </div>
         </div>
 
         <!-- Botón de Registro -->

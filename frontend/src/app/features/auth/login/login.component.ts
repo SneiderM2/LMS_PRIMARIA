@@ -33,6 +33,9 @@ export class LoginComponent implements OnInit, AfterViewInit {
   public captchaToken = '';
   public captchaWidgetId: any = null;
   public captchaRegWidgetId: any = null;
+  public isProduction = environment.production;
+  public captchaLoadError = false;
+  public isDevCaptchaActive = false;
 
   // Campos de Registro
   public regId = '';
@@ -107,67 +110,114 @@ export class LoginComponent implements OnInit, AfterViewInit {
     this.initGoogleSignIn();
   }
 
+  public bypassCaptchaDev(): void {
+    if (!this.isProduction) {
+      this.captchaToken = 'DEV_TEST_TOKEN';
+      this.isDevCaptchaActive = true;
+      this.errorMessage = null;
+    }
+  }
+
   private initRecaptcha(): void {
     const siteKey = environment.recaptchaSiteKey;
     if (!siteKey) {
       console.warn('[reCAPTCHA] No hay site key configurada; el registro y el login no estarán disponibles.');
+      this.captchaLoadError = true;
       return;
     }
 
-    // Esperar a que el SDK de Google reCAPTCHA esté listo
+    let attempts = 0;
+    const maxAttempts = 15; // ~4.5 segundos
     const checkGrecaptcha = setInterval(() => {
+      attempts++;
       if (typeof grecaptcha !== 'undefined' && grecaptcha.render) {
         clearInterval(checkGrecaptcha);
-
-        // 1. Widget de reCAPTCHA en el formulario de Login
-        const loginContainer = document.getElementById('recaptcha-container');
-        if (loginContainer && this.captchaWidgetId === null) {
-          try {
-            this.captchaWidgetId = grecaptcha.render('recaptcha-container', {
-              sitekey: siteKey,
-              callback: (token: string) => {
-                this.ngZone.run(() => {
-                  this.captchaToken = token;
-                  this.errorMessage = null;
-                });
-              },
-              'expired-callback': () => {
-                this.ngZone.run(() => {
-                  this.captchaToken = '';
-                });
-              }
-            });
-          } catch (e) {
-            console.warn('[reCAPTCHA Login] error al inicializar:', e);
-          }
+        this.renderLoginCaptcha(siteKey);
+        if (this.activeTab === 'register') {
+          this.renderRegisterCaptcha(siteKey);
         }
-
-        // 2. Widget de reCAPTCHA en el formulario de Registro
-        const regContainer = document.getElementById('recaptcha-reg-container');
-        if (regContainer && this.captchaRegWidgetId === null) {
-          try {
-            this.captchaRegWidgetId = grecaptcha.render('recaptcha-reg-container', {
-              sitekey: siteKey,
-              callback: (token: string) => {
-                this.ngZone.run(() => {
-                  this.captchaToken = token;
-                  this.errorMessage = null;
-                });
-              },
-              'expired-callback': () => {
-                this.ngZone.run(() => {
-                  this.captchaToken = '';
-                });
-              }
-            });
-          } catch (e) {
-            console.warn('[reCAPTCHA Registro] error al inicializar:', e);
-          }
-        }
+      } else if (attempts >= maxAttempts) {
+        clearInterval(checkGrecaptcha);
+        console.warn('[reCAPTCHA] SDK no disponible tras tiempo límite de espera.');
+        this.ngZone.run(() => {
+          this.captchaLoadError = true;
+        });
       }
     }, 300);
+  }
 
-    setTimeout(() => clearInterval(checkGrecaptcha), 10000);
+  private renderLoginCaptcha(siteKey: string): void {
+    const loginContainer = document.getElementById('recaptcha-container');
+    if (loginContainer && this.captchaWidgetId === null) {
+      try {
+        this.captchaWidgetId = grecaptcha.render('recaptcha-container', {
+          sitekey: siteKey,
+          callback: (token: string) => {
+            this.ngZone.run(() => {
+              this.captchaToken = token;
+              this.isDevCaptchaActive = false;
+              this.errorMessage = null;
+            });
+          },
+          'expired-callback': () => {
+            this.ngZone.run(() => {
+              this.captchaToken = '';
+            });
+          },
+          'error-callback': () => {
+            this.ngZone.run(() => {
+              console.warn('[reCAPTCHA Login] Error reportado por el widget.');
+              this.captchaLoadError = true;
+            });
+          }
+        });
+      } catch (e) {
+        console.warn('[reCAPTCHA Login] error al inicializar:', e);
+      }
+    }
+  }
+
+  private renderRegisterCaptcha(siteKey: string): void {
+    const regContainer = document.getElementById('recaptcha-reg-container');
+    if (regContainer && this.captchaRegWidgetId === null) {
+      try {
+        this.captchaRegWidgetId = grecaptcha.render('recaptcha-reg-container', {
+          sitekey: siteKey,
+          callback: (token: string) => {
+            this.ngZone.run(() => {
+              this.captchaToken = token;
+              this.isDevCaptchaActive = false;
+              this.errorMessage = null;
+            });
+          },
+          'expired-callback': () => {
+            this.ngZone.run(() => {
+              this.captchaToken = '';
+            });
+          },
+          'error-callback': () => {
+            this.ngZone.run(() => {
+              console.warn('[reCAPTCHA Registro] Error reportado por el widget.');
+              this.captchaLoadError = true;
+            });
+          }
+        });
+      } catch (e) {
+        console.warn('[reCAPTCHA Registro] error al inicializar:', e);
+      }
+    }
+  }
+
+  private ensureRecaptchaForTab(tab: 'login' | 'register'): void {
+    const siteKey = environment.recaptchaSiteKey;
+    if (!siteKey || typeof grecaptcha === 'undefined' || !grecaptcha.render) {
+      return;
+    }
+    if (tab === 'login') {
+      this.renderLoginCaptcha(siteKey);
+    } else {
+      this.renderRegisterCaptcha(siteKey);
+    }
   }
 
   private initGoogleSignIn(): void {
@@ -234,6 +284,11 @@ export class LoginComponent implements OnInit, AfterViewInit {
     this.activeTab = tab;
     this.errorMessage = null;
     this.successMessage = null;
+    this.captchaToken = '';
+    this.isDevCaptchaActive = false;
+    setTimeout(() => {
+      this.ensureRecaptchaForTab(tab);
+    }, 100);
   }
 
   public onLogin(): void {
@@ -242,10 +297,17 @@ export class LoginComponent implements OnInit, AfterViewInit {
       return;
     }
 
-    // Validación obligatoria de reCAPTCHA
+    // Validación de reCAPTCHA con soporte de entorno de desarrollo
     if (!this.captchaToken) {
-      this.errorMessage = 'Por favor completa la verificación de seguridad reCAPTCHA ("No soy un robot") 🤖';
-      return;
+      if (!this.isProduction) {
+        this.captchaToken = 'DEV_TEST_TOKEN';
+        this.isDevCaptchaActive = true;
+      } else {
+        this.errorMessage = this.captchaLoadError
+          ? 'No se pudo cargar la verificación de seguridad (reCAPTCHA). Si tienes un bloqueador de anuncios activo (AdBlock, Brave Shields), por favor desactívalo y recarga la página.'
+          : 'Por favor completa la verificación de seguridad reCAPTCHA ("No soy un robot") 🤖';
+        return;
+      }
     }
 
     this.isLoading = true;
@@ -388,10 +450,17 @@ export class LoginComponent implements OnInit, AfterViewInit {
       return;
     }
 
-    // Validación obligatoria de reCAPTCHA en Registro
+    // Validación de reCAPTCHA en Registro con soporte de entorno de desarrollo
     if (!this.captchaToken) {
-      this.errorMessage = 'Por favor completa la verificación de seguridad reCAPTCHA ("No soy un robot") 🤖';
-      return;
+      if (!this.isProduction) {
+        this.captchaToken = 'DEV_TEST_TOKEN';
+        this.isDevCaptchaActive = true;
+      } else {
+        this.errorMessage = this.captchaLoadError
+          ? 'No se pudo cargar la verificación de seguridad (reCAPTCHA). Si tienes un bloqueador de anuncios activo (AdBlock, Brave Shields), por favor desactívalo y recarga la página.'
+          : 'Por favor completa la verificación de seguridad reCAPTCHA ("No soy un robot") 🤖';
+        return;
+      }
     }
 
     this.isLoading = true;

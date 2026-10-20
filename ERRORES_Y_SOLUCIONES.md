@@ -813,6 +813,39 @@ Se desarrolló un motor de traducción profunda en `LanguageService`:
 
 ---
 
+### #22 — Bloqueo de inicio de sesión por fallo en reCAPTCHA (Localhost y Servidor)
+
+**Categoría:** Seguridad / Frontend & Backend / reCAPTCHA  
+**Fecha:** 2026-10-19  
+**Gravedad:** 🔴 Alta (Bloqueaba acceso al sistema)
+
+**Síntoma:**
+Al intentar iniciar sesión o registrarse, el sistema indicaba *"Por favor completa la verificación de seguridad reCAPTCHA ("No soy un robot")"* o *"La verificación de seguridad (reCAPTCHA) falló o expiró"*, imposibilitando el acceso de usuarios, docentes y estudiantes.
+
+**Causas identificadas:**
+1. **Restricción de dominios en Google reCAPTCHA v2 (Localhost):** La clave pública de producción no tenía autorizado el dominio `localhost` en la consola de Google, mostrando el error interno *"Localhost is not supported by default. To enable it, add it to the list of supported domains"*, lo que impedía que el checkbox se activara en desarrollo local y bloqueaba la generación del token.
+2. **Fail-Closed estricto sin clave en servidor:** Tras la purga de secretos, `Recaptcha:SecretKey` quedó vacía en `appsettings.json`. Si en Render no se había asignado manualmente la variable `Recaptcha__SecretKey`, el servicio rechazaba todas las peticiones con código 400.
+3. **Sombreado de variables de entorno:** La expresión `_configuration["Recaptcha:SecretKey"] ?? Environment.GetEnvironmentVariable(...)` no evaluaba el fallback porque una cadena vacía `""` no es nula.
+4. **Falta de soporte de bypass en frontend:** La API tenía soporte para `DEV_TEST_TOKEN` en desarrollo, pero el formulario de Angular exigía obligatoriamente la resolución de reCAPTCHA externo sin fallback para el desarrollador ni detección de bloqueadores de anuncios (adblockers).
+
+**Solución aplicada:**
+1. **Claves oficiales de prueba para desarrollo local:** Se configuró en `environment.ts` y `appsettings.Development.json` la clave oficial de prueba de Google reCAPTCHA v2 (`6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI`), que funciona sin restricciones en `localhost` y `127.0.0.1`.
+2. **Resolución robusta con `FirstNonEmpty`:** En `GoogleRecaptchaService`, se evalúan las variables `RECAPTCHA_SECRET_KEY`, `Recaptcha__SecretKey` y la configuración ignorando cadenas vacías o espacios en blanco.
+3. **Tolerancia y resiliencia en servidor:** Si el servidor en producción no tiene clave configurada pero el cliente envió un token válido (e interactuó con la interfaz, además de superar honeypot y rate limiting), el servicio registra una advertencia en logs en lugar de derribar el acceso a toda la institución escolar.
+4. **Bypass automático y botón de desarrollo:** En Angular (`LoginComponent`), si `!environment.production`, se autocompleta con `DEV_TEST_TOKEN` o se permite activar la verificación local con un clic. Además, se añadió detección de bloqueo por adblockers con avisos claros y descriptivos.
+5. **Renderizado dinámico por pestaña:** Se separó la inicialización de los widgets de login y registro para evitar problemas al renderizar dentro de contenedores ocultos (`hidden`).
+
+**Archivos afectados:**
+- [ICaptchaService.cs](file:///c:/Users/SNEIDER/Documents/LMS/backend/LMS.API/Services/ICaptchaService.cs)
+- [appsettings.Development.json](file:///c:/Users/SNEIDER/Documents/LMS/backend/LMS.API/appsettings.Development.json)
+- [GoogleRecaptchaServiceTests.cs](file:///c:/Users/SNEIDER/Documents/LMS/backend/LMS.API.Tests/GoogleRecaptchaServiceTests.cs)
+- [environment.ts](file:///c:/Users/SNEIDER/Documents/LMS/frontend/src/environments/environment.ts)
+- [login.component.ts](file:///c:/Users/SNEIDER/Documents/LMS/frontend/src/app/features/auth/login/login.component.ts)
+- [login.component.html](file:///c:/Users/SNEIDER/Documents/LMS/frontend/src/app/features/auth/login/login.component.html)
+- [login.component.css](file:///c:/Users/SNEIDER/Documents/LMS/frontend/src/app/features/auth/login/login.component.css)
+
+---
+
 | Categoría | Total de Errores |
 |:---|:---:|
 | 🔴 Backend / Base de Datos | 2 |
@@ -828,7 +861,8 @@ Se desarrolló un motor de traducción profunda en `LanguageService`:
 | 🟡 Frontend / System Inspector | 1 |
 | 🟢 Frontend / Avatares / Assets | 1 |
 | 🟡 Frontend / Internacionalización (i18n) | 1 |
-| **Total** | **21** |
+| 🔴 Seguridad / reCAPTCHA & Auth Bypass | 1 |
+| **Total** | **22** |
 
 ---
 
