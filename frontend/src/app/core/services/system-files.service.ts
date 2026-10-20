@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { getApiBaseUrl } from './api.config';
 
 export interface SystemFileDto {
   fileName: string;
@@ -73,8 +74,9 @@ export interface AuditLogFilterParams {
   providedIn: 'root'
 })
 export class SystemFilesService {
-  private readonly API_URL = `${environment.apiUrl}/systemfiles`;
-  private readonly ADMIN_URL = `${environment.apiUrl}/admin`;
+  private readonly baseUrl = getApiBaseUrl();
+  private readonly API_URL = `${this.baseUrl}/systemfiles`;
+  private readonly ADMIN_URL = `${this.baseUrl}/admin`;
 
   constructor(private http: HttpClient) {}
 

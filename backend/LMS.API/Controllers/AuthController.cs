@@ -277,23 +277,42 @@ public class AuthController : ControllerBase
     {
         if (!string.IsNullOrEmpty(request.HoneypotTrap))
         {
-            return Unauthorized(new { message = "Identificación o contraseña incorrecta." });
+            return Unauthorized(new { success = false, message = "Identificación o contraseña incorrecta." });
         }
 
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState);
+            return BadRequest(new { success = false, message = "Datos de inicio de sesión inválidos.", errors = ModelState });
         }
 
         try
         {
             var clientIp = ClientIp;
-            if (!await _captchaService.VerifyTokenAsync(request.CaptchaToken, clientIp))
+            bool captchaValid = false;
+            try
             {
-                return BadRequest(new { message = "La verificación de seguridad (reCAPTCHA) falló o expiró." });
+                captchaValid = await _captchaService.VerifyTokenAsync(request.CaptchaToken, clientIp);
+            }
+            catch (Exception exCaptcha)
+            {
+                _logger.LogWarning(exCaptcha, "Error verificando captcha durante login para {Username}", request.Id);
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "No fue posible verificar la seguridad (reCAPTCHA) por problemas de conectividad. Inténtalo de nuevo."
+                });
             }
 
-            var cleanUsername = request.Id.Trim();
+            if (!captchaValid)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "La verificación de seguridad (reCAPTCHA) falló o expiró."
+                });
+            }
+
+            var cleanUsername = request.Id?.Trim() ?? string.Empty;
             var user = await _context.Usuarios
                 .Include(u => u.Rol)
                 .Include(u => u.Alumno)
@@ -304,7 +323,7 @@ public class AuthController : ControllerBase
             if (user == null || !user.Activo)
             {
                 await AuditAsync(user, "Autenticación: Intento de login fallido", $"Identificador inexistente o inactivo: {cleanUsername}", "WARNING");
-                return Unauthorized(new { message = "Identificación o contraseña incorrecta." });
+                return Unauthorized(new { success = false, message = "Identificación o contraseña incorrecta." });
             }
 
             if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
@@ -313,6 +332,7 @@ public class AuthController : ControllerBase
                 await AuditAsync(user, "Autenticación: Login bloqueado por intentos fallidos", null, "WARNING");
                 return StatusCode(StatusCodes.Status423Locked, new
                 {
+                    success = false,
                     message = $"La cuenta está bloqueada temporalmente por seguridad. Intenta de nuevo en {minutes} minuto(s)."
                 });
             }
@@ -331,6 +351,7 @@ public class AuthController : ControllerBase
 
                     return StatusCode(StatusCodes.Status423Locked, new
                     {
+                        success = false,
                         message = "Se alcanzó el límite de intentos. La cuenta estará bloqueada temporalmente por 15 minutos."
                     });
                 }
@@ -339,7 +360,7 @@ public class AuthController : ControllerBase
                 await AuditAsync(user, "Autenticación: Contraseña incorrecta",
                     $"Intento fallido {user.AccessFailedCount} de {MaxFailedAttempts}.", "WARNING");
 
-                return Unauthorized(new { message = "Identificación o contraseña incorrecta." });
+                return Unauthorized(new { success = false, message = "Identificación o contraseña incorrecta." });
             }
 
             user.AccessFailedCount = 0;
@@ -352,13 +373,14 @@ public class AuthController : ControllerBase
             var gradeName = user.Alumno?.Grado?.Nombre;
             var avatar = user.AvatarUrl ?? $"https://api.dicebear.com/7.x/bottts/svg?seed={Uri.EscapeDataString(user.Username)}";
 
-            var (token, expiration) = _tokenService.GenerateToken(user, fullName, user.Rol.Nombre, gradeName, avatar);
+            var roleName = user.Rol?.Nombre ?? "ALUMNO";
+            var (token, expiration) = _tokenService.GenerateToken(user, fullName, roleName, gradeName, avatar);
 
-            var roleStr = TokenService.NormalizeRole(user.Rol.Nombre);
+            var roleStr = TokenService.NormalizeRole(roleName);
             var requiresPolicy = !_consent.IsCurrent(user);
 
             await AuditAsync(user, "Autenticación: Inicio de sesión exitoso",
-                $"Rol: {user.Rol.Nombre}; requiere aceptación de política: {requiresPolicy}.");
+                $"Rol: {roleName}; requiere aceptación de política: {requiresPolicy}.");
 
             return Ok(new LoginResponseDto
             {
@@ -381,13 +403,52 @@ public class AuthController : ControllerBase
                 }
             });
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning(ex, "Acceso no autorizado durante login para {Username}", request.Id);
+            return Unauthorized(new
+            {
+                success = false,
+                message = ex.Message ?? "Identificación o contraseña incorrecta."
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Parámetros inválidos durante login para {Username}", request.Id);
+            return BadRequest(new
+            {
+                success = false,
+                message = ex.Message ?? "Los datos de autenticación son inválidos."
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "Operación o claims inválidos durante login para {Username}", request.Id);
+            return BadRequest(new
+            {
+                success = false,
+                message = "Error al procesar las credenciales o claims de la sesión.",
+                detail = _env.IsDevelopment() ? ex.Message : null
+            });
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Fallo de conexión externa o Supabase durante login para {Username}", request.Id);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                success = false,
+                message = "El servicio de autenticación no está disponible en este momento. Intenta de nuevo en unos momentos.",
+                detail = _env.IsDevelopment() ? ex.Message : null
+            });
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error en login");
+            _logger.LogError(ex, "Error no controlado en login para {Username}", request.Id);
             await FileLogger.ExceptionAsync(ex, "POST /api/auth/login");
             return StatusCode(StatusCodes.Status500InternalServerError, new
             {
-                message = "Error interno del servidor. No fue posible conectar con el servicio de base de datos.",
+                success = false,
+                message = "Error interno del servidor al procesar el inicio de sesión.",
                 detail = _env.IsDevelopment() ? ex.Message : null
             });
         }
