@@ -3,6 +3,7 @@ using LMS.API.Configuration;
 using LMS.API.Data;
 using LMS.API.DTOs;
 using LMS.API.Entities;
+using LMS.API.Middleware;
 using LMS.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,15 +21,18 @@ public class StudentController : ControllerBase
     private readonly LMSDbContext _context;
     private readonly IFileStorageService _fileStorage;
     private readonly StorageOptions _storageOptions;
+    private readonly ILogger<StudentController> _logger;
 
     public StudentController(
         LMSDbContext context,
         IFileStorageService fileStorage,
-        IOptions<StorageOptions> storageOptions)
+        IOptions<StorageOptions> storageOptions,
+        ILogger<StudentController> logger)
     {
         _context = context;
         _fileStorage = fileStorage;
         _storageOptions = storageOptions.Value;
+        _logger = logger;
     }
 
     /// <summary>
@@ -267,6 +271,10 @@ public class StudentController : ControllerBase
         };
         _context.ArchivosEntrega.Add(archivo);
         await _context.SaveChangesAsync();
+
+        _logger.LogInformation("[AUDIT] El Estudiante {Student} (ID: {StudentId}) entregó la tarea {TaskId} ('{TaskTitle}') en el curso {CourseId}",
+            student.Usuario.Username, student.UsuarioId, tarea.Id, tarea.Titulo, tarea.CursoId);
+        await FileLogger.LogAsync("AUDIT", $"El Estudiante {student.Usuario.Username} (ID: {student.UsuarioId}) entregó la tarea {tarea.Id} ('{tarea.Titulo}') en el curso {tarea.CursoId}");
 
         return Ok(new UploadResultDto
         {

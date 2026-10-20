@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LMS.API.Data;
 using LMS.API.DTOs;
 using LMS.API.Entities;
+using LMS.API.Middleware;
 using LMS.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,15 +19,18 @@ public class TeacherController : ControllerBase
     private readonly LMSDbContext _context;
     private readonly ISemaforoService _semaforoService;
     private readonly IFileStorageService _fileStorage;
+    private readonly ILogger<TeacherController> _logger;
 
     public TeacherController(
         LMSDbContext context,
         ISemaforoService semaforoService,
-        IFileStorageService fileStorage)
+        IFileStorageService fileStorage,
+        ILogger<TeacherController> logger)
     {
         _context = context;
         _semaforoService = semaforoService;
         _fileStorage = fileStorage;
+        _logger = logger;
     }
 
     /// <summary>
@@ -284,6 +288,11 @@ public class TeacherController : ControllerBase
                 inscripcion.Estado = "ACTIVA";
                 inscripcion.FechaRegistro = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
+
+                _logger.LogInformation("[AUDIT] El Docente {UserId} reactivó la matrícula del Estudiante {AlumnoId} en el curso {CursoId}",
+                    currentUser.Username, alumno.UsuarioId, curso.Id);
+                await FileLogger.LogAsync("AUDIT", $"El Docente {currentUser.Username} reactivó la matrícula del Estudiante {alumno.UsuarioId} en el curso {curso.Id}");
+
                 return Ok(new { message = "Matrícula reactivada con éxito para el estudiante.", yaMatriculado = false });
             }
         }
@@ -298,6 +307,10 @@ public class TeacherController : ControllerBase
         };
         _context.Inscripciones.Add(nuevaInscripcion);
         await _context.SaveChangesAsync();
+
+        _logger.LogInformation("[AUDIT] El Docente {UserId} asignó/matriculó al Estudiante {AlumnoId} en el curso {CursoId}",
+            currentUser.Username, alumno.UsuarioId, curso.Id);
+        await FileLogger.LogAsync("AUDIT", $"El Docente {currentUser.Username} asignó/matriculó al Estudiante {alumno.UsuarioId} en el curso {curso.Id}");
 
         var studentName = !string.IsNullOrWhiteSpace(alumno.Usuario.FullName) 
             ? alumno.Usuario.FullName 
@@ -408,6 +421,10 @@ public class TeacherController : ControllerBase
 
         _context.Cursos.Add(curso);
         await _context.SaveChangesAsync();
+
+        _logger.LogInformation("[AUDIT] El Docente {UserId} creó exitosamente la materia/curso '{NombreCurso}' (ID: {CursoId})",
+            currentUser.Username, curso.Nombre, curso.Id);
+        await FileLogger.LogAsync("AUDIT", $"El Docente {currentUser.Username} creó exitosamente la materia/curso '{curso.Nombre}' (ID: {curso.Id})");
 
         var resultDto = new CourseDto
         {
@@ -846,6 +863,11 @@ public class TeacherController : ControllerBase
         inscripcion.Estado = "INACTIVA";
         await _context.SaveChangesAsync();
 
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Docente";
+        _logger.LogInformation("[AUDIT] El Docente {UserId} desmatriculó al Estudiante {AlumnoId} del curso {CursoId}",
+            currentUserId, alumno.UsuarioId, courseId);
+        await FileLogger.LogAsync("AUDIT", $"El Docente {currentUserId} desmatriculó al Estudiante {alumno.UsuarioId} del curso {courseId}");
+
         return Ok(new { message = "Estudiante desmatriculado exitosamente del curso." });
     }
 
@@ -874,6 +896,12 @@ public class TeacherController : ControllerBase
         curso.Descripcion = dto.Descripcion?.Trim();
 
         await _context.SaveChangesAsync();
+
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Docente";
+        _logger.LogInformation("[AUDIT] El Docente {UserId} editó/actualizó exitosamente la materia/curso '{NombreCurso}' (ID: {CursoId})",
+            currentUserId, curso.Nombre, curso.Id);
+        await FileLogger.LogAsync("AUDIT", $"El Docente {currentUserId} actualizó la materia/curso '{curso.Nombre}' (ID: {curso.Id})");
+
         return Ok(new { message = "Curso actualizado exitosamente.", curso });
     }
 

@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -114,17 +116,23 @@ public class RequestLoggingMiddleware
             var elapsedMs = stopwatch.ElapsedMilliseconds;
             var statusCode = caughtException != null ? 500 : context.Response.StatusCode;
 
-            // 1. Logs de texto convencionales (access.log y error.log)
+            // 1. Logs de texto estructurados obligatorios (access.log, audit.log y error.log)
             try
             {
-                var logEntry = FormatAccessLog(context, requestTime, elapsedMs);
-                await FileLogger.WriteAsync("access", logEntry);
+                var structuredLine = FormatStructuredLog(context, requestTime, statusCode, caughtException);
+                await FileLogger.WriteAsync("access", structuredLine);
+
+                // Si es un evento de modificación (POST, PUT, DELETE, PATCH) o endpoint administrativo/docente, registrar en audit.log
+                if (structuredLine.Contains(" | [AUDIT] | ") || context.Request.Method is "POST" or "PUT" or "DELETE" or "PATCH")
+                {
+                    await FileLogger.WriteAsync("audit", structuredLine);
+                }
 
                 if (statusCode >= 400 || caughtException != null)
                 {
                     var errorEntry = caughtException != null
                         ? FormatExceptionLog(context, requestTime, caughtException, elapsedMs)
-                        : FormatErrorLog(context, requestTime, elapsedMs);
+                        : FormatErrorLog(context, requestTime, statusCode, elapsedMs);
 
                     await FileLogger.WriteAsync("error", errorEntry);
 
@@ -144,7 +152,7 @@ public class RequestLoggingMiddleware
                 // El logging no debe interrumpir el flujo
             }
 
-            // 2. Registro estructurado en app-audit.log
+            // 2. Registro estructurado en app-audit.log para panel de auditoría JSON
             try
             {
                 var auditEntry = BuildAuditEntry(context, requestTime, elapsedMs, statusCode, caughtException);
@@ -542,28 +550,106 @@ public class RequestLoggingMiddleware
         return $"{method} {path}";
     }
 
-    private static string FormatAccessLog(HttpContext ctx, DateTime time, long elapsedMs)
+    /// <summary>
+    /// Formato estructurado obligatorio:
+    /// [TIMESTAMP] | [NIVEL: AUDIT/INFO/ERROR] | [USER_ID / ROL] | [MÉTODO HTTP] | [RUTA/ENDPOINT] | [STATUS CODE] | [IP]
+    /// </summary>
+    private static string FormatStructuredLog(HttpContext ctx, DateTime time, int statusCode, Exception? ex)
     {
-        var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0";
-        var method = ctx.Request.Method;
+        var ip = ResolveClientIp(ctx);
+        var method = ctx.Request.Method.ToUpperInvariant();
         var path = SafeRequestPath(ctx);
-        var status = ctx.Response.StatusCode;
-        var userAgent = Truncate(ctx.Request.Headers.UserAgent.ToString(), 200);
-        var userId = ctx.User.Identity?.IsAuthenticated == true
-            ? ctx.User.FindFirst("sub")?.Value ?? ctx.User.Identity.Name ?? "-"
-            : "-";
+        var (userId, userRole) = ResolveUserIdentity(ctx);
+        var level = DetermineLogLevel(method, path, statusCode, ex);
+        var timestamp = time.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 
-        return $"[{time:yyyy-MM-dd HH:mm:ss}] {ip} | {method} {path} | {status} | {elapsedMs}ms | User:{userId} | {userAgent}";
+        return $"[{timestamp}] | [{level}] | [{userId} / {userRole}] | [{method}] | [{path}] | [{statusCode}] | [{ip}]";
     }
 
-    private static string FormatErrorLog(HttpContext ctx, DateTime time, long elapsedMs)
+    /// <summary>
+    /// Extrae automáticamente la identidad del usuario (Claims NameIdentifier / Role) desde HttpContext.User
+    /// o decodificando el encabezado Authorization Bearer JWT.
+    /// </summary>
+    public static (string UserId, string Role) ResolveUserIdentity(HttpContext ctx)
+    {
+        string? userId = null;
+        string? role = null;
+
+        if (ctx.User?.Identity?.IsAuthenticated == true)
+        {
+            userId = ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                     ?? ctx.User.FindFirst("user_id")?.Value
+                     ?? ctx.User.FindFirst("sub")?.Value
+                     ?? ctx.User.Identity.Name;
+
+            role = ctx.User.FindFirst(ClaimTypes.Role)?.Value
+                   ?? ctx.User.FindFirst("role")?.Value;
+        }
+
+        // Si no se extrajo de ctx.User (ej. token Bearer antes del middleware de autenticación), extraer del header Authorization
+        if ((string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(role)) &&
+            ctx.Request.Headers.TryGetValue("Authorization", out var authHeader))
+        {
+            var headerVal = authHeader.ToString();
+            if (headerVal.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var tokenStr = headerVal.Substring("Bearer ".Length).Trim();
+                    var handler = new JwtSecurityTokenHandler();
+                    if (handler.CanReadToken(tokenStr))
+                    {
+                        var jwt = handler.ReadJwtToken(tokenStr);
+                        userId ??= jwt.Claims.FirstOrDefault(c => c.Type is ClaimTypes.NameIdentifier or "sub" or "user_id")?.Value;
+                        role ??= jwt.Claims.FirstOrDefault(c => c.Type is ClaimTypes.Role or "role")?.Value;
+                    }
+                }
+                catch
+                {
+                    // Ignorar token no parseable
+                }
+            }
+        }
+
+        return (userId ?? "ANONYMOUS", role ?? "NO_ROLE");
+    }
+
+    private static string DetermineLogLevel(string method, string path, int statusCode, Exception? ex)
+    {
+        if (statusCode >= 500 || ex != null)
+            return "ERROR";
+        if (method is "POST" or "PUT" or "DELETE" or "PATCH"
+            || path.Contains("/auth/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/admin/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/teacher/", StringComparison.OrdinalIgnoreCase))
+            return "AUDIT";
+        if (statusCode >= 400)
+            return "WARNING";
+        return "INFO";
+    }
+
+    private static string ResolveClientIp(HttpContext ctx)
     {
         var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0";
+        foreach (var header in new[] { "CF-Connecting-IP", "X-Real-IP", "X-Forwarded-For" })
+        {
+            if (ctx.Request.Headers.TryGetValue(header, out var hVal) && !string.IsNullOrWhiteSpace(hVal))
+            {
+                ip = hVal.ToString().Split(',')[0].Trim();
+                break;
+            }
+        }
+        return ip;
+    }
+
+    private static string FormatErrorLog(HttpContext ctx, DateTime time, int statusCode, long elapsedMs)
+    {
+        var ip = ResolveClientIp(ctx);
         var method = ctx.Request.Method;
         var path = SafeRequestPath(ctx);
-        var status = ctx.Response.StatusCode;
+        var (userId, userRole) = ResolveUserIdentity(ctx);
 
-        return $"[{time:yyyy-MM-dd HH:mm:ss}] [HTTP-{status}] {ip} | {method} {path} | {elapsedMs}ms";
+        return $"[{time:yyyy-MM-dd HH:mm:ss}] | [ERROR] | [{userId} / {userRole}] | [{method}] | [{path}] | [{statusCode}] | [{ip}] ({elapsedMs}ms)";
     }
 
     private static string FormatExceptionLog(HttpContext ctx, DateTime time, Exception ex, long elapsedMs)
@@ -643,7 +729,7 @@ public static class FileLogger
     public static string GetAuditLogPath() => Path.Combine(_logDirectory, "app-audit.log");
 
     /// <summary>
-    /// Escribir una línea en el archivo de log especificado.
+    /// Escribir una línea en el archivo de log especificado con Flush() inmediato a disco/memoria.
     /// </summary>
     public static async Task WriteAsync(string channel, string message)
     {
@@ -653,7 +739,12 @@ public static class FileLogger
             Directory.CreateDirectory(_logDirectory);
             var filePath = Path.Combine(_logDirectory, $"{channel}.log");
             RotateIfNeeded(filePath);
-            await File.AppendAllTextAsync(filePath, message + Environment.NewLine);
+
+            await using var stream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, 4096, useAsync: true);
+            await using var writer = new StreamWriter(stream, Encoding.UTF8);
+            await writer.WriteLineAsync(message);
+            await writer.FlushAsync();
+            await stream.FlushAsync();
         }
         catch
         {

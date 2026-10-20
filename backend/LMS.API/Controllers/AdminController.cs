@@ -245,6 +245,10 @@ public class AdminController : ControllerBase
             TemporaryPassword = generatedPassword ? password : null
         };
 
+        _logger.LogInformation("[AUDIT] El Administrador {Admin} creó el usuario {Username} con rol {Role}",
+            User.Identity?.Name ?? "Admin", usuario.Username, targetRoleName);
+        await FileLogger.LogAsync("AUDIT", $"El Administrador {User.Identity?.Name ?? "Admin"} creó el usuario {usuario.Username} con rol {targetRoleName}");
+
         return CreatedAtAction(nameof(GetUsers), new { id = usuario.Id }, result);
     }
 
@@ -353,7 +357,9 @@ public class AdminController : ControllerBase
         await _context.SaveChangesAsync();
 
         var statusText = usuario.Activo ? "habilitada" : "suspendida";
-        _logger.LogWarning("Cuenta de usuario {Username} fue {StatusText} por administrador {Admin}", usuario.Username, statusText, User.Identity?.Name);
+        _logger.LogInformation("[AUDIT] El Administrador {Admin} cambió el estado de la cuenta {Username} a {StatusText}",
+            User.Identity?.Name ?? "Admin", usuario.Username, statusText);
+        await FileLogger.LogAsync("AUDIT", $"El Administrador {User.Identity?.Name ?? "Admin"} cambió el estado de la cuenta {usuario.Username} a {statusText}");
 
         return Ok(new
         {
@@ -460,6 +466,10 @@ public class AdminController : ControllerBase
             Activo = curso.Activo
         };
 
+        _logger.LogInformation("[AUDIT] El Administrador {Admin} creó exitosamente la materia/curso '{NombreCurso}' (ID: {CursoId})",
+            User.Identity?.Name ?? "Admin", curso.Nombre, curso.Id);
+        await FileLogger.LogAsync("AUDIT", $"El Administrador {User.Identity?.Name ?? "Admin"} creó la materia/curso '{curso.Nombre}' (ID: {curso.Id})");
+
         return CreatedAtAction(nameof(GetAdminCourses), new { id = curso.Id }, result);
     }
 
@@ -492,7 +502,9 @@ public class AdminController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Curso ID {Id} actualizado por administrador {Admin}", id, User.Identity?.Name);
+        _logger.LogInformation("[AUDIT] El Administrador {Admin} editó/actualizó la materia/curso '{NombreCurso}' (ID: {CursoId})",
+            User.Identity?.Name ?? "Admin", curso.Nombre, id);
+        await FileLogger.LogAsync("AUDIT", $"El Administrador {User.Identity?.Name ?? "Admin"} actualizó la materia/curso '{curso.Nombre}' (ID: {id})");
 
         return Ok(new { message = "Curso actualizado correctamente." });
     }
@@ -510,9 +522,14 @@ public class AdminController : ControllerBase
         curso.Activo = !curso.Activo;
         await _context.SaveChangesAsync();
 
+        var statusText = curso.Activo ? "activado" : "desactivado";
+        _logger.LogInformation("[AUDIT] El Administrador {Admin} alternó el estado del curso '{NombreCurso}' (ID: {CursoId}) a {StatusText}",
+            User.Identity?.Name ?? "Admin", curso.Nombre, curso.Id, statusText);
+        await FileLogger.LogAsync("AUDIT", $"El Administrador {User.Identity?.Name ?? "Admin"} alternó el estado del curso '{curso.Nombre}' (ID: {curso.Id}) a {statusText}");
+
         return Ok(new
         {
-            message = $"El curso '{curso.Nombre}' ha sido {(curso.Activo ? "activado" : "desactivado")}.",
+            message = $"El curso '{curso.Nombre}' ha sido {statusText}.",
             activo = curso.Activo
         });
     }
