@@ -31,6 +31,7 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly PrivacyOptions _privacy;
     private readonly RegistrationOptions _registration;
+    private readonly IHostEnvironment _env;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -41,6 +42,7 @@ public class AuthController : ControllerBase
         IConfiguration configuration,
         IOptions<PrivacyOptions> privacy,
         IOptions<RegistrationOptions> registration,
+        IHostEnvironment env,
         ILogger<AuthController> logger)
     {
         _context = context;
@@ -50,6 +52,7 @@ public class AuthController : ControllerBase
         _configuration = configuration;
         _privacy = privacy.Value;
         _registration = registration.Value;
+        _env = env;
         _logger = logger;
     }
 
@@ -381,7 +384,12 @@ public class AuthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error en login");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error interno del servidor." });
+            await FileLogger.ExceptionAsync(ex, "POST /api/auth/login");
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                message = "Error interno del servidor. No fue posible conectar con el servicio de base de datos.",
+                detail = _env.IsDevelopment() ? ex.Message : null
+            });
         }
     }
 

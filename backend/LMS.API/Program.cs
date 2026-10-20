@@ -389,19 +389,36 @@ app.MapGet("/api/health", async (LMSDbContext context, ILogger<Program> logger) 
 {
     try
     {
-        var canConnect = await context.Database.CanConnectAsync();
+        string? dbError = null;
+        var canConnect = false;
+        try
+        {
+            var conn = context.Database.GetDbConnection();
+            await conn.OpenAsync();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT 1;";
+            await cmd.ExecuteScalarAsync();
+            await conn.CloseAsync();
+            canConnect = true;
+        }
+        catch (Exception ex)
+        {
+            dbError = ex.Message + (ex.InnerException != null ? " | " + ex.InnerException.Message : "");
+            logger.LogError(ex, "Fallo conectando a la base de datos.");
+        }
 
         return Results.Ok(new
         {
             status = canConnect ? "healthy" : "degraded",
             database = canConnect ? "connected" : "error",
+            error = dbError,
             timestamp = DateTime.UtcNow
         });
     }
     catch (Exception ex)
     {
         logger.LogError(ex, "Fallo en la verificación de salud de la base de datos.");
-        return Results.Json(new { status = "error" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+        return Results.Json(new { status = "error", error = ex.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 }).AllowAnonymous();
 
@@ -417,7 +434,7 @@ static string ClientKey(HttpContext context)
 
 static string NormalizeConnectionString(string raw, IConfiguration configuration)
 {
-    var trustCertificate = configuration.GetValue<bool?>("Database:TrustServerCertificate") ?? false;
+    var trustCertificate = configuration.GetValue<bool?>("Database:TrustServerCertificate") ?? true;
 
     if (raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)
         || raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
@@ -431,20 +448,33 @@ static string NormalizeConnectionString(string raw, IConfiguration configuration
         var database = uri.AbsolutePath.TrimStart('/');
         if (string.IsNullOrWhiteSpace(database)) database = "postgres";
 
-        var projectRef = configuration["Supabase:ProjectRef"];
+        var projectRef = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("SUPABASE_PROJECT_REF"),
+            Environment.GetEnvironmentVariable("Supabase__ProjectRef"),
+            configuration["Supabase:ProjectRef"]);
+
+        if (string.IsNullOrWhiteSpace(projectRef) && host.StartsWith("db.", StringComparison.OrdinalIgnoreCase))
+        {
+            var parts = host.Split('.');
+            if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
+            {
+                projectRef = parts[1];
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(projectRef))
+        {
+            projectRef = "rjvsbjjmlmvcihfgbiaz";
+        }
+
+        var poolerHost = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("SUPABASE_POOLER_HOST"),
+            Environment.GetEnvironmentVariable("Supabase__PoolerHost"),
+            configuration["Supabase:PoolerHost"]) ?? "aws-0-us-east-1.pooler.supabase.com";
 
         if (host.EndsWith(".supabase.co", StringComparison.OrdinalIgnoreCase))
         {
-            if (host.StartsWith("db.", StringComparison.OrdinalIgnoreCase))
-            {
-                var parts = host.Split('.');
-                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
-                {
-                    projectRef ??= parts[1];
-                }
-            }
-
-            host = configuration["Supabase:PoolerHost"] ?? "aws-0-us-east-1.pooler.supabase.com";
+            host = poolerHost;
             port = 5432;
 
             if (!user.Contains('.') && !string.IsNullOrWhiteSpace(projectRef))
@@ -463,7 +493,7 @@ static string NormalizeConnectionString(string raw, IConfiguration configuration
         }
 
         return $"Host={host};Port={port};Database={database};Username={user};Password={password};" +
-               $"SSL Mode=Require;Trust Server Certificate={trustCertificate.ToString().ToLowerInvariant()};" +
+               $"SSL Mode=Require;Trust Server Certificate=true;" +
                "Pooling=true;Minimum Pool Size=2;Maximum Pool Size=15;Connection Idle Lifetime=300;" +
                "Keepalive=30;Tcp Keepalive=true;";
     }
