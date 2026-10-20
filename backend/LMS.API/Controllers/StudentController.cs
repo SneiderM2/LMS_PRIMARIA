@@ -141,7 +141,7 @@ public class StudentController : ControllerBase
                 Description = m.Descripcion ?? string.Empty,
                 Type = m.Tipo == "VIDEO" ? "Video" : "Pdf",
                 Subject = m.Curso.Nombre,
-                FileUrl = m.RecursoUrl,
+                FileUrl = m.RecursoUrl ?? string.Empty,
                 DueDate = null,
                 GradeLevel = m.Curso.Grado.Nombre,
                 CreatedByUserId = m.Curso.Docente.Username,

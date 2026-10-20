@@ -813,6 +813,7 @@ public static class FileLogger
         {
             exception = ex.GetType().FullName,
             message = ex.Message,
+            innerException = ex.InnerException?.Message,
             stackTrace = ex.StackTrace
         });
 

@@ -545,15 +545,34 @@ public class TeacherController : ControllerBase
 
         var curso = await _context.Cursos
             .FirstOrDefaultAsync(c => c.DocenteId == currentUser.Id && c.Nombre == dto.Subject && c.GradoId == grado.Id)
+            ?? await _context.Cursos.FirstOrDefaultAsync(c => c.Nombre == dto.Subject && c.GradoId == grado.Id)
             ?? await _context.Cursos.FirstOrDefaultAsync(c => c.DocenteId == currentUser.Id);
 
         if (curso == null)
         {
+            var existingGroups = await _context.Cursos
+                .Where(c => c.Nombre == dto.Subject.Trim() && c.GradoId == grado.Id)
+                .Select(c => c.Grupo)
+                .ToListAsync();
+
+            var grupo = "A";
+            if (existingGroups.Contains("A"))
+            {
+                for (char g = 'B'; g <= 'Z'; g++)
+                {
+                    if (!existingGroups.Contains(g.ToString()))
+                    {
+                        grupo = g.ToString();
+                        break;
+                    }
+                }
+            }
+
             curso = new Curso
             {
                 Nombre = dto.Subject.Trim(),
                 GradoId = grado.Id,
-                Grupo = "A",
+                Grupo = grupo,
                 DocenteId = currentUser.Id,
                 Descripcion = $"Curso de {dto.Subject} para {grado.Nombre}",
                 Activo = true,
