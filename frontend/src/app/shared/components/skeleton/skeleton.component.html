@@ -1,0 +1,53 @@
+<div class="skeleton-container skeleton-variant-{{ variant }}" role="status" aria-label="Cargando contenido...">
+  <ng-container [ngSwitch]="variant">
+    
+    <!-- Variant: Card -->
+    <div *ngSwitchCase="'card'" class="skeleton-grid">
+      <div *ngFor="let item of items" class="skeleton-card">
+        <div class="skeleton-block skeleton-avatar-lg"></div>
+        <div class="skeleton-lines">
+          <div class="skeleton-block skeleton-line skeleton-w-80"></div>
+          <div class="skeleton-block skeleton-line skeleton-w-60"></div>
+          <div class="skeleton-block skeleton-line skeleton-w-40"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Variant: KPI -->
+    <div *ngSwitchCase="'kpi'" class="skeleton-grid skeleton-kpi-grid">
+      <div *ngFor="let item of items" class="skeleton-kpi-card">
+        <div class="skeleton-block skeleton-icon"></div>
+        <div class="skeleton-block skeleton-line skeleton-w-50"></div>
+        <div class="skeleton-block skeleton-line-lg skeleton-w-70"></div>
+      </div>
+    </div>
+
+    <!-- Variant: Table -->
+    <div *ngSwitchCase="'table'" class="skeleton-table">
+      <div class="skeleton-table-header">
+        <div class="skeleton-block skeleton-line"></div>
+        <div class="skeleton-block skeleton-line"></div>
+        <div class="skeleton-block skeleton-line"></div>
+        <div class="skeleton-block skeleton-line"></div>
+      </div>
+      <div *ngFor="let item of items" class="skeleton-table-row">
+        <div class="skeleton-block skeleton-line skeleton-w-60"></div>
+        <div class="skeleton-block skeleton-line skeleton-w-80"></div>
+        <div class="skeleton-block skeleton-line skeleton-w-50"></div>
+        <div class="skeleton-block skeleton-line skeleton-w-40"></div>
+      </div>
+    </div>
+
+    <!-- Variant: List -->
+    <div *ngSwitchCase="'list'" class="skeleton-list">
+      <div *ngFor="let item of items" class="skeleton-list-item">
+        <div class="skeleton-block skeleton-avatar-sm"></div>
+        <div class="skeleton-lines" style="flex: 1;">
+          <div class="skeleton-block skeleton-line skeleton-w-70"></div>
+          <div class="skeleton-block skeleton-line skeleton-w-40"></div>
+        </div>
+      </div>
+    </div>
+
+  </ng-container>
+</div>

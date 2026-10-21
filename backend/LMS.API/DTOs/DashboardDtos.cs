@@ -193,3 +193,92 @@ public class UpdateAdminCourseDto
     public int? DocenteId { get; set; }
     public string? Descripcion { get; set; }
 }
+
+// ==========================================
+// DTOs para Centro de Notificaciones Estudiante
+// ==========================================
+public class StudentNotificationDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Type { get; set; } = "NEW_TASK"; // NEW_TASK, GRADED, DUE_SOON, OVERDUE
+    public string Title { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public int? TaskId { get; set; }
+    public string? CourseName { get; set; }
+}
+
+// ==========================================
+// DTOs para Libro de Calificaciones Docente
+// ==========================================
+public class GradebookTaskDto
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public decimal MaxScore { get; set; } = 5.0m;
+    public DateTime? DueDate { get; set; }
+}
+
+public class GradebookStudentDto
+{
+    public int StudentId { get; set; }
+    public string FullName { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public Dictionary<string, decimal?> Grades { get; set; } = new();
+    public int SubmittedCount { get; set; }
+    public decimal? Average { get; set; }
+}
+
+public class GradebookDto
+{
+    public int CourseId { get; set; }
+    public string CourseName { get; set; } = string.Empty;
+    public string GradeName { get; set; } = string.Empty;
+    public List<GradebookTaskDto> Tasks { get; set; } = new();
+    public List<GradebookStudentDto> Students { get; set; } = new();
+}
+
+// ==========================================
+// DTOs para Progreso Histórico de Alumno
+// ==========================================
+public class StudentProgressItemDto
+{
+    public int TaskId { get; set; }
+    public string TaskTitle { get; set; } = string.Empty;
+    public string CourseName { get; set; } = string.Empty;
+    public decimal? Grade { get; set; }
+    public decimal MaxScore { get; set; } = 5.0m;
+    public DateTime SubmittedAt { get; set; }
+    public DateTime? GradedAt { get; set; }
+    public bool IsLate { get; set; }
+}
+
+// ==========================================
+// DTOs para Estadísticas y Gráficas de Administrador
+// ==========================================
+public class SubmissionsPerWeekDto
+{
+    public string WeekStart { get; set; } = string.Empty;
+    public int Count { get; set; }
+}
+
+public class GradeDistributionDto
+{
+    public string Range { get; set; } = string.Empty; // "0.0-2.9", "3.0-3.9", "4.0-4.5", "4.6-5.0"
+    public int Count { get; set; }
+}
+
+public class ActiveStudentsByGradeDto
+{
+    public string Grade { get; set; } = string.Empty;
+    public int Count { get; set; }
+}
+
+public class AdminActivityStatsDto
+{
+    public List<SubmissionsPerWeekDto> SubmissionsPerWeek { get; set; } = new();
+    public List<GradeDistributionDto> GradeDistribution { get; set; } = new();
+    public List<ActiveStudentsByGradeDto> ActiveStudentsByGrade { get; set; } = new();
+    public int TasksCreatedLast30Days { get; set; }
+    public int SubmissionsLast30Days { get; set; }
+}

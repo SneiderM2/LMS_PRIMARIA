@@ -27,6 +27,16 @@ export interface StudentCoursesCatalog {
   availableCourses: StudentCourseItem[];
 }
 
+export interface StudentNotification {
+  id: string;
+  type: 'NEW_TASK' | 'GRADED' | 'DUE_SOON' | 'OVERDUE';
+  title: string;
+  message: string;
+  createdAt: string;
+  taskId?: number;
+  courseName?: string;
+}
+
 import { environment } from '../../../environments/environment';
 
 @Injectable({
@@ -55,6 +65,10 @@ export class StudentService {
 
   public withdrawCourse(courseId: number): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.API_URL}/courses/${courseId}/withdraw`, {});
+  }
+
+  public getNotifications(): Observable<StudentNotification[]> {
+    return this.http.get<StudentNotification[]>(`${this.API_URL}/notifications`);
   }
 
   public uploadAssignment(assignmentId: string, file: File, studentComment?: string): Observable<UploadResult> {

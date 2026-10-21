@@ -6,6 +6,8 @@ import { ThemeToggleComponent } from './shared/components/theme-toggle/theme-tog
 import { LanguageSelectorComponent } from './shared/components/language-selector/language-selector.component';
 import { DataPolicyModalComponent } from './shared/components/data-policy-modal/data-policy-modal.component';
 import { SessionWarningModalComponent } from './shared/components/session-warning-modal/session-warning-modal.component';
+import { ToastContainerComponent } from './shared/components/toast-container/toast-container.component';
+import { ConfirmDialogHostComponent } from './shared/components/confirm-dialog-host/confirm-dialog-host.component';
 import { AuthService } from './core/services/auth.service';
 import { SessionTimeoutService } from './core/services/session-timeout.service';
 import { ServerStatusService } from './core/services/server-status.service';
@@ -23,6 +25,8 @@ import { environment } from '../environments/environment';
     LanguageSelectorComponent,
     DataPolicyModalComponent,
     SessionWarningModalComponent,
+    ToastContainerComponent,
+    ConfirmDialogHostComponent,
     TranslatePipe
   ],
   templateUrl: './app.component.html'

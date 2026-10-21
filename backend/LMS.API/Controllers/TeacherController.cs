@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace LMS.API.Controllers;
 
@@ -20,6 +21,7 @@ public class TeacherController : ControllerBase
     private readonly ISemaforoService _semaforoService;
     private readonly IFileStorageService _fileStorage;
     private readonly ConsentService _consent;
+    private readonly IMemoryCache _cache;
     private readonly ILogger<TeacherController> _logger;
 
     public TeacherController(
@@ -27,12 +29,14 @@ public class TeacherController : ControllerBase
         ISemaforoService semaforoService,
         IFileStorageService fileStorage,
         ConsentService consent,
+        IMemoryCache cache,
         ILogger<TeacherController> logger)
     {
         _context = context;
         _semaforoService = semaforoService;
         _fileStorage = fileStorage;
         _consent = consent;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -489,7 +493,14 @@ public class TeacherController : ControllerBase
     [ProducesResponseType(typeof(List<StudentStatusDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStudentsStatus([FromQuery] string? gradeLevel = null)
     {
+        var cacheKey = $"semaforo_status_{gradeLevel ?? "ALL"}";
+        if (_cache.TryGetValue(cacheKey, out List<StudentStatusDto>? cached) && cached != null)
+        {
+            return Ok(cached);
+        }
+
         var query = _context.Usuarios
+            .AsNoTracking()
             .Include(u => u.Rol)
             .Include(u => u.Alumno)
                 .ThenInclude(a => a!.Grado)
@@ -522,6 +533,8 @@ public class TeacherController : ControllerBase
         }
 
         var statusList = _semaforoService.CalculateStatusList(students, activityMap);
+        _cache.Set(cacheKey, statusList, TimeSpan.FromSeconds(30));
+
         var accessor = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Docente";
         await FileLogger.LogAsync("AUDIT",
             $"[Ley 1581 / Ley 1098] Consulta de semáforo escolar y seguimiento de actividad de menores ({statusList.Count} estudiantes, grado='{gradeLevel ?? "TODOS"}') por {accessor}.");
@@ -535,7 +548,14 @@ public class TeacherController : ControllerBase
     [ProducesResponseType(typeof(SemaforoSummaryMetricsDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMetrics([FromQuery] string? gradeLevel = null)
     {
+        var cacheKey = $"semaforo_metrics_{gradeLevel ?? "ALL"}";
+        if (_cache.TryGetValue(cacheKey, out SemaforoSummaryMetricsDto? cached) && cached != null)
+        {
+            return Ok(cached);
+        }
+
         var query = _context.Usuarios
+            .AsNoTracking()
             .Include(u => u.Rol)
             .Include(u => u.Alumno)
                 .ThenInclude(a => a!.Grado)
@@ -563,6 +583,7 @@ public class TeacherController : ControllerBase
 
         var statusList = _semaforoService.CalculateStatusList(students, activityMap);
         var metrics = _semaforoService.CalculateMetrics(statusList);
+        _cache.Set(cacheKey, metrics, TimeSpan.FromSeconds(30));
 
         return Ok(metrics);
     }
@@ -1320,5 +1341,149 @@ public class TeacherController : ControllerBase
 
             return Ok(new { message = tarea.Activo ? "Tarea activada." : "Tarea archivado.", isActive = tarea.Activo });
         }
+    }
+
+    /// <summary>
+    /// Consulta el libro de calificaciones completo de una materia (estudiantes matriculados x tareas con notas).
+    /// GET: /api/teacher/gradebook?courseId={id}
+    /// </summary>
+    [HttpGet("gradebook")]
+    [ProducesResponseType(typeof(GradebookDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetGradebook([FromQuery] int courseId)
+    {
+        if (!await CanManageCourseAsync(courseId))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "No tienes permiso para acceder a este curso." });
+        }
+
+        var course = await _context.Cursos
+            .AsNoTracking()
+            .Include(c => c.Grado)
+            .FirstOrDefaultAsync(c => c.Id == courseId);
+
+        if (course == null) return NotFound(new { message = "Curso no encontrado." });
+
+        // Tareas del curso ordenadas por fecha límite
+        var tasks = await _context.Tareas
+            .AsNoTracking()
+            .Where(t => t.CursoId == courseId && t.Activo)
+            .OrderBy(t => t.FechaLimite)
+            .Select(t => new GradebookTaskDto
+            {
+                Id = t.Id,
+                Title = t.Titulo,
+                MaxScore = t.PuntajeMaximo,
+                DueDate = t.FechaLimite
+            })
+            .ToListAsync();
+
+        var taskIds = tasks.Select(t => t.Id).ToList();
+
+        // Estudiantes matriculados activos
+        var enrollments = await _context.Inscripciones
+            .AsNoTracking()
+            .Include(i => i.Alumno)
+                .ThenInclude(a => a.Usuario)
+            .Where(i => i.CursoId == courseId && i.Estado == "ACTIVA" && i.Alumno.Usuario.Activo && i.Alumno.Usuario.AnonymizedAt == null)
+            .OrderBy(i => i.Alumno.Usuario.Apellido)
+            .ThenBy(i => i.Alumno.Usuario.Nombre)
+            .ToListAsync();
+
+        // Entregas de estas tareas
+        var submissions = await _context.Entregas
+            .AsNoTracking()
+            .Where(e => taskIds.Contains(e.TareaId))
+            .ToListAsync();
+
+        var studentRows = new List<GradebookStudentDto>();
+        foreach (var enr in enrollments)
+        {
+            var studentSubmissions = submissions.Where(e => e.AlumnoId == enr.AlumnoId).ToList();
+            var gradesDict = new Dictionary<string, decimal?>();
+            var gradedScores = new List<decimal>();
+
+            foreach (var t in tasks)
+            {
+                var sub = studentSubmissions.FirstOrDefault(s => s.TareaId == t.Id);
+                gradesDict[t.Id.ToString()] = sub?.Calificacion;
+                if (sub?.Calificacion != null)
+                {
+                    gradedScores.Add(sub.Calificacion.Value);
+                }
+            }
+
+            studentRows.Add(new GradebookStudentDto
+            {
+                StudentId = enr.AlumnoId,
+                FullName = enr.Alumno.Usuario.FullName,
+                Username = enr.Alumno.Usuario.Username,
+                Grades = gradesDict,
+                SubmittedCount = studentSubmissions.Count,
+                Average = gradedScores.Count > 0 ? Math.Round(gradedScores.Average(), 1) : null
+            });
+        }
+
+        var result = new GradebookDto
+        {
+            CourseId = course.Id,
+            CourseName = course.Nombre,
+            GradeName = course.Grado.Nombre,
+            Tasks = tasks,
+            Students = studentRows
+        };
+
+        var actor = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Docente";
+        await FileLogger.LogAsync("AUDIT",
+            $"[Ley 1581 / Ley 1098] Consulta de libro de calificaciones para curso #{courseId} '{course.Nombre}' ({studentRows.Count} estudiantes) por {actor}.");
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Consulta el progreso histórico y calificaciones de un alumno en las materias del docente.
+    /// GET: /api/teacher/students/{studentId}/progress
+    /// </summary>
+    [HttpGet("students/{studentId:int}/progress")]
+    [ProducesResponseType(typeof(List<StudentProgressItemDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStudentProgress(int studentId)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null) return Unauthorized();
+
+        var isAdmin = IsAdmin(currentUser.Rol?.Nombre);
+
+        var query = _context.Entregas
+            .AsNoTracking()
+            .Include(e => e.Tarea)
+                .ThenInclude(t => t.Curso)
+            .Where(e => e.AlumnoId == studentId);
+
+        if (!isAdmin)
+        {
+            query = query.Where(e => e.Tarea.Curso.DocenteId == currentUser.Id);
+        }
+
+        var progressItems = await query
+            .OrderBy(e => e.FechaEntrega)
+            .Select(e => new StudentProgressItemDto
+            {
+                TaskId = e.TareaId,
+                TaskTitle = e.Tarea.Titulo,
+                CourseName = e.Tarea.Curso.Nombre,
+                Grade = e.Calificacion,
+                MaxScore = e.Tarea.PuntajeMaximo,
+                SubmittedAt = e.FechaEntrega,
+                GradedAt = e.FechaCalificacion,
+                IsLate = e.FechaEntrega > e.Tarea.FechaLimite
+            })
+            .ToListAsync();
+
+        var actor = currentUser.Username;
+        await FileLogger.LogAsync("AUDIT",
+            $"[Ley 1581 / Ley 1098] Consulta de historial de progreso escolar de alumno ID:{studentId} ({progressItems.Count} registros) por {actor}.");
+
+        return Ok(progressItems);
     }
 }

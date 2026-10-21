@@ -1,0 +1,10 @@
+<div class="empty-state-card" role="region" [attr.aria-label]="title">
+  <div class="empty-icon-bubble" aria-hidden="true">
+    <span class="empty-icon">{{ icon }}</span>
+  </div>
+  <h4 class="empty-title">{{ title }}</h4>
+  <p *ngIf="message" class="empty-message">{{ message }}</p>
+  <div class="empty-actions">
+    <ng-content></ng-content>
+  </div>
+</div>

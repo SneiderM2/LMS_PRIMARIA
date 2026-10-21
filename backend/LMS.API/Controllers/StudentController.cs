@@ -49,6 +49,7 @@ public class StudentController : ControllerBase
         }
 
         var student = await _context.Alumnos
+            .AsNoTracking()
             .Include(a => a.Usuario)
             .Include(a => a.Grado)
             .Include(a => a.Inscripciones)
@@ -70,6 +71,7 @@ public class StudentController : ControllerBase
             .ToList();
 
         var tareas = await _context.Tareas
+            .AsNoTracking()
             .Include(t => t.Curso)
                 .ThenInclude(c => c.Docente)
             .Include(t => t.Curso)
@@ -81,6 +83,7 @@ public class StudentController : ControllerBase
             .ToListAsync();
 
         var materiales = await _context.Materiales
+            .AsNoTracking()
             .Include(m => m.Curso)
                 .ThenInclude(c => c.Docente)
             .Include(m => m.Curso)
@@ -561,5 +564,115 @@ public class StudentController : ControllerBase
         await FileLogger.LogAsync("AUDIT", $"Estudiante {username} (ID:{student.UsuarioId}) retiró el curso ID:{courseId}");
 
         return Ok(new { message = "Has retirado la clase de tu lista activa exitosamente." });
+    }
+
+    /// <summary>
+    /// Consulta las notificaciones recientes del estudiante (nuevas tareas, calificaciones, vencimientos).
+    /// GET: /api/student/notifications
+    /// </summary>
+    [HttpGet("notifications")]
+    [ProducesResponseType(typeof(List<StudentNotificationDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetNotifications()
+    {
+        var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        var student = await _context.Alumnos
+            .AsNoTracking()
+            .Include(a => a.Inscripciones)
+            .FirstOrDefaultAsync(a => a.Usuario.Username.ToLower() == username.ToLower());
+
+        if (student == null) return NotFound("Estudiante no encontrado.");
+
+        var now = DateTime.UtcNow;
+        var activeEnrolledCourseIds = student.Inscripciones
+            .Where(i => i.Estado == "ACTIVA")
+            .Select(i => i.CursoId)
+            .ToList();
+
+        // Tareas relevantes activas
+        var relevantTasks = await _context.Tareas
+            .AsNoTracking()
+            .Include(t => t.Curso)
+            .Where(t => t.Activo && (activeEnrolledCourseIds.Contains(t.CursoId) || t.Curso.GradoId == student.GradoId))
+            .ToListAsync();
+
+        // Entregas del estudiante
+        var studentSubmissions = await _context.Entregas
+            .AsNoTracking()
+            .Include(e => e.Tarea)
+                .ThenInclude(t => t.Curso)
+            .Where(e => e.AlumnoId == student.UsuarioId)
+            .ToListAsync();
+
+        var notifications = new List<StudentNotificationDto>();
+        var submittedTaskIds = studentSubmissions.Select(e => e.TareaId).ToHashSet();
+
+        // 1. Tareas nuevas en los últimos 7 días no entregadas
+        foreach (var task in relevantTasks.Where(t => t.FechaPublicacion >= now.AddDays(-7) && !submittedTaskIds.Contains(t.Id)))
+        {
+            notifications.Add(new StudentNotificationDto
+            {
+                Id = $"NEW_TASK-{task.Id}",
+                Type = "NEW_TASK",
+                Title = "Nueva misión publicada",
+                Message = $"Tienes una nueva misión en {task.Curso.Nombre}: '{task.Titulo}'",
+                CreatedAt = task.FechaPublicacion,
+                TaskId = task.Id,
+                CourseName = task.Curso.Nombre
+            });
+        }
+
+        // 2. Tareas por vencer en las próximas 48 horas no entregadas
+        foreach (var task in relevantTasks.Where(t => !submittedTaskIds.Contains(t.Id) && t.FechaLimite >= now && t.FechaLimite <= now.AddHours(48)))
+        {
+            notifications.Add(new StudentNotificationDto
+            {
+                Id = $"DUE_SOON-{task.Id}",
+                Type = "DUE_SOON",
+                Title = "Misión por vencer",
+                Message = $"La misión '{task.Titulo}' en {task.Curso.Nombre} vence pronto.",
+                CreatedAt = task.FechaLimite.AddHours(-48) > task.FechaPublicacion ? task.FechaLimite.AddHours(-48) : task.FechaPublicacion,
+                TaskId = task.Id,
+                CourseName = task.Curso.Nombre
+            });
+        }
+
+        // 3. Tareas vencidas en los últimos 7 días no entregadas
+        foreach (var task in relevantTasks.Where(t => !submittedTaskIds.Contains(t.Id) && t.FechaLimite < now && t.FechaLimite >= now.AddDays(-7)))
+        {
+            notifications.Add(new StudentNotificationDto
+            {
+                Id = $"OVERDUE-{task.Id}",
+                Type = "OVERDUE",
+                Title = "Misión vencida",
+                Message = $"El plazo para '{task.Titulo}' en {task.Curso.Nombre} ha finalizado.",
+                CreatedAt = task.FechaLimite,
+                TaskId = task.Id,
+                CourseName = task.Curso.Nombre
+            });
+        }
+
+        // 4. Entregas calificadas en los últimos 14 días
+        foreach (var sub in studentSubmissions.Where(s => s.FechaCalificacion.HasValue && s.FechaCalificacion.Value >= now.AddDays(-14)))
+        {
+            notifications.Add(new StudentNotificationDto
+            {
+                Id = $"GRADED-{sub.Id}",
+                Type = "GRADED",
+                Title = "Misión calificada ⭐",
+                Message = $"Tu entrega de '{sub.Tarea.Titulo}' fue calificada: {sub.Calificacion:F1} / {sub.Tarea.PuntajeMaximo:F1}",
+                CreatedAt = sub.FechaCalificacion!.Value,
+                TaskId = sub.TareaId,
+                CourseName = sub.Tarea.Curso.Nombre
+            });
+        }
+
+        var result = notifications
+            .OrderByDescending(n => n.CreatedAt)
+            .Take(30)
+            .ToList();
+
+        return Ok(result);
     }
 }

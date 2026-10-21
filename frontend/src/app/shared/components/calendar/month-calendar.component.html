@@ -1,0 +1,56 @@
+<div class="calendar-card" role="region" aria-label="Calendario de Entregas y Actividades">
+  
+  <!-- Header: Title & Controls -->
+  <div class="calendar-header">
+    <div class="calendar-title-group">
+      <span class="calendar-icon" aria-hidden="true">📅</span>
+      <h3 class="calendar-heading">{{ monthTitle }}</h3>
+    </div>
+    <div class="calendar-controls">
+      <button type="button" class="cal-btn-nav" (click)="prevMonth()" aria-label="Mes anterior">‹</button>
+      <button type="button" class="cal-btn-today" (click)="goToToday()">Hoy</button>
+      <button type="button" class="cal-btn-nav" (click)="nextMonth()" aria-label="Mes siguiente">›</button>
+    </div>
+  </div>
+
+  <!-- Weekdays row -->
+  <div class="calendar-weekdays" role="row">
+    <div *ngFor="let dayName of weekDays" class="weekday-cell" role="columnheader">
+      {{ dayName }}
+    </div>
+  </div>
+
+  <!-- Grid of days -->
+  <div class="calendar-grid" role="grid">
+    <div
+      *ngFor="let day of calendarDays"
+      class="day-cell"
+      [class.day-other-month]="!day.isCurrentMonth"
+      [class.day-today]="day.isToday"
+      [class.has-events]="day.events.length > 0"
+      (click)="onDaySelect(day)"
+      role="gridcell"
+      tabindex="0"
+      [attr.aria-label]="day.date.toLocaleDateString('es-CO') + ' (' + day.events.length + ' actividades)'">
+      
+      <div class="day-number">{{ day.dayNumber }}</div>
+
+      <!-- Event chips / dots -->
+      <div class="day-events-container">
+        <div
+          *ngFor="let ev of day.events.slice(0, 2)"
+          class="event-chip"
+          [style.background-color]="ev.color || '#38bdf8'"
+          (click)="onEventSelect(ev, $event)"
+          [title]="ev.title + (ev.subtitle ? ' - ' + ev.subtitle : '')">
+          <span class="event-chip-text">{{ ev.title }}</span>
+        </div>
+        <div *ngIf="day.events.length > 2" class="event-more-badge">
+          +{{ day.events.length - 2 }} más
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>

@@ -4,24 +4,44 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
-import { AdminService, AdminMetrics, AdminUser, CreateAdminUserDto, UpdateAdminUserDto, AdminCourse, CreateAdminCourseDto, UpdateAdminCourseDto } from '../../core/services/admin.service';
+import { AdminService, AdminMetrics, AdminUser, CreateAdminUserDto, UpdateAdminUserDto, AdminCourse, CreateAdminCourseDto, UpdateAdminCourseDto, AdminActivityStats } from '../../core/services/admin.service';
+import { ToastService } from '../../core/services/toast.service';
+import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { SystemInspectorComponent } from './system-inspector/system-inspector.component';
 import { ReportExportService } from '../../core/services/report-export.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { LanguageSelectorComponent } from '../../shared/components/language-selector/language-selector.component';
+import { MiniBarChartComponent } from '../../shared/components/charts/mini-bar-chart.component';
+import { DonutChartComponent } from '../../shared/components/charts/donut-chart.component';
+import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, SystemInspectorComponent, TranslatePipe, LanguageSelectorComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    SystemInspectorComponent,
+    TranslatePipe,
+    LanguageSelectorComponent,
+    MiniBarChartComponent,
+    DonutChartComponent,
+    SkeletonComponent,
+    EmptyStateComponent
+  ],
   templateUrl: './admin-dashboard.component.html',
   styleUrls: ['./admin-dashboard.component.css']
 })
 export class AdminDashboardComponent implements OnInit, OnDestroy {
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
-  // Pestañas: 'overview' (Usuarios), 'courses' (Materias/Cursos), 'inspector' (Auditoría/Logs)
-  public activeSection: 'overview' | 'courses' | 'inspector' = 'overview';
+  // Pestañas: 'overview' (Usuarios), 'courses' (Materias/Cursos), 'inspector' (Auditoría/Logs), 'stats' (Métricas Avanzadas)
+  public activeSection: 'overview' | 'courses' | 'inspector' | 'stats' = 'overview';
+
+  // Estadísticas y Analítica Avanzada
+  public activityStats: AdminActivityStats | null = null;
+  public isLoadingActivityStats = false;
 
   // Métricas Institucionales
   public metrics: AdminMetrics = {
@@ -111,13 +131,54 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     public authService: AuthService,
     private adminService: AdminService,
     private router: Router,
-    private reportService: ReportExportService
+    private reportService: ReportExportService,
+    private toastService: ToastService,
+    private confirmDialogService: ConfirmDialogService
   ) { }
 
   ngOnInit(): void {
     this.loadMetrics();
     this.loadUsers();
     this.loadAdminCourses();
+    this.loadActivityStats();
+  }
+
+  public loadActivityStats(): void {
+    this.isLoadingActivityStats = true;
+    this.adminService.getActivityStats()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (stats) => {
+          this.isLoadingActivityStats = false;
+          this.activityStats = stats;
+        },
+        error: () => {
+          this.isLoadingActivityStats = false;
+        }
+      });
+  }
+
+  public get weeklySubmissionsChartData(): { label: string; value: number }[] {
+    if (!this.activityStats || !this.activityStats.submissionsPerWeek) return [];
+    return this.activityStats.submissionsPerWeek.map(w => ({
+      label: w.weekStart ? w.weekStart.slice(5) : '',
+      value: w.count
+    }));
+  }
+
+  public get gradeDistributionDonutSegments(): { label: string; value: number; color: string }[] {
+    if (!this.activityStats || !this.activityStats.gradeDistribution) return [];
+    const colors: Record<string, string> = {
+      '0.0-2.9': '#ef4444',
+      '3.0-3.9': '#f59e0b',
+      '4.0-4.5': '#38bdf8',
+      '4.6-5.0': '#22c55e'
+    };
+    return this.activityStats.gradeDistribution.map(g => ({
+      label: `Nota ${g.range}`,
+      value: g.count,
+      color: colors[g.range] || '#6366f1'
+    }));
   }
 
   ngOnDestroy(): void {
@@ -129,13 +190,15 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  public setSection(section: 'overview' | 'courses' | 'inspector'): void {
+  public setSection(section: 'overview' | 'courses' | 'inspector' | 'stats'): void {
     this.activeSection = section;
     if (section === 'overview') {
       this.loadUsers();
       this.loadMetrics();
     } else if (section === 'courses') {
       this.loadAdminCourses();
+    } else if (section === 'stats') {
+      this.loadActivityStats();
     }
   }
 
@@ -378,7 +441,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
     const resetPass = (this.editUserForm.password || '').trim();
     if (resetPass.length > 0 && !this.isNormalizedPassword(resetPass)) {
-      alert('La nueva contraseña debe tener mínimo 8 caracteres e incluir mayúscula, minúscula, número y carácter especial.');
+      this.toastService.warning('La nueva contraseña debe tener mínimo 8 caracteres e incluir mayúscula, minúscula, número y carácter especial.');
       return;
     }
 
@@ -394,16 +457,19 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.isEditingUser = false;
-          alert('Error al actualizar usuario: ' + (err?.error?.message || err.message));
+          this.toastService.error('Error al actualizar usuario: ' + (err?.error?.message || err.message));
         }
       });
   }
 
-  public toggleUserStatus(user: AdminUser): void {
+  public async toggleUserStatus(user: AdminUser): Promise<void> {
     const action = user.activo ? 'suspender' : 'reactivar';
-    if (!confirm(`¿Estás seguro de ${action} la cuenta de ${user.fullName}? Sus registros históricos se preservarán.`)) {
-      return;
-    }
+    const confirmed = await this.confirmDialogService.confirm({
+      title: `${user.activo ? 'Suspender' : 'Reactivar'} Cuenta`,
+      message: `¿Estás seguro de ${action} la cuenta de ${user.fullName}? Sus registros históricos se preservarán.`,
+      tone: user.activo ? 'warning' : 'primary'
+    });
+    if (!confirmed) return;
 
     this.adminService.toggleUserStatus(user.id)
       .pipe(takeUntil(this.destroy$))
@@ -415,7 +481,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.loadMetrics();
         },
         error: (err) => {
-          alert('Error al cambiar el estado del usuario: ' + (err?.error?.message || err.message));
+          this.toastService.error('Error al cambiar el estado del usuario: ' + (err?.error?.message || err.message));
         }
       });
   }
@@ -522,14 +588,19 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.isEditingCourse = false;
-          alert('Error al editar curso: ' + (err?.error?.message || err.message));
+          this.toastService.error('Error al editar curso: ' + (err?.error?.message || err.message));
         }
       });
   }
 
-  public toggleCourseStatus(course: AdminCourse): void {
+  public async toggleCourseStatus(course: AdminCourse): Promise<void> {
     const action = course.activo ? 'suspender' : 'reactivar';
-    if (!confirm(`¿Deseas ${action} la materia "${course.nombre}"?`)) return;
+    const confirmed = await this.confirmDialogService.confirm({
+      title: `${course.activo ? 'Suspender' : 'Reactivar'} Materia`,
+      message: `¿Deseas ${action} la materia "${course.nombre}"?`,
+      tone: course.activo ? 'warning' : 'primary'
+    });
+    if (!confirmed) return;
 
     this.adminService.toggleCourseStatus(course.id)
       .pipe(takeUntil(this.destroy$))
@@ -540,7 +611,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.loadMetrics();
         },
         error: (err) => {
-          alert('Error al cambiar estado del curso: ' + (err?.error?.message || err.message));
+          this.toastService.error('Error al cambiar estado del curso: ' + (err?.error?.message || err.message));
         }
       });
   }
@@ -550,7 +621,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (this.isDownloadingBackup) return;
 
     this.isDownloadingBackup = true;
-    this.showToast('Generando dump SQL de la base de datos Supabase... Por favor espera.', 'info');
+    this.showToast('Generando la copia de seguridad institucional... Por favor espera.', 'info');
 
     this.adminService.downloadDatabaseBackup()
       .pipe(takeUntil(this.destroy$))
@@ -559,7 +630,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.isDownloadingBackup = false;
           const now = new Date();
           const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-          const fileName = `backup_lms_supabase_${timestamp}.sql`;
+          const fileName = `respaldo_scikids_${timestamp}.sql`;
 
           const blobUrl = window.URL.createObjectURL(blob);
           const link = document.createElement('a');
@@ -570,12 +641,12 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           document.body.removeChild(link);
           window.URL.revokeObjectURL(blobUrl);
 
-          this.showToast('Copia de seguridad SQL descargada exitosamente 💾', 'success');
+          this.showToast('Copia de seguridad descargada exitosamente 💾', 'success');
         },
         error: (err) => {
           this.isDownloadingBackup = false;
           console.error('Error al descargar copia de seguridad:', err);
-          this.showToast('No fue posible generar el backup de la base de datos. Verifica la conexión con Supabase.', 'warning');
+          this.showToast('No fue posible generar la copia de seguridad. Intenta nuevamente en unos minutos.', 'warning');
         }
       });
   }
@@ -607,7 +678,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     }, 2000);
   }
 
-  public onFileSelected(event: Event): void {
+  public async onFileSelected(event: Event): Promise<void> {
     const target = event.target as HTMLInputElement;
     if (!target || !target.files || target.files.length === 0) return;
 
@@ -615,23 +686,26 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     if (!file) return;
 
     if (!file.name.toLowerCase().endsWith('.sql')) {
-      alert('Por favor selecciona un archivo con extensión .sql válido.');
+      this.toastService.warning('Por favor selecciona un archivo de copia de seguridad válido (.sql).');
       target.value = '';
       return;
     }
 
     if (file.size === 0) {
-      alert('El archivo seleccionado está vacío.');
+      this.toastService.warning('El archivo seleccionado está vacío.');
       target.value = '';
       return;
     }
 
     const sizeKb = (file.size / 1024).toFixed(1);
-    const confirmAction = confirm(
-      `⚠️ ¡ATENCIÓN! Se restaurará la base de datos de PostgreSQL en Supabase con la información del archivo:\n\n📄 "${file.name}" (${sizeKb} KB)\n\n¿Deseas continuar?`
-    );
+    const confirmed = await this.confirmDialogService.confirm({
+      title: 'Restaurar Base de Datos',
+      message: `Se restaurará la información institucional a partir del archivo: "${file.name}" (${sizeKb} KB). ¿Deseas continuar?`,
+      tone: 'danger',
+      confirmText: 'Restaurar'
+    });
 
-    if (!confirmAction) {
+    if (!confirmed) {
       target.value = '';
       return;
     }
@@ -639,7 +713,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.isRestoringBackup = true;
     // Bloquear recarga del Service Worker durante la operación crítica
     (window as any).__swReloadBlocked = true;
-    this.showToast('Subiendo y ejecutando script de restauración en Supabase PostgreSQL... Por favor espera.', 'info');
+    this.showToast('Restaurando la copia de seguridad... Por favor espera.', 'info');
 
     this.adminService.restoreBackup(file)
       .pipe(takeUntil(this.destroy$))
@@ -653,14 +727,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
           this.loadMetrics();
           this.loadUsers();
           this.loadAdminCourses();
+          this.loadActivityStats();
         },
         error: (err: any) => {
           this.isRestoringBackup = false;
           (window as any).__swReloadBlocked = false;
           console.error('Error al restaurar backup:', err);
           const errorMsg = err?.error?.message || err?.error?.detail || err?.message || 'Error al comunicarse con el servidor.';
-          this.showToast(`❌ Error al restaurar: ${errorMsg}`, 'warning');
-          alert(`❌ No fue posible restaurar la base de datos:\n\n${errorMsg}`);
+          this.toastService.error(`❌ No fue posible restaurar la base de datos: ${errorMsg}`);
           target.value = '';
         }
       });
@@ -673,6 +747,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     }
     this.toastMessage = message;
     this.toastType = type;
+    if (type === 'success') {
+      this.toastService.success(message);
+    } else if (type === 'warning') {
+      this.toastService.warning(message);
+    } else {
+      this.toastService.info(message);
+    }
     this.toastTimeoutId = setTimeout(() => {
       this.toastMessage = null;
       this.toastTimeoutId = null;
@@ -748,7 +829,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
             { label: 'Total Materias', value: this.filteredCourses.length, color: 'blue' },
             { label: 'Alumnos Activos', value: this.metrics.activeStudentsCount, color: 'green' },
             { label: 'Docentes Activos', value: this.metrics.activeTeachersCount, color: 'purple' },
-            { label: 'Estado Kestrel', value: this.metrics.systemStatus, color: 'yellow' }
+            { label: 'Estado de la Plataforma', value: this.metrics.systemStatus, color: 'yellow' }
           ]
         });
         this.showToast('Reporte de materias en PDF generado exitosamente 📄', 'success');
@@ -756,7 +837,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     } else if (this.activeSection === 'inspector') {
       const headers = ['Componente / Parámetro', 'Estado / Valor', 'Descripción Técnica'];
       const rows = [
-        ['Estado General del Servidor', this.metrics.systemStatus, 'Kestrel Web Server (.NET 8) y PostgreSQL (Supabase)'],
+        ['Estado General del Servidor', this.metrics.systemStatus, 'Servicios de la plataforma y almacenamiento de datos'],
         ['Total Usuarios Habilitados', this.metrics.totalActiveUsers, 'Cuentas con acceso activo a la plataforma'],
         ['Docentes Registrados', this.metrics.activeTeachersCount, 'Profesores titulares de materias'],
         ['Estudiantes Matriculados', this.metrics.activeStudentsCount, 'Alumnos de 1° a 6° de básica primaria'],

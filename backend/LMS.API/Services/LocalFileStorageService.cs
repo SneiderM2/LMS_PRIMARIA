@@ -29,6 +29,8 @@ public sealed class LocalFileStorageService : IFileStorageService
     private readonly StorageOptions _options;
     private readonly string _rootPath;
 
+    public string ProviderName => "Local";
+
     public LocalFileStorageService(IWebHostEnvironment environment, IOptions<StorageOptions> options)
     {
         _environment = environment;
@@ -185,6 +187,25 @@ public sealed class LocalFileStorageService : IFileStorageService
         catch
         {
             return null;
+        }
+    }
+
+    public Task<Stream?> OpenReadStreamAsync(string storageKey, CancellationToken cancellationToken = default)
+    {
+        var physicalPath = ResolvePhysicalPath(storageKey) ?? ResolveLegacyPhysicalPath(storageKey);
+        if (physicalPath == null || !System.IO.File.Exists(physicalPath))
+        {
+            return Task.FromResult<Stream?>(null);
+        }
+
+        try
+        {
+            Stream stream = new FileStream(physicalPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
+            return Task.FromResult<Stream?>(stream);
+        }
+        catch
+        {
+            return Task.FromResult<Stream?>(null);
         }
     }
 

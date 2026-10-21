@@ -13,7 +13,7 @@ export class ServerStatusService {
    * Mensaje descriptivo amigable para los usuarios (profesores, alumnos, admins).
    */
   readonly statusMessage = signal<string>(
-    'Iniciando servidor en la nube... Render está reactivando los servicios tras inactividad (Cold Start).'
+    'Estamos preparando la plataforma para ti. Esto puede tardar unos segundos, gracias por tu paciencia. ⏳'
   );
 
   private autoResetTimer: any = null;
@@ -26,7 +26,7 @@ export class ServerStatusService {
       this.statusMessage.set(customMessage);
     } else {
       this.statusMessage.set(
-        'Iniciando servidor en la nube... Render está reactivando los servicios tras inactividad (Cold Start).'
+        'Estamos preparando la plataforma para ti. Esto puede tardar unos segundos, gracias por tu paciencia. ⏳'
       );
     }
 

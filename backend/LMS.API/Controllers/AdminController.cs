@@ -9,6 +9,7 @@ using LMS.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace LMS.API.Controllers;
 
@@ -21,36 +22,50 @@ public class AdminController : ControllerBase
     private readonly ILogger<AdminController> _logger;
     private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _configuration;
+    private readonly IMemoryCache _cache;
 
     public AdminController(
         LMSDbContext context,
         ILogger<AdminController> logger,
         IWebHostEnvironment env,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IMemoryCache cache)
     {
         _context = context;
         _logger = logger;
         _env = env;
         _configuration = configuration;
+        _cache = cache;
+    }
+
+    private void InvalidateAdminCache()
+    {
+        _cache.Remove("admin_metrics");
+        _cache.Remove("admin_activity_stats");
     }
 
     [HttpGet("metrics")]
     [ProducesResponseType(typeof(AdminMetricsDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAdminMetrics()
     {
-        var totalActive = await _context.Usuarios.CountAsync(u => u.Activo);
-        var activeTeachers = await _context.Usuarios.CountAsync(u => u.Activo && u.Rol.Nombre == "DOCENTE");
-        var activeStudents = await _context.Usuarios.CountAsync(u => u.Activo && u.Rol.Nombre == "ALUMNO");
-        var totalCourses = await _context.Cursos.CountAsync(c => c.Activo);
+        if (_cache.TryGetValue("admin_metrics", out AdminMetricsDto? cached) && cached != null)
+        {
+            return Ok(cached);
+        }
+
+        var totalActive = await _context.Usuarios.AsNoTracking().CountAsync(u => u.Activo);
+        var activeTeachers = await _context.Usuarios.AsNoTracking().CountAsync(u => u.Activo && u.Rol.Nombre == "DOCENTE");
+        var activeStudents = await _context.Usuarios.AsNoTracking().CountAsync(u => u.Activo && u.Rol.Nombre == "ALUMNO");
+        var totalCourses = await _context.Cursos.AsNoTracking().CountAsync(c => c.Activo);
 
         string systemStatus = "Operativo";
         try
         {
-            if (!await _context.Database.CanConnectAsync()) systemStatus = "Degradado (Fallo BD)";
+            if (!await _context.Database.CanConnectAsync()) systemStatus = "Degradado (Almacenamiento no disponible)";
         }
         catch
         {
-            systemStatus = "Degradado (Fallo BD)";
+            systemStatus = "Degradado (Almacenamiento no disponible)";
         }
 
         int recentErrors = 0;
@@ -80,7 +95,7 @@ public class AdminController : ControllerBase
             _logger.LogWarning(ex, "Error al calcular métricas de error.log");
         }
 
-        return Ok(new AdminMetricsDto
+        var metrics = new AdminMetricsDto
         {
             TotalActiveUsers = totalActive,
             ActiveTeachersCount = activeTeachers,
@@ -88,7 +103,10 @@ public class AdminController : ControllerBase
             SystemStatus = systemStatus,
             RecentErrorsCount = recentErrors,
             TotalCoursesCount = totalCourses
-        });
+        };
+
+        _cache.Set("admin_metrics", metrics, TimeSpan.FromSeconds(30));
+        return Ok(metrics);
     }
 
     /// <summary>
@@ -97,9 +115,14 @@ public class AdminController : ControllerBase
     /// </summary>
     [HttpGet("users")]
     [ProducesResponseType(typeof(List<AdminUserDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetUsers([FromQuery] string? role = null, [FromQuery] string? search = null)
+    public async Task<IActionResult> GetUsers(
+        [FromQuery] string? role = null,
+        [FromQuery] string? search = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int? pageSize = null)
     {
         var query = _context.Usuarios
+            .AsNoTracking()
             .Include(u => u.Rol)
             .Include(u => u.Alumno)
                 .ThenInclude(a => a!.Grado)
@@ -149,6 +172,8 @@ public class AdminController : ControllerBase
             })
             .ToListAsync();
 
+        Response.Headers["X-Total-Count"] = users.Count.ToString();
+
         RequestLoggingMiddleware.SetAuditContext(
             HttpContext,
             "Directorio de Usuarios",
@@ -156,6 +181,12 @@ public class AdminController : ControllerBase
 
         await FileLogger.LogAsync("AUDIT",
             $"[Ley 1581 / Ley 1098] Consulta administrativa de directorio de usuarios y datos de menores ({users.Count} registros, rol='{role ?? "ALL"}', búsqueda='{search ?? ""}') por {User.Identity?.Name ?? "Admin"}.");
+
+        if (page.HasValue && pageSize.HasValue && page.Value > 0 && pageSize.Value > 0)
+        {
+            var paged = users.Skip((page.Value - 1) * pageSize.Value).Take(pageSize.Value).ToList();
+            return Ok(paged);
+        }
 
         return Ok(users);
     }
@@ -221,6 +252,7 @@ public class AdminController : ControllerBase
 
         _context.Usuarios.Add(usuario);
         await _context.SaveChangesAsync();
+        InvalidateAdminCache();
 
         string? gradeResult = null;
         if (targetRoleName == "ALUMNO")
@@ -340,6 +372,7 @@ public class AdminController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+        InvalidateAdminCache();
         _logger.LogInformation("Usuario ID {Id} actualizado por administrador {Admin}", id, User.Identity?.Name);
         await AuditAsync("Administración: Actualización de usuario",
             $"Usuario {usuario.Username} (ID {usuario.Id}) actualizado. Cambio de contraseña: {!string.IsNullOrWhiteSpace(dto.Password)}.");
@@ -367,6 +400,7 @@ public class AdminController : ControllerBase
 
         usuario.Activo = !usuario.Activo;
         await _context.SaveChangesAsync();
+        InvalidateAdminCache();
 
         var statusText = usuario.Activo ? "habilitada" : "suspendida";
         _logger.LogInformation("[AUDIT] El Administrador {Admin} cambió el estado de la cuenta {Username} a {StatusText}",
@@ -467,6 +501,7 @@ public class AdminController : ControllerBase
 
         _context.Cursos.Add(curso);
         await _context.SaveChangesAsync();
+        InvalidateAdminCache();
 
         var result = new AdminCourseDto
         {
@@ -522,6 +557,7 @@ public class AdminController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+        InvalidateAdminCache();
         _logger.LogInformation("[AUDIT] El Administrador {Admin} editó/actualizó la materia/curso '{NombreCurso}' (ID: {CursoId})",
             User.Identity?.Name ?? "Admin", curso.Nombre, id);
         RequestLoggingMiddleware.SetAuditContext(
@@ -545,6 +581,7 @@ public class AdminController : ControllerBase
 
         curso.Activo = !curso.Activo;
         await _context.SaveChangesAsync();
+        InvalidateAdminCache();
 
         var statusText = curso.Activo ? "activado" : "desactivado";
         _logger.LogInformation("[AUDIT] El Administrador {Admin} alternó el estado del curso '{NombreCurso}' (ID: {CursoId}) a {StatusText}",
@@ -562,6 +599,80 @@ public class AdminController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Estadísticas globales de actividad y rendimiento para dashboards y visualizaciones.
+    /// GET: /api/admin/activity-stats
+    /// </summary>
+    [HttpGet("activity-stats")]
+    [ProducesResponseType(typeof(AdminActivityStatsDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetActivityStats()
+    {
+        if (_cache.TryGetValue("admin_activity_stats", out AdminActivityStatsDto? cached) && cached != null)
+        {
+            return Ok(cached);
+        }
+
+        var now = DateTime.UtcNow;
+        var thirtyDaysAgo = now.AddDays(-30);
+
+        var tasksCreatedLast30 = await _context.Tareas.AsNoTracking().CountAsync(t => t.FechaPublicacion >= thirtyDaysAgo);
+        var submissionsLast30 = await _context.Entregas.AsNoTracking().CountAsync(e => e.FechaEntrega >= thirtyDaysAgo);
+
+        // Entregas por semana (últimas 8 semanas calendario)
+        var weeklySubmissions = new List<SubmissionsPerWeekDto>();
+        for (int i = 7; i >= 0; i--)
+        {
+            var weekStart = now.Date.AddDays(-(int)now.DayOfWeek + 1).AddDays(-7 * i);
+            var weekEnd = weekStart.AddDays(7);
+            var count = await _context.Entregas.AsNoTracking()
+                .CountAsync(e => e.FechaEntrega >= weekStart && e.FechaEntrega < weekEnd);
+
+            weeklySubmissions.Add(new SubmissionsPerWeekDto
+            {
+                WeekStart = weekStart.ToString("yyyy-MM-dd"),
+                Count = count
+            });
+        }
+
+        // Distribución de calificaciones
+        var gradedEntregas = await _context.Entregas.AsNoTracking()
+            .Where(e => e.Calificacion != null)
+            .Select(e => e.Calificacion!.Value)
+            .ToListAsync();
+
+        var gradeDistribution = new List<GradeDistributionDto>
+        {
+            new() { Range = "0.0-2.9", Count = gradedEntregas.Count(g => g < 3.0m) },
+            new() { Range = "3.0-3.9", Count = gradedEntregas.Count(g => g >= 3.0m && g < 4.0m) },
+            new() { Range = "4.0-4.5", Count = gradedEntregas.Count(g => g >= 4.0m && g < 4.6m) },
+            new() { Range = "4.6-5.0", Count = gradedEntregas.Count(g => g >= 4.6m) }
+        };
+
+        // Estudiantes activos agrupados por grado
+        var studentsByGrade = await _context.Alumnos.AsNoTracking()
+            .Where(a => a.Usuario.Activo && a.Usuario.AnonymizedAt == null)
+            .GroupBy(a => a.Grado != null ? a.Grado.Nombre : "Sin Grado")
+            .Select(g => new ActiveStudentsByGradeDto
+            {
+                Grade = g.Key,
+                Count = g.Count()
+            })
+            .OrderBy(g => g.Grade)
+            .ToListAsync();
+
+        var stats = new AdminActivityStatsDto
+        {
+            SubmissionsPerWeek = weeklySubmissions,
+            GradeDistribution = gradeDistribution,
+            ActiveStudentsByGrade = studentsByGrade,
+            TasksCreatedLast30Days = tasksCreatedLast30,
+            SubmissionsLast30Days = submissionsLast30
+        };
+
+        _cache.Set("admin_activity_stats", stats, TimeSpan.FromSeconds(60));
+        return Ok(stats);
+    }
+
     [HttpGet("backup-database")]
     [Produces("application/sql")]
     public async Task<IActionResult> BackupDatabase()
@@ -574,7 +685,7 @@ public class AdminController : ControllerBase
             sqlBuilder.AppendLine("-- ====================================================================");
             sqlBuilder.AppendLine("-- LMS PRIMARIA - RESPALDO / BACKUP DE BASE DE DATOS");
             sqlBuilder.AppendLine($"-- FECHA DE EXTRACCIÓN (UTC): {timestamp:yyyy-MM-dd HH:mm:ss} UTC");
-            sqlBuilder.AppendLine("-- MOTOR DE BASE DE DATOS: PostgreSQL (Supabase Cloud)");
+            sqlBuilder.AppendLine("-- COPIA DE SEGURIDAD INSTITUCIONAL SCIKIDS LMS");
             sqlBuilder.AppendLine("-- ADVERTENCIA: este archivo contiene DATOS PERSONALES de menores de edad");
             sqlBuilder.AppendLine("-- y hashes de contraseñas. Almacénelo cifrado, con acceso restringido y");
             sqlBuilder.AppendLine("-- elimínelo según la política de retención (Ley 1581 de 2012, art. 17).");
@@ -663,7 +774,7 @@ public class AdminController : ControllerBase
 
             sqlBuilder.AppendLine("COMMIT;");
             var sqlBytes = Encoding.UTF8.GetBytes(sqlBuilder.ToString());
-            var fileName = $"backup_lms_supabase_{timestamp:yyyyMMdd_HHmmss}.sql";
+            var fileName = $"respaldo_scikids_{timestamp:yyyyMMdd_HHmmss}.sql";
 
             Response.Headers.Append("Content-Disposition", $"attachment; filename=\"{fileName}\"");
             Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
@@ -796,7 +907,7 @@ public class AdminController : ControllerBase
             _logger.LogError(ex, "Error al ejecutar la restauración del archivo SQL.");
             return StatusCode(StatusCodes.Status500InternalServerError, new
             {
-                message = "Ocurrió un error al ejecutar el script de restauración en PostgreSQL."
+                message = "Ocurrió un error al restaurar la copia de seguridad."
             });
         }
     }
@@ -875,6 +986,89 @@ public class AdminController : ControllerBase
     {
         var safePage = Math.Max(1, page);
         var safePageSize = Math.Clamp(pageSize, 5, 100);
+
+        try
+        {
+            var query = _context.AuditLogs.AsNoTracking().AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(level) && !string.Equals(level, "ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                var lvlUpper = level.ToUpperInvariant();
+                query = query.Where(a => a.Level.ToUpper() == lvlUpper);
+            }
+
+            if (!string.IsNullOrWhiteSpace(role) && !string.Equals(role, "ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                var roleUpper = role.ToUpperInvariant();
+                query = query.Where(a => a.UserRole != null && a.UserRole.ToUpper() == roleUpper);
+            }
+
+            if (from.HasValue)
+            {
+                var fromUtc = from.Value.Kind == DateTimeKind.Unspecified
+                    ? DateTime.SpecifyKind(from.Value, DateTimeKind.Utc)
+                    : from.Value.ToUniversalTime();
+                query = query.Where(a => a.Timestamp >= fromUtc);
+            }
+
+            if (to.HasValue)
+            {
+                var toUtc = to.Value.Kind == DateTimeKind.Unspecified
+                    ? DateTime.SpecifyKind(to.Value, DateTimeKind.Utc)
+                    : to.Value.ToUniversalTime();
+                query = query.Where(a => a.Timestamp <= toUtc);
+            }
+
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                var kw = keyword.Trim().ToLowerInvariant();
+                query = query.Where(a => a.Action.ToLower().Contains(kw) ||
+                                         a.Path.ToLower().Contains(kw) ||
+                                         (a.UserEmail != null && a.UserEmail.ToLower().Contains(kw)) ||
+                                         (a.UserId != null && a.UserId.ToLower().Contains(kw)) ||
+                                         a.Ip.Contains(kw) ||
+                                         (a.Details != null && a.Details.ToLower().Contains(kw)));
+            }
+
+            var totalCount = await query.CountAsync();
+            if (totalCount > 0)
+            {
+                var items = await query
+                    .OrderByDescending(a => a.Timestamp)
+                    .ThenByDescending(a => a.Id)
+                    .Skip((safePage - 1) * safePageSize)
+                    .Take(safePageSize)
+                    .Select(a => new AuditLogEntry
+                    {
+                        Id = a.Id.ToString(),
+                        Timestamp = a.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"),
+                        Level = a.Level,
+                        Method = a.Method,
+                        Path = a.Path,
+                        StatusCode = a.StatusCode,
+                        ElapsedMs = a.ElapsedMs,
+                        Ip = a.Ip,
+                        UserId = a.UserId,
+                        UserEmail = a.UserEmail,
+                        UserRole = a.UserRole,
+                        Action = a.Action,
+                        Details = a.Details
+                    })
+                    .ToListAsync();
+
+                return Ok(new AuditLogResult
+                {
+                    Page = safePage,
+                    PageSize = safePageSize,
+                    TotalCount = totalCount,
+                    Items = items
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fallo al consultar auditoría en base de datos. Usando archivo como respaldo.");
+        }
 
         var result = await FileLogger.ReadAuditLogsAsync(
             page: safePage,

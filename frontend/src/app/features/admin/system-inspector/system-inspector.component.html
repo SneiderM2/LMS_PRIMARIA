@@ -71,7 +71,7 @@
       class="tab-btn" 
       [class.active]="activeTab() === 'audit'" 
       (click)="selectTab('audit')">
-      🛡️ Auditoría Global (app-audit.log)
+      🛡️ Auditoría Global
       <span *ngIf="auditTotalCount() > 0" class="tab-pill tab-pill-audit">{{ auditTotalCount() }}</span>
     </button>
     <button 
@@ -81,7 +81,7 @@
       class="tab-btn" 
       [class.active]="activeTab() === 'logs'" 
       (click)="selectTab('logs')">
-      📋 Archivos del Servidor (*.log)
+      📋 Registros del Sistema
       <span *ngIf="logFiles().length > 0" class="tab-pill">{{ logFiles().length }}</span>
     </button>
   </div>
@@ -414,7 +414,7 @@
           <div class="search-wrap">
             <input 
               type="text" 
-              placeholder="Buscar por usuario, carnet, endpoint o mensaje..."
+              placeholder="Buscar por usuario, carnet, sección o mensaje..."
               [ngModel]="searchUser()" 
               (ngModelChange)="searchUser.set($event)"
               (keyup.enter)="loadParsedLogs()"
@@ -441,7 +441,7 @@
               <th style="width: 170px;">Fecha y Hora</th>
               <th style="width: 110px;">Severidad</th>
               <th style="width: 165px;">Actor / Rol</th>
-              <th>Evento / Acción Registrada en .log</th>
+              <th>Evento / Acción Registrada</th>
               <th style="width: 135px;">IP / Estado / Latencia</th>
               <th style="width: 110px; text-align: center;">Detalles</th>
             </tr>
@@ -492,7 +492,7 @@
                 <td colspan="6" class="accordion-cell">
                   <div class="accordion-content">
                     <div class="accordion-header">
-                      <span class="acc-title">Traza y Contexto Técnico Registrado en {{ selectedLogName() }}</span>
+                      <span class="acc-title">Detalle del Evento Registrado</span>
                       <span class="acc-ip" *ngIf="entry.clientIp">IP: {{ entry.clientIp }} | Usuario: {{ entry.user }}</span>
                     </div>
                     <pre class="sanitized-trace">{{ entry.details }}</pre>
@@ -538,7 +538,7 @@
             <span class="dot yellow"></span>
             <span class="dot green"></span>
           </div>
-          <span class="terminal-title">Consola de Servidor — {{ currentFileName() }}</span>
+          <span class="terminal-title">Consola de Registros — {{ currentFileName() }}</span>
           <span class="terminal-status" [class.loading]="isLoading()">
             {{ isLoading() ? 'Leyendo...' : 'Listo' }}
           </span>
@@ -547,7 +547,7 @@
         <div class="terminal-body" [class.is-loading]="isLoading()">
           <div *ngIf="isLoading()" class="terminal-loader">
             <div class="spinner"></div>
-            <p>Consultando archivo en el servidor...</p>
+            <p>Consultando registros...</p>
           </div>
 
           <div *ngIf="!isLoading() && filteredLines.length === 0" class="terminal-empty">

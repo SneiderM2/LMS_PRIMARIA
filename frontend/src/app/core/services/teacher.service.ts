@@ -39,6 +39,41 @@ export interface UpdateActivityDto {
   resourceUrl?: string;
 }
 
+export interface GradebookTask {
+  id: number;
+  title: string;
+  maxScore: number;
+  dueDate?: string;
+}
+
+export interface GradebookStudent {
+  studentId: number;
+  fullName: string;
+  username: string;
+  grades: Record<string, number | null>;
+  submittedCount: number;
+  average: number | null;
+}
+
+export interface Gradebook {
+  courseId: number;
+  courseName: string;
+  gradeName: string;
+  tasks: GradebookTask[];
+  students: GradebookStudent[];
+}
+
+export interface StudentProgressItem {
+  taskId: number;
+  taskTitle: string;
+  courseName: string;
+  grade: number | null;
+  maxScore: number;
+  submittedAt: string;
+  gradedAt?: string;
+  isLate: boolean;
+}
+
 import { environment } from '../../../environments/environment';
 
 @Injectable({
@@ -143,5 +178,14 @@ export class TeacherService {
       `${this.API_URL}/submissions/${submissionId}/grade`,
       { grade, feedback }
     );
+  }
+
+  public getGradebook(courseId: number): Observable<Gradebook> {
+    const params = new HttpParams().set('courseId', courseId.toString());
+    return this.http.get<Gradebook>(`${this.API_URL}/gradebook`, { params });
+  }
+
+  public getStudentProgress(studentId: number | string): Observable<StudentProgressItem[]> {
+    return this.http.get<StudentProgressItem[]>(`${this.API_URL}/students/${studentId}/progress`);
   }
 }

@@ -11,7 +11,7 @@
     </div>
 
     <div class="nav-user">
-      <img [src]="authService.currentUser()?.avatarUrl" alt="Avatar" class="user-avatar" />
+      <img [src]="authService.currentUser()?.avatarUrl" alt="Avatar" class="user-avatar" loading="lazy" width="40" height="40" />
       <div class="user-info">
         <span class="user-name">{{ authService.currentUser()?.fullName }}</span>
         <span class="user-grade">📚 {{ authService.currentUser()?.gradeLevel || ('teacher.roleTeacher' | translate) }}</span>
@@ -55,6 +55,15 @@
         [class.active]="activeTab === 'students'"
         (click)="switchTab('students')">
         {{ 'teacher.tabStudents' | translate }}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'gradebook'"
+        class="portal-tab-btn"
+        [class.active]="activeTab === 'gradebook'"
+        (click)="switchTab('gradebook')">
+        📊 Calificador
       </button>
     </div>
   </nav>
@@ -448,7 +457,7 @@
         <div *ngIf="!isLoadingSemaforo && filteredStudents.length > 0 && viewMode === 'cards'" class="cards-grid">
           <div *ngFor="let student of filteredStudents" class="student-card glass-panel" [ngClass]="'status-' + student.semaforoColor.toLowerCase()">
             <div class="card-status-indicator" [ngClass]="'indicator-' + student.semaforoColor.toLowerCase()"></div>
-            <img [src]="student.avatarUrl" alt="Avatar" class="avatar-img" />
+            <img [src]="student.avatarUrl" alt="Avatar" class="avatar-img" loading="lazy" width="56" height="56" />
             <div class="card-info">
               <h4>{{ student.fullName }}</h4>
               <span class="grade-badge">{{ student.gradeLevel }}</span>
@@ -481,7 +490,7 @@
                 </td>
                 <td>
                   <div class="user-cell">
-                    <img [src]="student.avatarUrl" alt="Avatar" class="avatar-sm" />
+                    <img [src]="student.avatarUrl" alt="Avatar" class="avatar-sm" loading="lazy" width="36" height="36" />
                     <strong>{{ student.fullName }}</strong>
                   </div>
                 </td>
@@ -590,7 +599,7 @@
                 <td><code class="doc-code">{{ student.username }}</code></td>
                 <td>
                   <div class="user-cell">
-                    <img [src]="student.avatarUrl" alt="Avatar" class="avatar-sm" />
+                    <img [src]="student.avatarUrl" alt="Avatar" class="avatar-sm" loading="lazy" width="36" height="36" />
                     <strong>{{ student.fullName }}</strong>
                   </div>
                 </td>
@@ -640,7 +649,7 @@
                 <td><code class="doc-code">{{ student.username }}</code></td>
                 <td>
                   <div class="user-cell">
-                    <img [src]="student.avatarUrl" alt="Avatar" class="avatar-sm" />
+                    <img [src]="student.avatarUrl" alt="Avatar" class="avatar-sm" loading="lazy" width="36" height="36" />
                     <strong>{{ student.fullName }}</strong>
                   </div>
                 </td>
@@ -658,6 +667,127 @@
                     (click)="enrollStudent(student)">
                     {{ enrollingMap[student.id] ? ('teacher.enrolling' | translate) : ('teacher.btnEnroll' | translate) }}
                   </button>
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    style="margin-left: 0.35rem;"
+                    (click)="openStudentProgress(student)"
+                    title="Ver Historial Académico y Entregas">
+                    📈 Progreso
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- PESTAÑA 4: LIBRO DE CALIFICACIONES INTERACTIVO (GRADEBOOK)               -->
+    <!-- ========================================================================= -->
+    <div *ngIf="activeTab === 'gradebook'" class="animate-fade-in">
+      <section class="section-card glass-panel">
+        <div class="section-header" style="flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;">
+          <div>
+            <h2 class="section-title">📊 Libro de Calificaciones Escolar</h2>
+            <p class="section-subtitle">Visualiza la sábana de notas por materia y exporta directamente a Excel</p>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <!-- Selector de Curso/Materia -->
+            <select
+              class="form-select"
+              style="min-width: 200px; padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border: 2px solid #cbd5e1;"
+              [ngModel]="gradebookCourseId"
+              (ngModelChange)="onGradebookCourseChange($event)">
+              <option [ngValue]="null" disabled>Selecciona una materia...</option>
+              <option *ngFor="let c of courses" [ngValue]="c.id">
+                {{ c.nombre }} ({{ c.grado }} - Grupo {{ c.grupo }})
+              </option>
+            </select>
+
+            <!-- Botón Exportar a Excel -->
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              [disabled]="!gradebookData || gradebookData.students.length === 0"
+              (click)="exportGradebookToExcel()"
+              title="Descargar sábana de notas en formato Excel compatible (.xls)">
+              📗 Exportar a Excel
+            </button>
+          </div>
+        </div>
+
+        <!-- Skeleton loader -->
+        <app-skeleton *ngIf="isLoadingGradebook" variant="table" [count]="5"></app-skeleton>
+
+        <!-- Empty state si no hay datos -->
+        <app-empty-state
+          *ngIf="!isLoadingGradebook && (!gradebookData || gradebookData.students.length === 0)"
+          icon="📚"
+          title="Sin datos en el calificador"
+          message="No hay estudiantes matriculados o tareas publicadas en esta materia aún.">
+        </app-empty-state>
+
+        <!-- Sábana de Notas -->
+        <div *ngIf="!isLoadingGradebook && gradebookData && gradebookData.students.length > 0" class="table-container" style="overflow-x: auto; margin-top: 1rem;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="min-width: 180px;">Estudiante</th>
+                <th style="min-width: 110px;">Documento</th>
+                <th *ngFor="let t of gradebookData.tasks" style="min-width: 120px; text-align: center;">
+                  {{ t.title }}
+                  <span style="display: block; font-size: 0.75rem; opacity: 0.8; font-weight: normal;">(Máx: {{ t.maxScore }})</span>
+                </th>
+                <th style="text-align: center; min-width: 90px;">Entregas</th>
+                <th style="text-align: center; min-width: 100px;">Promedio</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let s of gradebookData.students">
+                <td>
+                  <strong>{{ s.fullName }}</strong>
+                </td>
+                <td><code class="doc-code">{{ s.username }}</code></td>
+                
+                <!-- Nota de cada tarea -->
+                <td *ngFor="let t of gradebookData.tasks" style="text-align: center;">
+                  <span
+                    *ngIf="s.grades[t.id.toString()] !== null && s.grades[t.id.toString()] !== undefined"
+                    class="grade-badge"
+                    [class.grade-high]="s.grades[t.id.toString()]! >= 4.0"
+                    [class.grade-mid]="s.grades[t.id.toString()]! >= 3.0 && s.grades[t.id.toString()]! < 4.0"
+                    [class.grade-low]="s.grades[t.id.toString()]! < 3.0">
+                    {{ s.grades[t.id.toString()] | number:'1.1-1' }}
+                  </span>
+                  <span *ngIf="s.grades[t.id.toString()] === null || s.grades[t.id.toString()] === undefined" class="text-muted">
+                    -
+                  </span>
+                </td>
+
+                <!-- Conteo de entregas -->
+                <td style="text-align: center;">
+                  <span class="badge-active" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">
+                    {{ s.submittedCount }} / {{ gradebookData.tasks.length }}
+                  </span>
+                </td>
+
+                <!-- Promedio final -->
+                <td style="text-align: center;">
+                  <strong
+                    *ngIf="s.average !== null && s.average !== undefined"
+                    class="grade-badge"
+                    [class.grade-high]="s.average >= 4.0"
+                    [class.grade-mid]="s.average >= 3.0 && s.average < 4.0"
+                    [class.grade-low]="s.average < 3.0"
+                    style="font-size: 0.95rem;">
+                    {{ s.average | number:'1.2-2' }}
+                  </strong>
+                  <span *ngIf="s.average === null || s.average === undefined" class="text-muted">
+                    Sin notas
+                  </span>
                 </td>
               </tr>
             </tbody>
@@ -726,7 +856,7 @@
           <div *ngFor="let sub of filteredSubmissionsList" class="submission-item-card glass-panel">
             <div class="submission-item-header">
               <div class="student-meta">
-                <img [src]="sub.studentAvatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + sub.studentId" alt="Avatar" class="avatar-sm" />
+                <img [src]="sub.studentAvatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + sub.studentId" alt="Avatar" class="avatar-sm" loading="lazy" width="36" height="36" />
                 <div>
                   <strong>{{ sub.studentName }}</strong>
                   <span class="doc-code">{{ sub.studentId }}</span>
@@ -1046,6 +1176,82 @@
           </div>
         </form>
       </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: HISTORIAL DE PROGRESO DEL ESTUDIANTE               -->
+  <!-- ========================================================= -->
+  <div *ngIf="showProgressModal" class="modal-overlay" (click)="closeStudentProgress()" role="dialog" aria-modal="true">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width: 680px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+          <span style="font-size: 1.75rem;">📈</span>
+          <div>
+            <h3 class="modal-title">Historial Académico del Alumno</h3>
+            <p class="modal-subtitle" *ngIf="selectedStudentForProgress">
+              {{ selectedStudentForProgress.fullName }} ({{ selectedStudentForProgress.username }} - Grado {{ selectedStudentForProgress.grade }})
+            </p>
+          </div>
+        </div>
+        <button type="button" class="btn-close" (click)="closeStudentProgress()" aria-label="Cerrar modal">✕</button>
+      </div>
+
+      <div class="modal-body" style="max-height: 60vh; overflow-y: auto; padding: 1.25rem;">
+        <!-- Skeleton loader -->
+        <app-skeleton *ngIf="isLoadingStudentProgress" variant="list" [count]="4"></app-skeleton>
+
+        <!-- Empty state -->
+        <app-empty-state
+          *ngIf="!isLoadingStudentProgress && studentProgressList.length === 0"
+          icon="📝"
+          title="Sin entregas registradas"
+          message="El estudiante aún no tiene entregas o actividades registradas en tus cursos.">
+        </app-empty-state>
+
+        <!-- Lista cronológica de entregas -->
+        <div *ngIf="!isLoadingStudentProgress && studentProgressList.length > 0" style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div *ngFor="let p of studentProgressList" class="submission-item-card" style="margin-bottom: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap;">
+              <div>
+                <strong style="font-size: 1rem; color: #0f172a;">{{ p.taskTitle }}</strong>
+                <div style="font-size: 0.82rem; color: #64748b; margin-top: 2px;">
+                  <span>📘 {{ p.courseName }}</span>
+                  <span style="margin: 0 6px;">•</span>
+                  <span>Enviado: {{ p.submittedAt | date:'dd/MM/yyyy, h:mm a' }}</span>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 0.45rem; align-items: center;">
+                <span class="punctuality-badge" [class.late]="p.isLate" [class.ontime]="!p.isLate">
+                  {{ p.isLate ? '⚠️ Tardía' : '✅ A Tiempo' }}
+                </span>
+
+                <span
+                  *ngIf="p.grade !== null && p.grade !== undefined"
+                  class="grade-badge"
+                  [class.grade-high]="p.grade >= 4.0"
+                  [class.grade-mid]="p.grade >= 3.0 && p.grade < 4.0"
+                  [class.grade-low]="p.grade < 3.0"
+                  style="font-size: 0.85rem;">
+                  Nota: {{ p.grade }} / {{ p.maxScore }}
+                </span>
+                <span *ngIf="p.grade === null || p.grade === undefined" class="badge-suspended" style="font-size: 0.8rem;">
+                  Pendiente
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="padding: 1rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary btn-sm" (click)="closeStudentProgress()">
+          Cerrar
+        </button>
+      </div>
+
     </div>
   </div>
 

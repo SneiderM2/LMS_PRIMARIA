@@ -24,7 +24,11 @@ ASP.NET Core lee las variables con doble guion bajo (`__`) para navegar la confi
 | `Supabase__ProjectRef` | Si la URL no incluye el usuario completo | `abcdefghijklmnop` |
 | `Cors__AllowedOrigins__0` | Sí | `https://sneiderm2.github.io` |
 | `Cors__AllowedOrigins__1` | No | `http://localhost:4200` |
-| `Storage__RootPath` | No | Ruta privada; por defecto `App_Data/uploads` |
+| `Storage__Provider` o `STORAGE_PROVIDER` | Recomendada | `Local` (por defecto) o `Supabase` para almacenamiento persistente en la nube |
+| `Storage__Supabase__Url` o `SUPABASE_URL` | Si Provider=Supabase | URL del proyecto Supabase (ej. `https://<ref>.supabase.co`) |
+| `Storage__Supabase__ServiceRoleKey` o `SUPABASE_SERVICE_ROLE_KEY` | Si Provider=Supabase | Service Role Key (privada, para escribir en el bucket privado) |
+| `Storage__Supabase__Bucket` o `SUPABASE_STORAGE_BUCKET` | No | Nombre del bucket (`lms-uploads` por defecto) |
+| `Storage__RootPath` | No | Ruta privada para fallback local; por defecto `App_Data/uploads` |
 | `Seed__Enabled` | No | `false` (nunca `true` en producción salvo instalación inicial) |
 | `Features__EnableDatabaseRestore` | No | `false` |
 | `Features__AllowRestoreInProduction` | No | `false` |

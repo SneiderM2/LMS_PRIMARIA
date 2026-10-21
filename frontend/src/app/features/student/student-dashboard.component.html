@@ -11,7 +11,8 @@
     </div>
 
     <div class="student-badge-group">
-      <img [src]="authService.currentUser()?.avatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=student'" alt="Mi Avatar" class="kid-nav-avatar" />
+      <app-notification-bell [items]="notifications" (itemClick)="onNotificationClick($event)"></app-notification-bell>
+      <img [src]="authService.currentUser()?.avatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=student'" alt="Mi Avatar" class="kid-nav-avatar" loading="lazy" width="42" height="42" />
       <div class="kid-nav-info">
         <span class="kid-name">{{ authService.currentUser()?.fullName }}</span>
         <span class="kid-grade">⭐ {{ authService.currentUser()?.gradeLevel || ('student.gradePrimary' | translate) }}</span>
@@ -202,21 +203,50 @@
 
       <!-- Lista de Actividades y Tareas -->
       <section class="activities-section">
-        <div class="activities-header">
+        <div class="activities-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
           <h2 class="section-title">
             {{ 'student.tasksTitle' | translate }}
             <span class="badge-count" *ngIf="!isLoading">({{ filteredContents.length }})</span>
           </h2>
+
+          <!-- Selector de Modo: Misiones o Calendario -->
+          <div class="view-mode-toggle" style="display: flex; gap: 0.35rem; background: #e2e8f0; padding: 4px; border-radius: var(--radius-sm); border: 1px solid #cbd5e1;">
+            <button
+              type="button"
+              class="btn-toggle-view"
+              [class.active]="viewMode === 'cards'"
+              (click)="viewMode = 'cards'"
+              style="padding: 0.35rem 0.75rem; border-radius: 8px; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer;"
+              [style.background]="viewMode === 'cards' ? '#0284c7' : 'transparent'"
+              [style.color]="viewMode === 'cards' ? '#ffffff' : '#334155'">
+              🃏 Misiones
+            </button>
+            <button
+              type="button"
+              class="btn-toggle-view"
+              [class.active]="viewMode === 'calendar'"
+              (click)="viewMode = 'calendar'"
+              style="padding: 0.35rem 0.75rem; border-radius: 8px; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer;"
+              [style.background]="viewMode === 'calendar' ? '#0284c7' : 'transparent'"
+              [style.color]="viewMode === 'calendar' ? '#ffffff' : '#334155'">
+              📅 Calendario
+            </button>
+          </div>
         </div>
 
-        <!-- Spinner de Carga -->
-        <div *ngIf="isLoading" class="student-loading glass-panel">
-          <span class="loading-icon bounce-animation">🌟</span>
-          <p>{{ 'student.loadingTasks' | translate }}</p>
+        <!-- Skeleton loader -->
+        <app-skeleton *ngIf="isLoading" variant="card" [count]="4"></app-skeleton>
+
+        <!-- Vista Calendario Mensual Interactivo -->
+        <div *ngIf="!isLoading && viewMode === 'calendar'" style="margin-top: 1rem;">
+          <app-month-calendar
+            [events]="calendarEvents"
+            (eventClick)="onCalendarEventClick($event)">
+          </app-month-calendar>
         </div>
 
-        <!-- Tarjetas de Actividades -->
-        <div *ngIf="!isLoading && filteredContents.length > 0" class="activities-grid">
+        <!-- Tarjetas de Actividades (Modo Misiones) -->
+        <div *ngIf="!isLoading && viewMode === 'cards' && filteredContents.length > 0" class="activities-grid">
           <div *ngFor="let item of filteredContents" class="activity-card glass-panel">
             
             <!-- Encabezado de la Tarjeta -->
@@ -354,11 +384,12 @@
           </div>
         </div>
 
-        <div *ngIf="!isLoading && filteredContents.length === 0" class="no-activities glass-panel">
-          <span class="empty-emoji bounce-animation">🌈</span>
-          <h3>{{ 'student.emptyTitle' | translate }}</h3>
-          <p>{{ 'student.emptyDesc' | translate }}</p>
-        </div>
+        <app-empty-state
+          *ngIf="!isLoading && filteredContents.length === 0"
+          icon="🌈"
+          [title]="'student.emptyTitle' | translate"
+          [message]="'student.emptyDesc' | translate">
+        </app-empty-state>
       </section>
     </div>
 

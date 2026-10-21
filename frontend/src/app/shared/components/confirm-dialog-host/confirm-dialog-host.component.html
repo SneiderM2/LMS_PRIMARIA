@@ -1,0 +1,56 @@
+<div
+  *ngIf="dialogService.state().isOpen"
+  class="dialog-backdrop animate-fade-in"
+  role="presentation"
+  (click)="dialogService.onCancel()">
+  <div
+    class="dialog-modal"
+    role="alertdialog"
+    aria-modal="true"
+    [attr.aria-label]="dialogService.state().title"
+    (click)="$event.stopPropagation()">
+    
+    <div class="dialog-header">
+      <div class="dialog-icon-badge" [ngClass]="'tone-' + dialogService.state().tone" aria-hidden="true">
+        <span *ngIf="dialogService.state().tone === 'danger'">🗑️</span>
+        <span *ngIf="dialogService.state().tone === 'warning'">⚠️</span>
+        <span *ngIf="dialogService.state().tone === 'primary'">💬</span>
+      </div>
+      <div class="dialog-titles">
+        <h3 class="dialog-title">{{ dialogService.state().title }}</h3>
+        <p class="dialog-message">{{ dialogService.state().message }}</p>
+      </div>
+    </div>
+
+    <!-- Input for prompt type -->
+    <div *ngIf="dialogService.state().type === 'prompt'" class="dialog-body">
+      <input
+        #promptInput
+        type="text"
+        class="dialog-input"
+        [placeholder]="dialogService.state().placeholder"
+        [ngModel]="dialogService.state().inputValue"
+        (ngModelChange)="dialogService.updateInputValue($event)"
+        [attr.aria-label]="dialogService.state().title" />
+    </div>
+
+    <div class="dialog-actions">
+      <button
+        type="button"
+        class="dialog-btn dialog-btn-cancel"
+        (click)="dialogService.onCancel()">
+        {{ dialogService.state().cancelText }}
+      </button>
+
+      <button
+        #confirmBtn
+        type="button"
+        class="dialog-btn dialog-btn-confirm"
+        [ngClass]="'btn-' + dialogService.state().tone"
+        (click)="dialogService.onConfirm()">
+        {{ dialogService.state().confirmText }}
+      </button>
+    </div>
+
+  </div>
+</div>

@@ -1,0 +1,66 @@
+<div class="notif-wrapper">
+  <!-- Bell Button -->
+  <button
+    type="button"
+    class="bell-btn"
+    (click)="toggleDropdown()"
+    [attr.aria-expanded]="isOpen"
+    aria-label="Notificaciones escolares">
+    <span class="bell-icon" aria-hidden="true">🔔</span>
+    <span *ngIf="unreadCount > 0" class="unread-badge animate-bounce">
+      {{ unreadCount > 9 ? '9+' : unreadCount }}
+    </span>
+  </button>
+
+  <!-- Dropdown Panel -->
+  <div *ngIf="isOpen" class="notif-dropdown animate-fade-in" role="region" aria-label="Lista de notificaciones">
+    <div class="notif-dropdown-header">
+      <div class="notif-header-title">
+        <span>Notificaciones</span>
+        <span *ngIf="unreadCount > 0" class="notif-header-count">({{ unreadCount }} nuevas)</span>
+      </div>
+      <button
+        *ngIf="unreadCount > 0"
+        type="button"
+        class="notif-mark-all"
+        (click)="markAllAsRead()">
+        Marcar todo leído
+      </button>
+    </div>
+
+    <!-- Notification List -->
+    <div class="notif-list" *ngIf="items.length > 0; else noNotifs">
+      <div
+        *ngFor="let item of items"
+        class="notif-item"
+        [class.notif-unread]="!isRead(item.id)"
+        (click)="onSelectNotification(item)"
+        tabindex="0"
+        role="button">
+        
+        <div class="notif-type-icon" aria-hidden="true">
+          {{ getTypeIcon(item.type) }}
+        </div>
+
+        <div class="notif-item-body">
+          <div class="notif-item-title">{{ item.title }}</div>
+          <div class="notif-item-msg">{{ item.message }}</div>
+          <div class="notif-item-meta">
+            <span *ngIf="item.courseName" class="notif-course">{{ item.courseName }} · </span>
+            <span class="notif-time">{{ formatRelativeTime(item.createdAt) }}</span>
+          </div>
+        </div>
+
+        <div *ngIf="!isRead(item.id)" class="unread-dot" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <!-- Empty state in dropdown -->
+    <ng-template #noNotifs>
+      <div class="notif-empty">
+        <span class="notif-empty-icon">🎉</span>
+        <p class="notif-empty-text">¡Estás al día! No tienes notificaciones pendientes.</p>
+      </div>
+    </ng-template>
+  </div>
+</div>

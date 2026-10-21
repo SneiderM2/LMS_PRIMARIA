@@ -2,8 +2,11 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
-import { TeacherService, TeacherMetrics, TeacherActivity, UpdateActivityDto } from '../../core/services/teacher.service';
+import { TeacherService, TeacherMetrics, TeacherActivity, UpdateActivityDto, Gradebook, StudentProgressItem } from '../../core/services/teacher.service';
 import { AuthService } from '../../core/services/auth.service';
+import { ToastService } from '../../core/services/toast.service';
+import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
+import { ExcelExportService } from '../../core/services/excel-export.service';
 import { StudentStatus, SemaforoSummaryMetrics } from '../../core/models/semaforo.model';
 import { CreateContent, StudentSubmission } from '../../core/models/content.model';
 import { Course, TeacherStudent } from '../../core/models/user.model';
@@ -11,17 +14,37 @@ import { ReportExportService } from '../../core/services/report-export.service';
 import { FileDownloadService } from '../../core/services/file-download.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { LanguageSelectorComponent } from '../../shared/components/language-selector/language-selector.component';
+import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
 @Component({
   selector: 'app-teacher-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, LanguageSelectorComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    TranslatePipe,
+    LanguageSelectorComponent,
+    SkeletonComponent,
+    EmptyStateComponent
+  ],
   templateUrl: './teacher-dashboard.component.html',
   styleUrls: ['./teacher-dashboard.component.css']
 })
 export class TeacherDashboardComponent implements OnInit, OnDestroy {
-  // Pestañas: 'activities' | 'semaforo' | 'students'
-  public activeTab: 'activities' | 'semaforo' | 'students' = 'activities';
+  // Pestañas: 'activities' | 'semaforo' | 'students' | 'gradebook'
+  public activeTab: 'activities' | 'semaforo' | 'students' | 'gradebook' = 'activities';
+
+  // --- Módulo Libro de Calificaciones (Gradebook) ---
+  public gradebookCourseId: number | null = null;
+  public gradebookData: Gradebook | null = null;
+  public isLoadingGradebook = false;
+
+  // --- Módulo Historial de Progreso del Alumno ---
+  public selectedStudentForProgress: TeacherStudent | null = null;
+  public studentProgressList: StudentProgressItem[] = [];
+  public isLoadingStudentProgress = false;
+  public showProgressModal = false;
 
   // --- Métricas Académicas ---
   public academicMetrics: TeacherMetrics = {
@@ -134,7 +157,10 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
     public authService: AuthService,
     private teacherService: TeacherService,
     private reportService: ReportExportService,
-    private fileDownload: FileDownloadService
+    private fileDownload: FileDownloadService,
+    private toastService: ToastService,
+    private confirmDialogService: ConfirmDialogService,
+    private excelExportService: ExcelExportService
   ) {}
 
   ngOnInit(): void {
@@ -165,7 +191,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
     this.fileDownload.save(submission.fileUrl, submission.originalFileName || 'entrega');
   }
 
-  public switchTab(tab: 'activities' | 'semaforo' | 'students'): void {
+  public switchTab(tab: 'activities' | 'semaforo' | 'students' | 'gradebook'): void {
     this.activeTab = tab;
     if (tab === 'activities') {
       this.loadAcademicMetrics();
@@ -175,7 +201,104 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
       this.loadCourses();
     } else if (tab === 'semaforo') {
       this.loadSemaforoData();
+    } else if (tab === 'gradebook') {
+      this.loadCourses();
+      if (!this.gradebookCourseId && this.courses.length > 0) {
+        this.gradebookCourseId = this.courses[0].id;
+      }
+      if (this.gradebookCourseId) {
+        this.loadGradebook(this.gradebookCourseId);
+      }
     }
+  }
+
+  // --- Métodos de Libro de Calificaciones (Gradebook) ---
+  public onGradebookCourseChange(courseId: number): void {
+    this.gradebookCourseId = courseId;
+    this.loadGradebook(courseId);
+  }
+
+  public loadGradebook(courseId?: number): void {
+    const targetId = courseId || this.gradebookCourseId || (this.courses.length > 0 ? this.courses[0].id : null);
+    if (!targetId) return;
+
+    this.gradebookCourseId = targetId;
+    this.isLoadingGradebook = true;
+
+    this.teacherService.getGradebook(targetId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (data) => {
+          this.isLoadingGradebook = false;
+          this.gradebookData = data;
+        },
+        error: (err) => {
+          this.isLoadingGradebook = false;
+          this.toastService.error('Error al cargar calificaciones del curso: ' + (err?.error?.message || err.message));
+        }
+      });
+  }
+
+  public exportGradebookToExcel(): void {
+    if (!this.gradebookData) return;
+    const gb = this.gradebookData;
+    const headers = [
+      'Estudiante',
+      'Documento',
+      ...gb.tasks.map(t => `${t.title} (Máx: ${t.maxScore})`),
+      'Entregas',
+      'Promedio'
+    ];
+
+    const rows = gb.students.map(s => {
+      const taskGrades = gb.tasks.map(t => {
+        const val = s.grades[t.id.toString()];
+        return val !== null && val !== undefined ? val : '-';
+      });
+      return [
+        s.fullName,
+        s.username,
+        ...taskGrades,
+        s.submittedCount,
+        s.average !== null && s.average !== undefined ? s.average : '-'
+      ];
+    });
+
+    const today = new Date().toISOString().substring(0, 10);
+    this.excelExportService.exportTable(
+      `calificaciones_${gb.courseName.replace(/\s+/g, '_')}_${today}`,
+      gb.courseName,
+      headers,
+      rows
+    );
+    this.toastService.success('¡Libro de calificaciones exportado a Excel exitosamente! 📗');
+  }
+
+  // --- Métodos de Historial de Progreso de Estudiante ---
+  public openStudentProgress(student: TeacherStudent): void {
+    this.selectedStudentForProgress = student;
+    this.showProgressModal = true;
+    this.isLoadingStudentProgress = true;
+    this.studentProgressList = [];
+
+    this.teacherService.getStudentProgress(student.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (list) => {
+          this.isLoadingStudentProgress = false;
+          this.studentProgressList = list;
+        },
+        error: (err) => {
+          this.isLoadingStudentProgress = false;
+          this.toastService.error('Error al cargar progreso del estudiante: ' + (err?.error?.message || err.message));
+        }
+      });
+  }
+
+  public closeStudentProgress(): void {
+    this.showProgressModal = false;
+    this.selectedStudentForProgress = null;
+    this.studentProgressList = [];
   }
 
   // --- Métricas Académicas y Actividades ---
@@ -324,7 +447,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.isUploadingResourceFile = false;
-          alert('Error al subir archivo: ' + (err.error?.message || err.message));
+          this.toastService.error('Error al subir archivo: ' + (err.error?.message || err.message));
         }
       });
   }
@@ -344,7 +467,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.isUploadingEditResourceFile = false;
-          alert('Error al subir archivo: ' + (err.error?.message || err.message));
+          this.toastService.error('Error al subir archivo: ' + (err.error?.message || err.message));
         }
       });
   }
@@ -356,7 +479,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
 
   public saveContent(): void {
     if (!this.newContent.title.trim()) {
-      alert('Por favor ingresa un título para la actividad.');
+      this.toastService.warning('Por favor ingresa un título para la actividad.');
       return;
     }
 
@@ -373,7 +496,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.isSavingContent = false;
-          alert('Error al publicar la actividad: ' + (err.error?.message || err.message));
+          this.toastService.error('Error al publicar la actividad: ' + (err.error?.message || err.message));
         }
       });
   }
@@ -399,7 +522,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
   public saveEditActivity(): void {
     if (!this.selectedActivityToEdit) return;
     if (!this.editActivityForm.title.trim()) {
-      alert('El título es requerido.');
+      this.toastService.warning('El título es requerido.');
       return;
     }
 
@@ -418,16 +541,19 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.isEditingActivity = false;
-          alert('Error al editar la actividad: ' + (err.error?.message || err.message));
+          this.toastService.error('Error al editar la actividad: ' + (err.error?.message || err.message));
         }
       });
   }
 
-  public toggleActivityStatus(act: TeacherActivity): void {
+  public async toggleActivityStatus(act: TeacherActivity): Promise<void> {
     const actionText = act.isActive ? 'archivar' : 'reactivar';
-    if (!confirm(`¿Estás seguro de ${actionText} "${act.title}"? Los datos históricos no se eliminarán.`)) {
-      return;
-    }
+    const confirmed = await this.confirmDialogService.confirm({
+      title: `${act.isActive ? 'Archivar' : 'Reactivar'} Actividad`,
+      message: `¿Estás seguro de ${actionText} "${act.title}"? Los datos históricos no se eliminarán.`,
+      tone: act.isActive ? 'warning' : 'primary'
+    });
+    if (!confirmed) return;
 
     this.teacherService.toggleActivityStatus(act.id, act.kind)
       .pipe(takeUntil(this.destroy$))
@@ -439,7 +565,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
           this.loadAcademicMetrics();
         },
         error: (err) => {
-          alert('Error al cambiar el estado de la actividad: ' + (err.error?.message || err.message));
+          this.toastService.error('Error al cambiar el estado de la actividad: ' + (err.error?.message || err.message));
         }
       });
   }
@@ -532,7 +658,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
     if (!this.gradingSubmission) return;
     const subId = this.gradingSubmission.submissionId || parseInt(this.gradingSubmission.id, 10);
     if (!subId) {
-      alert('Identificador de entrega no válido.');
+      this.toastService.warning('Identificador de entrega no válido.');
       return;
     }
 
@@ -555,7 +681,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.isSavingGrade = false;
-          alert('Error al calificar: ' + (err?.error?.message || err.message));
+          this.toastService.error('Error al calificar: ' + (err?.error?.message || err.message));
         }
       });
   }
@@ -654,7 +780,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
 
   public enrollStudent(student: TeacherStudent): void {
     if (!this.selectedCourseId) {
-      alert('Por favor selecciona un curso para matricular al estudiante.');
+      this.toastService.warning('Por favor selecciona un curso para matricular al estudiante.');
       return;
     }
 
@@ -685,19 +811,23 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.enrollingMap[student.id] = false;
-          alert(err?.error?.message || 'Error al matricular al estudiante.');
+          this.toastService.error(err?.error?.message || 'Error al matricular al estudiante.');
         }
       });
   }
 
-  public unenrollStudent(student: TeacherStudent): void {
+  public async unenrollStudent(student: TeacherStudent): Promise<void> {
     if (!this.selectedCourseId) return;
     const currentCourse = this.courses.find(c => c.id === this.selectedCourseId);
     const courseName = currentCourse ? currentCourse.nombre : 'este curso';
 
-    if (!confirm(`¿Estás seguro de desmatricular a ${student.fullName} de ${courseName}?`)) {
-      return;
-    }
+    const confirmed = await this.confirmDialogService.confirm({
+      title: 'Desmatricular Estudiante',
+      message: `¿Estás seguro de desmatricular a ${student.fullName} de ${courseName}?`,
+      tone: 'danger',
+      confirmText: 'Desmatricular'
+    });
+    if (!confirmed) return;
 
     this.teacherService.unenrollStudent(this.selectedCourseId, student.id)
       .pipe(takeUntil(this.destroy$))
@@ -709,7 +839,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
           this.loadAcademicMetrics();
         },
         error: (err) => {
-          alert(err?.error?.message || 'Error al desmatricular al estudiante.');
+          this.toastService.error(err?.error?.message || 'Error al desmatricular al estudiante.');
         }
       });
   }
@@ -730,7 +860,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
 
   public saveCourse(): void {
     if (!this.newCourse.nombre.trim()) {
-      alert('El nombre del curso es requerido.');
+      this.toastService.warning('El nombre del curso es requerido.');
       return;
     }
     this.isCreatingCourse = true;
@@ -746,7 +876,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.isCreatingCourse = false;
-          alert(err?.error?.message || 'Error al crear el curso.');
+          this.toastService.error(err?.error?.message || 'Error al crear el curso.');
         }
       });
   }

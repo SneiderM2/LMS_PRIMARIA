@@ -54,12 +54,24 @@ public sealed class StorageOptions
 {
     public const string SectionName = "Storage";
 
-    /// <summary>Ruta física privada (fuera de wwwroot) donde se guardan los adjuntos.</summary>
+    /// <summary>Proveedor de almacenamiento: "Local" (por defecto) o "Supabase".</summary>
+    public string Provider { get; set; } = "Local";
+
+    /// <summary>Ruta física privada (fuera de wwwroot) donde se guardan los adjuntos locales.</summary>
     public string RootPath { get; set; } = string.Empty;
 
     public long MaxFileSizeBytes { get; set; } = 25 * 1024 * 1024;
 
     public int MaxFilesPerSubmission { get; set; } = 5;
+
+    public SupabaseStorageOptions Supabase { get; set; } = new();
+}
+
+public sealed class SupabaseStorageOptions
+{
+    public string Url { get; set; } = string.Empty;
+    public string ServiceRoleKey { get; set; } = string.Empty;
+    public string Bucket { get; set; } = "lms-uploads";
 }
 
 public sealed class RegistrationOptions

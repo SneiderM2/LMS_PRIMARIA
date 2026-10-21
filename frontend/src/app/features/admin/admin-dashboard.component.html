@@ -56,6 +56,15 @@
         (click)="setSection('inspector')">
         {{ 'admin.tabLogs' | translate }}
       </button>
+      <button 
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeSection === 'stats'"
+        class="admin-tab-btn" 
+        [class.active]="activeSection === 'stats'"
+        (click)="setSection('stats')">
+        📈 Analítica
+      </button>
     </div>
   </nav>
 
@@ -97,7 +106,7 @@
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
             <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" title="Restauración deshabilitada por seguridad. Use docs/OPERACION_BACKUP.md." [title]="'admin.restoreBackup' | translate">
+          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" [title]="'admin.restoreBackup' | translate">
             <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
           <button class="btn btn-secondary" (click)="goToTeacherView()">
@@ -123,7 +132,7 @@
         </div>
 
         <!-- Estado General del Sistema -->
-        <div class="metric-box box-green glass-panel metric-interactive" role="button" tabindex="0" (click)="onAdminKpiClick('inspector')" (keydown.enter)="onAdminKpiClick('inspector')" title="Abrir Inspector de Auditoría y Logs del Servidor">
+        <div class="metric-box box-green glass-panel metric-interactive" role="button" tabindex="0" (click)="onAdminKpiClick('inspector')" (keydown.enter)="onAdminKpiClick('inspector')" title="Abrir Inspector de Auditoría y Registros del Sistema">
           <div class="metric-top">
             <span class="box-icon">🖥️</span>
             <span class="metric-trend trend-green">{{ 'admin.metricOnline' | translate }}</span>
@@ -134,7 +143,7 @@
           <span class="box-label">{{ 'admin.metricServicesLabel' | translate }}</span>
           <div class="metric-subdetail">
             <span>{{ 'admin.metricLatency' | translate }}</span>
-            <span>🔍 Ver Logs (.log)</span>
+            <span>🔍 Ver Auditoría</span>
           </div>
         </div>
 
@@ -259,7 +268,7 @@
               <tr *ngFor="let user of filteredUsers" [class.user-inactive]="!user.activo">
                 <td>
                   <div class="user-cell">
-                    <img [src]="user.avatarUrl && !user.avatarUrl.includes('example.com') ? user.avatarUrl : 'https://api.dicebear.com/7.x/bottts/svg?seed=' + user.username" alt="Avatar" class="avatar-sm" />
+                    <img [src]="user.avatarUrl && !user.avatarUrl.includes('example.com') ? user.avatarUrl : 'https://api.dicebear.com/7.x/bottts/svg?seed=' + user.username" alt="Avatar" class="avatar-sm" loading="lazy" width="36" height="36" />
                     <div>
                       <strong>{{ user.fullName }}</strong>
                       <span class="user-subid">ID: {{ user.id }}</span>
@@ -336,7 +345,7 @@
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
             <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" title="Restauración deshabilitada por seguridad. Use docs/OPERACION_BACKUP.md." [title]="'admin.restoreBackup' | translate">
+          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" [title]="'admin.restoreBackup' | translate">
             <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
         </div>
@@ -476,7 +485,7 @@
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
             <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" title="Restauración deshabilitada por seguridad. Use docs/OPERACION_BACKUP.md." [title]="'admin.restoreBackup' | translate">
+          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" [title]="'admin.restoreBackup' | translate">
             <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
         </div>
@@ -486,7 +495,7 @@
       <section class="crud-users-card glass-panel db-backup-panel" style="margin-bottom: 1.5rem;">
         <div class="db-backup-header">
           <div class="db-backup-info">
-            <span class="db-badge">🗄️ PostgreSQL • Supabase Cloud</span>
+            <span class="db-badge">🗄️ Copias de Seguridad Institucionales</span>
             <h2 style="margin: 0.35rem 0; font-size: 1.35rem;">{{ 'admin.dbTitle' | translate }}</h2>
             <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
               {{ 'admin.dbDesc' | translate }}
@@ -496,7 +505,7 @@
             <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
               <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
             </button>
-            <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" title="Restauración deshabilitada por seguridad. Use docs/OPERACION_BACKUP.md." [title]="'admin.restoreBackup' | translate">
+            <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" [title]="'admin.restoreBackup' | translate">
               <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
             </button>
           </div>
@@ -504,6 +513,106 @@
       </section>
 
       <app-system-inspector></app-system-inspector>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- SECCIÓN 4: ANALÍTICA Y RENDIMIENTO INSTITUCIONAL          -->
+    <!-- ========================================================= -->
+    <div *ngIf="activeSection === 'stats'" class="animate-fade-in">
+      <section class="admin-banner glass-panel" style="margin-bottom: 1.5rem;">
+        <div class="banner-content">
+          <div class="status-pill-live">
+            <span class="live-dot"></span>
+            <span>Métricas en Tiempo Real</span>
+          </div>
+          <h1>📈 Analítica y Rendimiento Institucional</h1>
+          <p>Tendencia de entregas, distribución de notas escolares y participación estudiantil por grado.</p>
+        </div>
+      </section>
+
+      <!-- Skeleton loader -->
+      <app-skeleton *ngIf="isLoadingActivityStats" variant="kpi" [count]="4"></app-skeleton>
+
+      <!-- KPI Summary Cards -->
+      <div *ngIf="!isLoadingActivityStats && activityStats" class="metrics-grid" style="margin-bottom: 1.5rem;">
+        <div class="kpi-card glass-panel">
+          <div class="kpi-icon" style="background: #e0f2fe;">📝</div>
+          <div class="kpi-content">
+            <div class="kpi-label">Tareas Publicadas (30d)</div>
+            <div class="kpi-value">{{ activityStats.tasksCreatedLast30Days }}</div>
+          </div>
+        </div>
+        <div class="kpi-card glass-panel">
+          <div class="kpi-icon" style="background: #dcfce7;">📬</div>
+          <div class="kpi-content">
+            <div class="kpi-label">Entregas de Alumnos (30d)</div>
+            <div class="kpi-value">{{ activityStats.submissionsLast30Days }}</div>
+          </div>
+        </div>
+        <div class="kpi-card glass-panel">
+          <div class="kpi-icon" style="background: #fef3c7;">📊</div>
+          <div class="kpi-content">
+            <div class="kpi-label">Semanas Monitoreadas</div>
+            <div class="kpi-value">{{ activityStats.submissionsPerWeek.length }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Visual Charts Grid -->
+      <div *ngIf="!isLoadingActivityStats && activityStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+        
+        <!-- Gráfico de Barras: Entregas Semanales -->
+        <div class="crud-users-card glass-panel" style="padding: 1.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+            <div>
+              <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a;">📅 Entregas por Semana</h3>
+              <p style="margin: 2px 0 0; font-size: 0.85rem; color: var(--text-muted);">Actividad en las últimas 8 semanas</p>
+            </div>
+            <span class="badge-active" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Semanas ISO</span>
+          </div>
+
+          <app-mini-bar-chart
+            [data]="weeklySubmissionsChartData"
+            [height]="170"
+            valueSuffix=" entregas"
+            ariaLabel="Entregas semanales recibidas">
+          </app-mini-bar-chart>
+        </div>
+
+        <!-- Gráfico de Dona: Distribución de Calificaciones -->
+        <div class="crud-users-card glass-panel" style="padding: 1.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+            <div>
+              <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a;">🎯 Distribución de Notas</h3>
+              <p style="margin: 2px 0 0; font-size: 0.85rem; color: var(--text-muted);">Desempeño en tareas evaluadas</p>
+            </div>
+            <span class="badge-active" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Escala 0.0 - 5.0</span>
+          </div>
+
+          <app-donut-chart
+            [segments]="gradeDistributionDonutSegments"
+            [size]="160"
+            centerLabel="Total Calificadas"
+            [centerValue]="activityStats.submissionsLast30Days.toString()">
+          </app-donut-chart>
+        </div>
+
+      </div>
+
+      <!-- Alumnos Activos por Grado Escolar -->
+      <div *ngIf="!isLoadingActivityStats && activityStats" class="crud-users-card glass-panel" style="padding: 1.5rem;">
+        <h3 style="margin: 0 0 0.5rem; font-size: 1.15rem; color: #0f172a;">🎒 Estudiantes Activos por Grado</h3>
+        <p style="margin: 0 0 1.25rem; font-size: 0.85rem; color: var(--text-muted);">Matrícula y cobertura escolar distribuida por nivel de primaria</p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem;">
+          <div *ngFor="let g of activityStats.activeStudentsByGrade" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius-sm); padding: 1rem; text-align: center;">
+            <div style="font-size: 1.25rem; margin-bottom: 0.25rem;">⭐</div>
+            <strong style="display: block; font-size: 0.95rem; color: #0f172a;">{{ g.grade }}</strong>
+            <span style="font-size: 0.85rem; color: #0284c7; font-weight: 700;">{{ g.count }} alumnos</span>
+          </div>
+        </div>
+      </div>
+
     </div>
 
   </main>

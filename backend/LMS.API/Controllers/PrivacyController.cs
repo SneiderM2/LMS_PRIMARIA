@@ -88,9 +88,9 @@ public class PrivacyController : ControllerBase
             },
             internationalTransfers = new[]
             {
-                new { provider = "Supabase (PostgreSQL)", country = "Estados Unidos", purpose = "Alojamiento de la base de datos", safeguard = "Cláusulas contractuales y cifrado en tránsito" },
-                new { provider = "Render", country = "Estados Unidos", purpose = "Alojamiento de la API", safeguard = "Cláusulas contractuales y cifrado en tránsito" },
-                new { provider = "GitHub Pages", country = "Estados Unidos", purpose = "Alojamiento del frontend", safeguard = "Sitio estático sin datos personales" }
+                new { provider = "Proveedor de almacenamiento de datos en la nube", country = "Estados Unidos", purpose = "Almacenamiento seguro de la información", safeguard = "Cláusulas contractuales y cifrado en tránsito" },
+                new { provider = "Proveedor de alojamiento de la plataforma", country = "Estados Unidos", purpose = "Funcionamiento de los servicios de la plataforma", safeguard = "Cláusulas contractuales y cifrado en tránsito" },
+                new { provider = "Proveedor de publicación del sitio web", country = "Estados Unidos", purpose = "Publicación del sitio web", safeguard = "Sitio estático sin datos personales" }
             },
             children = "El tratamiento de datos de menores de edad requiere la autorización previa, expresa e informada de su representante legal, conforme al artículo 7 de la Ley 1581 de 2012 y la Ley 1098 de 2006.",
             authority = "Superintendencia de Industria y Comercio — " + _privacy.SuperintendenceUrl

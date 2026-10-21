@@ -863,6 +863,9 @@ public static class FileLogger
     private static readonly SemaphoreSlim _semaphore = new(1, 1);
     private static string _logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
 
+    /// <summary>Cola opcional para persistencia en base de datos.</summary>
+    public static Services.AuditLogQueue? DbQueue { get; set; }
+
     /// <summary>Tamaño máximo por archivo antes de rotar (5 MB).</summary>
     private const long MaxFileSize = 5 * 1024 * 1024;
 
@@ -913,6 +916,7 @@ public static class FileLogger
     {
         try
         {
+            DbQueue?.Enqueue(entry);
             var json = JsonSerializer.Serialize(entry);
             await WriteAsync("app-audit", json);
         }

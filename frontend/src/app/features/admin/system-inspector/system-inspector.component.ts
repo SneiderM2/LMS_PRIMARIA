@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { SystemFilesService, LogFileInfo, ParsedLogEntry, AuditLogItem } from '../../../core/services/system-files.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { ConfirmDialogService } from '../../../core/services/confirm-dialog.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 @Component({
@@ -57,7 +59,9 @@ export class SystemInspectorComponent implements OnInit, OnDestroy {
 
   constructor(
     private systemFilesService: SystemFilesService,
-    public authService: AuthService
+    public authService: AuthService,
+    private confirmDialogService: ConfirmDialogService,
+    private toastService: ToastService
   ) {}
 
   ngOnInit(): void {
@@ -318,11 +322,17 @@ export class SystemInspectorComponent implements OnInit, OnDestroy {
     }
   }
 
-  public clearCurrentLog(): void {
+  public async clearCurrentLog(): Promise<void> {
     const fileName = this.selectedLogName();
     if (!fileName) return;
 
-    if (!confirm(`¿Estás seguro de reiniciar el archivo de log '${fileName}'?`)) {
+    const confirmed = await this.confirmDialogService.confirm({
+      title: 'Reiniciar Registro de Actividad',
+      message: '¿Estás seguro de reiniciar el registro seleccionado? Se iniciará un ciclo limpio.',
+      tone: 'warning',
+      confirmText: 'Reiniciar'
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -331,6 +341,7 @@ export class SystemInspectorComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (res) => {
           this.successMessage.set(res.message);
+          this.toastService.success(res.message);
           this.refreshCurrent();
           if (this.statusTimerId) clearTimeout(this.statusTimerId);
           this.statusTimerId = setTimeout(() => {
@@ -339,7 +350,9 @@ export class SystemInspectorComponent implements OnInit, OnDestroy {
           }, 4000);
         },
         error: (err) => {
-          this.errorMessage.set('Error al limpiar el log: ' + (err.error?.message || err.message));
+          const msg = 'Error al limpiar el registro: ' + (err.error?.message || err.message);
+          this.errorMessage.set(msg);
+          this.toastService.error(msg);
         }
       });
   }

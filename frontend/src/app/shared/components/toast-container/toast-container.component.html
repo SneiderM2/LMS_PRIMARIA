@@ -1,0 +1,24 @@
+<aside class="toast-viewport" role="status" aria-live="polite" aria-label="Notificaciones emergentes">
+  <div
+    *ngFor="let toast of toastService.toasts(); trackBy: trackById"
+    class="toast-card toast-{{ toast.type }}"
+    role="alert"
+    tabindex="0"
+    (click)="toastService.remove(toast.id)"
+    [attr.aria-label]="toast.message">
+    <div class="toast-icon-wrapper" aria-hidden="true">
+      <span class="toast-icon">{{ getIcon(toast.type) }}</span>
+    </div>
+    <div class="toast-content">
+      <div class="toast-title">{{ getTitle(toast) }}</div>
+      <div class="toast-msg">{{ toast.message }}</div>
+    </div>
+    <button
+      type="button"
+      class="toast-close"
+      (click)="$event.stopPropagation(); toastService.remove(toast.id)"
+      aria-label="Cerrar notificación">
+      ✕
+    </button>
+  </div>
+</aside>

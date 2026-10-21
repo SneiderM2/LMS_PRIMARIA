@@ -1,0 +1,233 @@
+.calendar-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg, 24px);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+  padding: 1.5rem;
+  overflow: hidden;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.calendar-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.calendar-icon {
+  font-size: 1.5rem;
+}
+
+.calendar-heading {
+  font-family: var(--font-heading, sans-serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  text-transform: capitalize;
+}
+
+.calendar-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cal-btn-nav, .cal-btn-today {
+  font-family: var(--font-heading, sans-serif);
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: var(--radius-sm, 12px);
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.cal-btn-nav {
+  width: 34px;
+  height: 34px;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.cal-btn-today {
+  padding: 0 0.85rem;
+  height: 34px;
+  font-size: 0.85rem;
+}
+
+.cal-btn-nav:hover, .cal-btn-today:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.weekday-cell {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  padding: 4px 0;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.day-cell {
+  min-height: 85px;
+  background: #f8fafc;
+  border-radius: var(--radius-sm, 12px);
+  border: 1px solid #f1f5f9;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.day-cell:hover {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+}
+
+.day-other-month {
+  opacity: 0.4;
+  background: #ffffff;
+}
+
+.day-today {
+  background: #e0f2fe;
+  border: 2px solid #0284c7;
+}
+
+.day-today .day-number {
+  color: #0284c7;
+  font-weight: 800;
+}
+
+.day-number {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 4px;
+}
+
+.day-events-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.event-chip {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  color: #ffffff;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.event-chip:hover {
+  filter: brightness(0.9);
+}
+
+.event-chip-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-more-badge {
+  font-size: 0.68rem;
+  color: #64748b;
+  font-weight: 700;
+  text-align: right;
+  margin-top: 1px;
+}
+
+/* Modo oscuro */
+:host-context(body.dark-mode) .calendar-card,
+body.dark-mode .calendar-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+:host-context(body.dark-mode) .calendar-heading,
+body.dark-mode .calendar-heading {
+  color: #f8fafc;
+}
+
+:host-context(body.dark-mode) .cal-btn-nav,
+:host-context(body.dark-mode) .cal-btn-today,
+body.dark-mode .cal-btn-nav,
+body.dark-mode .cal-btn-today {
+  background: #0f172a;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+:host-context(body.dark-mode) .day-cell,
+body.dark-mode .day-cell {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+
+:host-context(body.dark-mode) .day-cell:hover,
+body.dark-mode .day-cell:hover {
+  background: #1e293b;
+  border-color: #0284c7;
+}
+
+:host-context(body.dark-mode) .day-number,
+body.dark-mode .day-number {
+  color: #cbd5e1;
+}
+
+:host-context(body.dark-mode) .day-today,
+body.dark-mode .day-today {
+  background: rgba(2, 132, 199, 0.2);
+  border-color: #38bdf8;
+}
+
+@media (max-width: 640px) {
+  .day-cell {
+    min-height: 60px;
+    padding: 4px;
+  }
+  .event-chip-text {
+    display: none;
+  }
+  .event-chip {
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border-radius: 50%;
+  }
+}

@@ -36,6 +36,8 @@ public sealed class StoredFileMetadata
 
 public interface IFileStorageService
 {
+    string ProviderName { get; }
+
     Task<StoredFile> SaveFileAsync(
         IFormFile file,
         string scope,
@@ -46,6 +48,8 @@ public interface IFileStorageService
     Task<StoredFileMetadata?> GetMetadataAsync(string storageKey, CancellationToken cancellationToken = default);
 
     Task<bool> DeleteAsync(string? urlOrStorageKey, CancellationToken cancellationToken = default);
+
+    Task<Stream?> OpenReadStreamAsync(string storageKey, CancellationToken cancellationToken = default);
 
     /// <summary>Resuelve la ruta física de una clave validada; null si es inválida o inexistente.</summary>
     string? ResolvePhysicalPath(string storageKey);

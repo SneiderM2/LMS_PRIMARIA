@@ -74,14 +74,20 @@ public class FilesController : ControllerBase
             contentType = metadata?.ContentType ?? "application/octet-stream";
         }
 
+        Stream? cloudStream = null;
         if (physicalPath == null || !System.IO.File.Exists(physicalPath))
         {
-            return NotFound(new { message = "El archivo no existe o fue eliminado." });
+            cloudStream = await _storage.OpenReadStreamAsync(normalizedKey, HttpContext.RequestAborted);
+            if (cloudStream == null)
+            {
+                return NotFound(new { message = "El archivo no existe o fue eliminado." });
+            }
         }
 
         var authorized = await IsAuthorizedAsync(currentUser, normalizedKey, metadata, isLegacy, isAdmin);
         if (!authorized)
         {
+            if (cloudStream != null) await cloudStream.DisposeAsync();
             _logger.LogWarning(
                 "Acceso denegado a archivo {Key} por usuario {User}.",
                 normalizedKey,
@@ -101,7 +107,12 @@ public class FilesController : ControllerBase
 
         await WriteAuditAsync(currentUser, normalizedKey, isLegacy);
 
-        return PhysicalFile(physicalPath, contentType, enableRangeProcessing: true);
+        if (physicalPath != null && System.IO.File.Exists(physicalPath))
+        {
+            return PhysicalFile(physicalPath, contentType, enableRangeProcessing: true);
+        }
+
+        return File(cloudStream!, contentType, enableRangeProcessing: true);
     }
 
     private async Task<bool> IsAuthorizedAsync(

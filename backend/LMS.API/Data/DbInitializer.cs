@@ -333,10 +333,42 @@ public class DbInitializer
             }
 
             await EnsureLoginIndexAsync(conn);
+            await EnsureAuditLogsTableAsync(conn);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Verificación de esquema no completada. Revise la conexión a PostgreSQL.");
+        }
+    }
+
+    private static async Task EnsureAuditLogsTableAsync(System.Data.Common.DbConnection conn)
+    {
+        try
+        {
+            using var auditCmd = conn.CreateCommand();
+            auditCmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id BIGSERIAL PRIMARY KEY,
+                timestamp TIMESTAMPTZ NOT NULL,
+                level VARCHAR(20) NOT NULL,
+                method VARCHAR(10) NOT NULL,
+                path VARCHAR(500) NOT NULL,
+                status_code INT NOT NULL,
+                elapsed_ms BIGINT NOT NULL,
+                ip VARCHAR(50) NOT NULL,
+                user_id VARCHAR(100) NULL,
+                user_email VARCHAR(200) NULL,
+                user_role VARCHAR(50) NULL,
+                action VARCHAR(250) NOT NULL,
+                details TEXT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);
+            CREATE INDEX IF NOT EXISTS idx_audit_logs_level ON audit_logs (level);";
+            await auditCmd.ExecuteNonQueryAsync();
+        }
+        catch
+        {
+            // La tabla de auditoría se creará o se usará fallback en memoria/archivo
         }
     }
 

@@ -8,6 +8,7 @@ using LMS.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -74,11 +75,41 @@ if (!string.IsNullOrWhiteSpace(renderPort))
 }
 
 // ---------------------------------------------------------------------------
-// 3. Inyección de dependencias
+// 3. Inyección de dependencias y rendimiento
 // ---------------------------------------------------------------------------
+builder.Services.AddMemoryCache();
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+
+builder.Services.AddSingleton<AuditLogQueue>();
+builder.Services.AddHostedService<AuditLogDbBackgroundService>();
+builder.Services.AddHostedService<AuditLogRetentionBackgroundService>();
+
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ISemaforoService, SemaforoService>();
-builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+
+builder.Services.AddHttpClient("SupabaseStorage", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
+var storageProvider = builder.Configuration.GetValue<string>("Storage:Provider")
+                      ?? Environment.GetEnvironmentVariable("STORAGE_PROVIDER")
+                      ?? "Local";
+
+if (storageProvider.Equals("Supabase", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddScoped<IFileStorageService, SupabaseStorageService>();
+}
+else
+{
+    builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+}
+
 builder.Services.AddScoped<ConsentService>();
 builder.Services.AddHttpClient<ICaptchaService, GoogleRecaptchaService>(client =>
 {
@@ -172,7 +203,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .WithExposedHeaders("Content-Disposition", "X-Trace-Id");
+            .WithExposedHeaders("Content-Disposition", "X-Trace-Id", "X-Total-Count");
     });
 });
 
@@ -300,6 +331,7 @@ var logsPath = Path.Combine(AppContext.BaseDirectory, "logs");
 try { Directory.CreateDirectory(logsPath); }
 catch { logsPath = Path.Combine(Path.GetTempPath(), "lms-logs"); Directory.CreateDirectory(logsPath); }
 FileLogger.SetLogDirectory(logsPath);
+FileLogger.DbQueue = app.Services.GetRequiredService<AuditLogQueue>();
 
 // ---------------------------------------------------------------------------
 // 12. Inicialización de BD después de que Kestrel empieza a escuchar
@@ -339,6 +371,7 @@ app.Lifetime.ApplicationStarted.Register(() =>
 // ---------------------------------------------------------------------------
 // 13. Pipeline HTTP
 // ---------------------------------------------------------------------------
+app.UseResponseCompression();
 app.UseForwardedHeaders();
 app.UseGlobalExceptionHandler();
 app.UseSecurityHeaders();

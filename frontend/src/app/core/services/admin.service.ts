@@ -63,6 +63,14 @@ export interface CreateAdminCourseDto {
   descripcion?: string;
 }
 
+export interface AdminActivityStats {
+  submissionsPerWeek: { weekStart: string; count: number }[];
+  gradeDistribution: { range: string; count: number }[];
+  activeStudentsByGrade: { grade: string; count: number }[];
+  tasksCreatedLast30Days: number;
+  submissionsLast30Days: number;
+}
+
 export interface UpdateAdminCourseDto {
   nombre: string;
   grado: string;
@@ -141,5 +149,9 @@ export class AdminService {
       `${this.API_URL}/restore-backup`,
       formData
     );
+  }
+
+  public getActivityStats(): Observable<AdminActivityStats> {
+    return this.http.get<AdminActivityStats>(`${this.API_URL}/activity-stats`);
   }
 }

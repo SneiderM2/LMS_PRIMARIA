@@ -2,18 +2,34 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
-import { StudentService, StudentMetrics, StudentCoursesCatalog } from '../../core/services/student.service';
+import { StudentService, StudentMetrics, StudentCoursesCatalog, StudentNotification } from '../../core/services/student.service';
 import { AuthService } from '../../core/services/auth.service';
 import { FileDownloadService } from '../../core/services/file-download.service';
+import { ToastService } from '../../core/services/toast.service';
+import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { Content } from '../../core/models/content.model';
 import { FileDropZoneComponent } from './components/file-drop-zone/file-drop-zone.component';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { LanguageSelectorComponent } from '../../shared/components/language-selector/language-selector.component';
+import { NotificationBellComponent } from '../../shared/components/notification-bell/notification-bell.component';
+import { MonthCalendarComponent, CalendarEvent } from '../../shared/components/calendar/month-calendar.component';
+import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
 @Component({
   selector: 'app-student-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, FileDropZoneComponent, TranslatePipe, LanguageSelectorComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    FileDropZoneComponent,
+    TranslatePipe,
+    LanguageSelectorComponent,
+    NotificationBellComponent,
+    MonthCalendarComponent,
+    SkeletonComponent,
+    EmptyStateComponent
+  ],
   templateUrl: './student-dashboard.component.html',
   styleUrls: ['./student-dashboard.component.css']
 })
@@ -24,6 +40,13 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
   public selectedSubject: string = 'Todas';
   public missionStatusFilter: 'ALL' | 'PENDIENTES' | 'ENTREGADAS' | 'CALIFICADAS' = 'ALL';
   public searchQuery: string = '';
+
+  // Modo de visualización de misiones: 'cards' o 'calendar'
+  public viewMode: 'cards' | 'calendar' = 'cards';
+  public calendarEvents: CalendarEvent[] = [];
+
+  // Notificaciones escolares activas
+  public notifications: StudentNotification[] = [];
 
   // Pestañas del estudiante
   public activeTab: 'activities' | 'courses' = 'activities';
@@ -66,13 +89,16 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
   constructor(
     public authService: AuthService,
     private studentService: StudentService,
-    private fileDownload: FileDownloadService
+    private fileDownload: FileDownloadService,
+    private toastService: ToastService,
+    private confirmDialogService: ConfirmDialogService
   ) {}
 
   ngOnInit(): void {
     this.loadDashboard();
     this.loadMetrics();
     this.loadCourses();
+    this.loadNotifications();
   }
 
   ngOnDestroy(): void {
@@ -91,6 +117,7 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
     } else {
       this.loadDashboard();
       this.loadMetrics();
+      this.loadNotifications();
     }
   }
 
@@ -103,12 +130,48 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
           this.contents = items;
           this.syncDynamicSubjects(items);
           this.applySubjectFilter();
+          this.calendarEvents = items
+            .filter(i => i.dueDate)
+            .map(i => ({
+              id: i.id,
+              date: i.dueDate!,
+              title: i.title,
+              color: i.hasSubmitted ? '#22c55e' : (this.isOverdue(i.dueDate) ? '#ef4444' : '#38bdf8'),
+              subtitle: i.subject
+            }));
           this.isLoading = false;
         },
         error: () => {
           this.isLoading = false;
         }
       });
+  }
+
+  public loadNotifications(): void {
+    this.studentService.getNotifications()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (notifs) => {
+          this.notifications = notifs;
+        },
+        error: () => {}
+      });
+  }
+
+  public onNotificationClick(notif: StudentNotification): void {
+    if (notif.taskId) {
+      const task = this.contents.find(c => c.id === notif.taskId?.toString());
+      if (task) {
+        this.openTaskDetailModal(task);
+      }
+    }
+  }
+
+  public onCalendarEventClick(event: CalendarEvent): void {
+    const task = this.contents.find(c => c.id === event.id.toString());
+    if (task) {
+      this.openTaskDetailModal(task);
+    }
   }
 
   private syncDynamicSubjects(items: Content[]): void {
@@ -218,10 +281,14 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
       });
   }
 
-  public withdrawFromCourse(courseId: number, courseName: string): void {
-    if (!confirm(`¿Deseas retirar ${courseName} de tus clases activas? Tu historial y notas no se perderán.`)) {
-      return;
-    }
+  public async withdrawFromCourse(courseId: number, courseName: string): Promise<void> {
+    const confirmed = await this.confirmDialogService.confirm({
+      title: 'Retirar Materia',
+      message: `¿Deseas retirar ${courseName} de tus clases activas? Tu historial y notas no se perderán.`,
+      tone: 'warning',
+      confirmText: 'Retirar Materia'
+    });
+    if (!confirmed) return;
 
     this.studentService.withdrawCourse(courseId)
       .pipe(takeUntil(this.destroy$))
@@ -243,6 +310,13 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
     }
     this.notificationMessage = msg;
     this.notificationType = type;
+    if (type === 'success') {
+      this.toastService.success(msg);
+    } else if (type === 'warning') {
+      this.toastService.warning(msg);
+    } else {
+      this.toastService.info(msg);
+    }
     this.toastTimeoutId = setTimeout(() => {
       this.notificationMessage = '';
       this.toastTimeoutId = null;

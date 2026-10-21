@@ -19,6 +19,7 @@ public class LMSDbContext : DbContext
     public DbSet<Entrega> Entregas => Set<Entrega>();
     public DbSet<ArchivoEntrega> ArchivosEntrega => Set<ArchivoEntrega>();
     public DbSet<Material> Materiales => Set<Material>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -297,6 +298,29 @@ public class LMSDbContext : DbContext
                   .HasForeignKey(m => m.CursoId)
                   .OnDelete(DeleteBehavior.Cascade)
                   .HasConstraintName("fk_materiales_cursos");
+        });
+
+        // 12. AUDIT LOGS (Persistencia Ley 1581 / Ley 1098)
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("audit_logs");
+            entity.HasKey(a => a.Id);
+            entity.Property(a => a.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            entity.Property(a => a.Timestamp).HasColumnName("timestamp").IsRequired();
+            entity.Property(a => a.Level).HasColumnName("level").HasMaxLength(20).IsRequired();
+            entity.Property(a => a.Method).HasColumnName("method").HasMaxLength(10).IsRequired();
+            entity.Property(a => a.Path).HasColumnName("path").HasMaxLength(500).IsRequired();
+            entity.Property(a => a.StatusCode).HasColumnName("status_code").IsRequired();
+            entity.Property(a => a.ElapsedMs).HasColumnName("elapsed_ms").IsRequired();
+            entity.Property(a => a.Ip).HasColumnName("ip").HasMaxLength(50).IsRequired();
+            entity.Property(a => a.UserId).HasColumnName("user_id").HasMaxLength(100);
+            entity.Property(a => a.UserEmail).HasColumnName("user_email").HasMaxLength(200);
+            entity.Property(a => a.UserRole).HasColumnName("user_role").HasMaxLength(50);
+            entity.Property(a => a.Action).HasColumnName("action").HasMaxLength(250).IsRequired();
+            entity.Property(a => a.Details).HasColumnName("details");
+
+            entity.HasIndex(a => a.Timestamp).HasDatabaseName("idx_audit_logs_timestamp");
+            entity.HasIndex(a => a.Level).HasDatabaseName("idx_audit_logs_level");
         });
     }
 }
