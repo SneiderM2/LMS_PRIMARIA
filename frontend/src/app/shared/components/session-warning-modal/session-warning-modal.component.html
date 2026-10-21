@@ -1,13 +1,13 @@
-<div class="timeout-backdrop" *ngIf="visible">
+<div class="timeout-backdrop" *ngIf="visible" role="alertdialog" aria-modal="true" aria-labelledby="timeout-modal-title" aria-describedby="timeout-modal-desc">
   <div class="timeout-card animate-bounce-in">
-    <div class="timeout-icon-circle">
+    <div class="timeout-icon-circle" aria-hidden="true">
       <span class="sand-clock">⏳</span>
     </div>
     
-    <h3 class="timeout-title">{{ 'timeout.title' | translate }}</h3>
-    <p class="timeout-subtitle">{{ 'timeout.subtitle' | translate }}</p>
+    <h3 id="timeout-modal-title" class="timeout-title">{{ 'timeout.title' | translate }}</h3>
+    <p id="timeout-modal-desc" class="timeout-subtitle">{{ 'timeout.subtitle' | translate }}</p>
 
-    <div class="countdown-badge">
+    <div class="countdown-badge" role="timer" aria-live="polite" aria-atomic="true">
       <span class="clock-label">{{ 'timeout.clockLabel' | translate }}</span>
       <span class="clock-digits">{{ formattedTime }}</span>
     </div>

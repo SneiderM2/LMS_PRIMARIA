@@ -20,6 +20,15 @@ public class CreateStudentDto
 
     [Required(ErrorMessage = "El Grado escolar es obligatorio")]
     public string Grade { get; set; } = "1°";
+
+    /// <summary>Datos opcionales de consentimiento informado del acudiente (Ley 1581 de 2012 / Ley 1098 de 2006).</summary>
+    [MaxLength(150)]
+    public string? GuardianFullName { get; set; }
+
+    [MaxLength(30)]
+    public string? GuardianDocument { get; set; }
+
+    public bool GuardianAuthorization { get; set; }
 }
 
 public class EnrollStudentDto

@@ -77,4 +77,17 @@ public class ConsentServiceTests
         Assert.Equal("*******756", ConsentService.MaskDocument("1029384756"));
         Assert.Equal(string.Empty, ConsentService.MaskDocument(null));
     }
+
+    [Fact]
+    public void Validates_guardian_consent_and_verifies_hmac_signature()
+    {
+        Assert.False(ConsentService.ValidateGuardianConsent(false, "Maria Gomez", "1029384756").IsValid);
+        Assert.False(ConsentService.ValidateGuardianConsent(true, "Ana", "1029384756").IsValid);
+        Assert.True(ConsentService.ValidateGuardianConsent(true, "Maria Gomez", "1029384756").IsValid);
+
+        var service = CreateService();
+        var evidence = service.BuildEvidence(CreateUser(), "registration", "127.0.0.1", "UnitTest", "Maria Gomez", "1029384756");
+        Assert.True(service.VerifyEvidenceSignature(evidence));
+        Assert.False(service.VerifyEvidenceSignature(evidence.Replace("Maria Gomez", "Alterado")));
+    }
 }

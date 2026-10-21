@@ -130,16 +130,21 @@ public class AuthController : ControllerBase
             }
 
             var guardianRequired = _privacy.RequireGuardianConsentForMinors && targetRoleName == "ALUMNO";
-            if (guardianRequired
-                && (!request.GuardianAuthorization
-                    || string.IsNullOrWhiteSpace(request.GuardianFullName)
-                    || request.GuardianFullName.Trim().Length < 5))
+            if (guardianRequired)
             {
-                return BadRequest(new
+                var guardianValidation = ConsentService.ValidateGuardianConsent(
+                    request.GuardianAuthorization,
+                    request.GuardianFullName,
+                    request.GuardianDocument);
+
+                if (!guardianValidation.IsValid)
                 {
-                    code = "GUARDIAN_CONSENT_REQUIRED",
-                    message = "Para registrar a un menor de edad se requiere el nombre y la autorización del padre, madre o acudiente (Ley 1581 de 2012, art. 7)."
-                });
+                    return BadRequest(new
+                    {
+                        code = "GUARDIAN_CONSENT_REQUIRED",
+                        message = guardianValidation.Message
+                    });
+                }
             }
 
             var passwordCheck = PasswordPolicy.Validate(request.Password, request.Id, request.FullName);
@@ -483,14 +488,17 @@ public class AuthController : ControllerBase
 
         if (_privacy.RequireGuardianConsentForMinors && isStudent)
         {
-            if (!dto.GuardianAuthorization
-                || string.IsNullOrWhiteSpace(dto.GuardianFullName)
-                || dto.GuardianFullName.Trim().Length < 5)
+            var guardianValidation = ConsentService.ValidateGuardianConsent(
+                dto.GuardianAuthorization,
+                dto.GuardianFullName,
+                dto.GuardianDocument);
+
+            if (!guardianValidation.IsValid)
             {
                 return BadRequest(new
                 {
                     code = "GUARDIAN_CONSENT_REQUIRED",
-                    message = "Para estudiantes menores de edad se requiere la autorización del padre, madre o acudiente."
+                    message = guardianValidation.Message
                 });
             }
         }
@@ -711,6 +719,82 @@ public class AuthController : ControllerBase
         }
 
         return Ok(new { valid = true });
+    }
+
+    /// <summary>
+    /// Permite al usuario autenticado cambiar su contraseña validando la contraseña actual,
+    /// aplicando las reglas estrictas de normalización (mínimo 8 caracteres, mayúscula,
+    /// minúscula, número y carácter especial) y almacenando con BCrypt (workFactor: 12).
+    /// </summary>
+    [Authorize]
+    [HttpPost("change-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await GetCurrentUserAsync(includeStudent: false);
+        if (user == null || !user.Activo)
+        {
+            return Unauthorized();
+        }
+
+        if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
+        {
+            await AuditAsync(user, "Autenticación: Intento fallido de cambio de contraseña",
+                "La contraseña actual proporcionada no coincide.", "WARNING");
+            return BadRequest(new
+            {
+                code = "INVALID_CURRENT_PASSWORD",
+                message = "La contraseña actual ingresada no es correcta."
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.ConfirmNewPassword)
+            && !string.Equals(dto.NewPassword, dto.ConfirmNewPassword, StringComparison.Ordinal))
+        {
+            return BadRequest(new
+            {
+                code = "PASSWORD_MISMATCH",
+                message = "La nueva contraseña y su confirmación no coinciden."
+            });
+        }
+
+        if (string.Equals(dto.CurrentPassword, dto.NewPassword, StringComparison.Ordinal))
+        {
+            return BadRequest(new
+            {
+                code = "SAME_PASSWORD",
+                message = "La nueva contraseña debe ser diferente a la contraseña actual."
+            });
+        }
+
+        var passwordCheck = PasswordPolicy.Validate(dto.NewPassword, user.Username, user.FullName);
+        if (!passwordCheck.IsValid)
+        {
+            return BadRequest(new
+            {
+                code = "WEAK_PASSWORD",
+                message = passwordCheck.Message
+            });
+        }
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword, workFactor: 12);
+        user.AccessFailedCount = 0;
+        user.LockoutEnd = null;
+        await _context.SaveChangesAsync();
+
+        await AuditAsync(user, "Autenticación: Cambio de contraseña exitoso",
+            "Contraseña actualizada cumpliendo política estricta y hash BCrypt (workFactor 12).");
+
+        return Ok(new
+        {
+            message = "Tu contraseña ha sido actualizada exitosamente."
+        });
     }
 
     private async Task<Usuario?> GetCurrentUserAsync(bool includeStudent)

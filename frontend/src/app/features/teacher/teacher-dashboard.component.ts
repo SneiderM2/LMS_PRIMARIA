@@ -1,6 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subject, takeUntil } from 'rxjs';
 import { TeacherService, TeacherMetrics, TeacherActivity, UpdateActivityDto } from '../../core/services/teacher.service';
 import { AuthService } from '../../core/services/auth.service';
 import { StudentStatus, SemaforoSummaryMetrics } from '../../core/models/semaforo.model';
@@ -18,7 +19,7 @@ import { LanguageSelectorComponent } from '../../shared/components/language-sele
   templateUrl: './teacher-dashboard.component.html',
   styleUrls: ['./teacher-dashboard.component.css']
 })
-export class TeacherDashboardComponent implements OnInit {
+export class TeacherDashboardComponent implements OnInit, OnDestroy {
   // Pestañas: 'activities' | 'semaforo' | 'students'
   public activeTab: 'activities' | 'semaforo' | 'students' = 'activities';
 
@@ -120,6 +121,8 @@ export class TeacherDashboardComponent implements OnInit {
   // Notificaciones
   public enrollingMap: { [key: number]: boolean } = {};
   public enrollNotification: { message: string; type: 'success' | 'info' | 'error' } | null = null;
+  private readonly destroy$ = new Subject<void>();
+  private toastTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     public authService: AuthService,
@@ -134,6 +137,15 @@ export class TeacherDashboardComponent implements OnInit {
     this.loadCourses();
     this.loadAllStudents();
     this.loadSemaforoData();
+  }
+
+  ngOnDestroy(): void {
+    if (this.toastTimeoutId) {
+      clearTimeout(this.toastTimeoutId);
+      this.toastTimeoutId = null;
+    }
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   /**
@@ -162,23 +174,27 @@ export class TeacherDashboardComponent implements OnInit {
 
   // --- Métricas Académicas y Actividades ---
   public loadAcademicMetrics(): void {
-    this.teacherService.getAcademicMetrics().subscribe({
-      next: (m) => this.academicMetrics = m
-    });
+    this.teacherService.getAcademicMetrics()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (m) => this.academicMetrics = m
+      });
   }
 
   public loadActivities(): void {
     this.isLoadingActivities = true;
-    this.teacherService.getActivities().subscribe({
-      next: (acts) => {
-        this.activities = acts;
-        this.applyActivityFilter();
-        this.isLoadingActivities = false;
-      },
-      error: () => {
-        this.isLoadingActivities = false;
-      }
-    });
+    this.teacherService.getActivities()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (acts) => {
+          this.activities = acts;
+          this.applyActivityFilter();
+          this.isLoadingActivities = false;
+        },
+        error: () => {
+          this.isLoadingActivities = false;
+        }
+      });
   }
 
   public setActivityFilter(filter: 'ALL' | 'ACTIVE' | 'ARCHIVED'): void {
@@ -225,17 +241,19 @@ export class TeacherDashboardComponent implements OnInit {
     if (!file) return;
 
     this.isUploadingResourceFile = true;
-    this.teacherService.uploadResource(file).subscribe({
-      next: (res) => {
-        this.isUploadingResourceFile = false;
-        this.newContent.fileUrl = res.fileUrl;
-        this.showToast(`Archivo "${res.originalName}" subido exitosamente.`, 'success');
-      },
-      error: (err) => {
-        this.isUploadingResourceFile = false;
-        alert('Error al subir archivo: ' + (err.error?.message || err.message));
-      }
-    });
+    this.teacherService.uploadResource(file)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.isUploadingResourceFile = false;
+          this.newContent.fileUrl = res.fileUrl;
+          this.showToast(`Archivo "${res.originalName}" subido exitosamente.`, 'success');
+        },
+        error: (err) => {
+          this.isUploadingResourceFile = false;
+          alert('Error al subir archivo: ' + (err.error?.message || err.message));
+        }
+      });
   }
 
   public saveContent(): void {
@@ -245,19 +263,21 @@ export class TeacherDashboardComponent implements OnInit {
     }
 
     this.isSavingContent = true;
-    this.teacherService.createContent(this.newContent).subscribe({
-      next: () => {
-        this.isSavingContent = false;
-        this.closeCreateModal();
-        this.showToast('¡Actividad creada y publicada con éxito! 🎉', 'success');
-        this.loadActivities();
-        this.loadAcademicMetrics();
-      },
-      error: (err) => {
-        this.isSavingContent = false;
-        alert('Error al publicar la actividad: ' + (err.error?.message || err.message));
-      }
-    });
+    this.teacherService.createContent(this.newContent)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.isSavingContent = false;
+          this.closeCreateModal();
+          this.showToast('¡Actividad creada y publicada con éxito! 🎉', 'success');
+          this.loadActivities();
+          this.loadAcademicMetrics();
+        },
+        error: (err) => {
+          this.isSavingContent = false;
+          alert('Error al publicar la actividad: ' + (err.error?.message || err.message));
+        }
+      });
   }
 
   // Editar Actividad
@@ -289,18 +309,20 @@ export class TeacherDashboardComponent implements OnInit {
     const kind = this.selectedActivityToEdit.kind;
     const id = this.selectedActivityToEdit.id;
 
-    this.teacherService.updateActivity(id, kind, this.editActivityForm).subscribe({
-      next: (res) => {
-        this.isEditingActivity = false;
-        this.closeEditModal();
-        this.showToast(res.message, 'success');
-        this.loadActivities();
-      },
-      error: (err) => {
-        this.isEditingActivity = false;
-        alert('Error al editar la actividad: ' + (err.error?.message || err.message));
-      }
-    });
+    this.teacherService.updateActivity(id, kind, this.editActivityForm)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.isEditingActivity = false;
+          this.closeEditModal();
+          this.showToast(res.message, 'success');
+          this.loadActivities();
+        },
+        error: (err) => {
+          this.isEditingActivity = false;
+          alert('Error al editar la actividad: ' + (err.error?.message || err.message));
+        }
+      });
   }
 
   public toggleActivityStatus(act: TeacherActivity): void {
@@ -309,17 +331,19 @@ export class TeacherDashboardComponent implements OnInit {
       return;
     }
 
-    this.teacherService.toggleActivityStatus(act.id, act.kind).subscribe({
-      next: (res) => {
-        this.showToast(res.message, 'info');
-        act.isActive = res.isActive;
-        this.applyActivityFilter();
-        this.loadAcademicMetrics();
-      },
-      error: (err) => {
-        alert('Error al cambiar el estado de la actividad: ' + (err.error?.message || err.message));
-      }
-    });
+    this.teacherService.toggleActivityStatus(act.id, act.kind)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.showToast(res.message, 'info');
+          act.isActive = res.isActive;
+          this.applyActivityFilter();
+          this.loadAcademicMetrics();
+        },
+        error: (err) => {
+          alert('Error al cambiar el estado de la actividad: ' + (err.error?.message || err.message));
+        }
+      });
   }
 
   // --- Módulo de Entregas y Calificación ---
@@ -338,15 +362,17 @@ export class TeacherDashboardComponent implements OnInit {
 
   public loadSubmissions(activityId: number): void {
     this.isLoadingSubmissions = true;
-    this.teacherService.getAssignmentSubmissions(activityId).subscribe({
-      next: (subs) => {
-        this.submissionsList = subs;
-        this.isLoadingSubmissions = false;
-      },
-      error: () => {
-        this.isLoadingSubmissions = false;
-      }
-    });
+    this.teacherService.getAssignmentSubmissions(activityId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (subs) => {
+          this.submissionsList = subs;
+          this.isLoadingSubmissions = false;
+        },
+        error: () => {
+          this.isLoadingSubmissions = false;
+        }
+      });
   }
 
   public startGrading(sub: StudentSubmission): void {
@@ -368,41 +394,47 @@ export class TeacherDashboardComponent implements OnInit {
     }
 
     this.isSavingGrade = true;
-    this.teacherService.gradeSubmission(subId, this.gradeInput, this.feedbackInput).subscribe({
-      next: (res) => {
-        this.isSavingGrade = false;
-        this.showToast(res.message, 'success');
-        if (this.gradingSubmission) {
-          this.gradingSubmission.grade = res.grade;
-          this.gradingSubmission.feedback = res.feedback;
-          this.gradingSubmission.status = res.status;
+    this.teacherService.gradeSubmission(subId, this.gradeInput, this.feedbackInput)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.isSavingGrade = false;
+          this.showToast(res.message, 'success');
+          if (this.gradingSubmission) {
+            this.gradingSubmission.grade = res.grade;
+            this.gradingSubmission.feedback = res.feedback;
+            this.gradingSubmission.status = res.status;
+          }
+          this.gradingSubmission = null;
+          this.loadAcademicMetrics();
+          this.loadActivities();
+        },
+        error: (err) => {
+          this.isSavingGrade = false;
+          alert('Error al calificar: ' + (err?.error?.message || err.message));
         }
-        this.gradingSubmission = null;
-        this.loadAcademicMetrics();
-        this.loadActivities();
-      },
-      error: (err) => {
-        this.isSavingGrade = false;
-        alert('Error al calificar: ' + (err?.error?.message || err.message));
-      }
-    });
+      });
   }
 
   // --- Módulo Semáforo ---
   public loadSemaforoData(): void {
     this.isLoadingSemaforo = true;
-    this.teacherService.getStudentsStatus(this.selectedGrade).subscribe({
-      next: (data) => {
-        this.students = data;
-        this.applySemaforoFilter();
-        this.isLoadingSemaforo = false;
-      },
-      error: () => this.isLoadingSemaforo = false
-    });
+    this.teacherService.getStudentsStatus(this.selectedGrade)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (data) => {
+          this.students = data;
+          this.applySemaforoFilter();
+          this.isLoadingSemaforo = false;
+        },
+        error: () => this.isLoadingSemaforo = false
+      });
 
-    this.teacherService.getMetrics(this.selectedGrade).subscribe({
-      next: (res) => this.metrics = res
-    });
+    this.teacherService.getMetrics(this.selectedGrade)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => this.metrics = res
+      });
   }
 
   public setStatusFilter(status: 'All' | 'Green' | 'Yellow' | 'Red'): void {
@@ -420,14 +452,16 @@ export class TeacherDashboardComponent implements OnInit {
 
   // --- Cursos y Alumnos ---
   public loadCourses(): void {
-    this.teacherService.getCourses().subscribe({
-      next: (c) => {
-        this.courses = c;
-        if (c.length > 0 && !this.selectedCourseId) {
-          this.selectedCourseId = c[0].id;
+    this.teacherService.getCourses()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (c) => {
+          this.courses = c;
+          if (c.length > 0 && !this.selectedCourseId) {
+            this.selectedCourseId = c[0].id;
+          }
         }
-      }
-    });
+      });
   }
 
   public onCourseChange(): void {
@@ -450,14 +484,16 @@ export class TeacherDashboardComponent implements OnInit {
 
   public loadAllStudents(): void {
     this.isLoadingStudents = true;
-    this.teacherService.getAllStudents().subscribe({
-      next: (res) => {
-        this.allStudents = res;
-        this.onStudentFilterChange();
-        this.isLoadingStudents = false;
-      },
-      error: () => this.isLoadingStudents = false
-    });
+    this.teacherService.getAllStudents()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.allStudents = res;
+          this.onStudentFilterChange();
+          this.isLoadingStudents = false;
+        },
+        error: () => this.isLoadingStudents = false
+      });
   }
 
   public onStudentFilterChange(): void {
@@ -481,31 +517,33 @@ export class TeacherDashboardComponent implements OnInit {
     const courseId = this.selectedCourseId;
     this.enrollingMap[student.id] = true;
 
-    this.teacherService.enrollStudent(courseId, student.id).subscribe({
-      next: (res) => {
-        this.enrollingMap[student.id] = false;
-        const currentCourse = this.courses.find(c => c.id === courseId);
-        const courseName = currentCourse ? currentCourse.nombre : 'el curso';
+    this.teacherService.enrollStudent(courseId, student.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.enrollingMap[student.id] = false;
+          const currentCourse = this.courses.find(c => c.id === courseId);
+          const courseName = currentCourse ? currentCourse.nombre : 'el curso';
 
-        if (res.yaMatriculado) {
-          this.showToast(`${student.fullName} ya estaba matriculado(a) en ${courseName}.`, 'info');
-        } else {
-          this.showToast(`¡${student.fullName} fue matriculado(a) exitosamente en ${courseName}! 🎉`, 'success');
-          student.enrolledCourses.push({
-            courseId: courseId,
-            courseName: courseName,
-            group: currentCourse?.grupo || 'A',
-            status: 'ACTIVA'
-          });
-          if (currentCourse) currentCourse.totalStudents++;
-          this.loadAcademicMetrics();
+          if (res.yaMatriculado) {
+            this.showToast(`${student.fullName} ya estaba matriculado(a) en ${courseName}.`, 'info');
+          } else {
+            this.showToast(`¡${student.fullName} fue matriculado(a) exitosamente en ${courseName}! 🎉`, 'success');
+            student.enrolledCourses.push({
+              courseId: courseId,
+              courseName: courseName,
+              group: currentCourse?.grupo || 'A',
+              status: 'ACTIVA'
+            });
+            if (currentCourse) currentCourse.totalStudents++;
+            this.loadAcademicMetrics();
+          }
+        },
+        error: (err) => {
+          this.enrollingMap[student.id] = false;
+          alert(err?.error?.message || 'Error al matricular al estudiante.');
         }
-      },
-      error: (err) => {
-        this.enrollingMap[student.id] = false;
-        alert(err?.error?.message || 'Error al matricular al estudiante.');
-      }
-    });
+      });
   }
 
   public unenrollStudent(student: TeacherStudent): void {
@@ -517,17 +555,19 @@ export class TeacherDashboardComponent implements OnInit {
       return;
     }
 
-    this.teacherService.unenrollStudent(this.selectedCourseId, student.id).subscribe({
-      next: (res) => {
-        this.showToast(res.message, 'info');
-        student.enrolledCourses = student.enrolledCourses.filter(c => c.courseId !== this.selectedCourseId);
-        if (currentCourse && currentCourse.totalStudents > 0) currentCourse.totalStudents--;
-        this.loadAcademicMetrics();
-      },
-      error: (err) => {
-        alert(err?.error?.message || 'Error al desmatricular al estudiante.');
-      }
-    });
+    this.teacherService.unenrollStudent(this.selectedCourseId, student.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.showToast(res.message, 'info');
+          student.enrolledCourses = student.enrolledCourses.filter(c => c.courseId !== this.selectedCourseId);
+          if (currentCourse && currentCourse.totalStudents > 0) currentCourse.totalStudents--;
+          this.loadAcademicMetrics();
+        },
+        error: (err) => {
+          alert(err?.error?.message || 'Error al desmatricular al estudiante.');
+        }
+      });
   }
 
   public isStudentEnrolledInCourse(student: TeacherStudent, courseId: number | null): boolean {
@@ -550,19 +590,21 @@ export class TeacherDashboardComponent implements OnInit {
       return;
     }
     this.isCreatingCourse = true;
-    this.teacherService.createCourse(this.newCourse).subscribe({
-      next: (course) => {
-        this.isCreatingCourse = false;
-        this.showCreateCourseModal = false;
-        this.courses.push(course);
-        this.selectedCourseId = course.id;
-        this.showToast(`¡Materia ${course.nombre} creada con éxito! 📘`, 'success');
-      },
-      error: (err) => {
-        this.isCreatingCourse = false;
-        alert(err?.error?.message || 'Error al crear el curso.');
-      }
-    });
+    this.teacherService.createCourse(this.newCourse)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (course) => {
+          this.isCreatingCourse = false;
+          this.showCreateCourseModal = false;
+          this.courses.push(course);
+          this.selectedCourseId = course.id;
+          this.showToast(`¡Materia ${course.nombre} creada con éxito! 📘`, 'success');
+        },
+        error: (err) => {
+          this.isCreatingCourse = false;
+          alert(err?.error?.message || 'Error al crear el curso.');
+        }
+      });
   }
 
   public openCreateStudentModal(): void {
@@ -582,9 +624,17 @@ export class TeacherDashboardComponent implements OnInit {
     }
 
     const password = this.newStudent.password.trim();
-    if (password.length > 0 && password.length < 12) {
-      this.createStudentError = 'La contraseña debe tener al menos 12 caracteres, con letras y números.';
-      return;
+    if (password.length > 0) {
+      const hasMinLength = password.length >= 8;
+      const hasUpper = /[A-ZÁÉÍÓÚÑ]/.test(password);
+      const hasLower = /[a-záéíóúñ]/.test(password);
+      const hasDigit = /\d/.test(password);
+      const hasSpecial = /[^A-Za-z0-9\s]/.test(password);
+
+      if (!hasMinLength || !hasUpper || !hasLower || !hasDigit || !hasSpecial) {
+        this.createStudentError = 'La contraseña personalizada debe tener mínimo 8 caracteres e incluir mayúscula, minúscula, número y carácter especial.';
+        return;
+      }
     }
 
     this.isCreatingStudent = true;
@@ -595,30 +645,36 @@ export class TeacherDashboardComponent implements OnInit {
       fullName: this.newStudent.fullName.trim(),
       password,
       grade: this.newStudent.grade
-    }).subscribe({
-      next: (created) => {
-        this.isCreatingStudent = false;
-        this.showCreateStudentModal = false;
+    })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (created) => {
+          this.isCreatingStudent = false;
+          this.showCreateStudentModal = false;
 
-        const message = created.temporaryPassword
-          ? `Alumno ${created.fullName} registrado. Contraseña temporal: ${created.temporaryPassword} — entrégala al acudiente.`
-          : `¡Alumno ${created.fullName} registrado con éxito! 🎓`;
+          const message = created.temporaryPassword
+            ? `Alumno ${created.fullName} registrado. Contraseña temporal: ${created.temporaryPassword} — entrégala al acudiente.`
+            : `¡Alumno ${created.fullName} registrado con éxito! 🎓`;
 
-        this.showToast(message, 'success');
-        this.loadAllStudents();
-        this.loadAcademicMetrics();
-      },
-      error: (err) => {
-        this.isCreatingStudent = false;
-        this.createStudentError = err?.error?.message || 'Error al registrar al estudiante.';
-      }
-    });
+          this.showToast(message, 'success');
+          this.loadAllStudents();
+          this.loadAcademicMetrics();
+        },
+        error: (err) => {
+          this.isCreatingStudent = false;
+          this.createStudentError = err?.error?.message || 'Error al registrar al estudiante.';
+        }
+      });
   }
 
   public showToast(message: string, type: 'success' | 'info' | 'error'): void {
+    if (this.toastTimeoutId) {
+      clearTimeout(this.toastTimeoutId);
+    }
     this.enrollNotification = { message, type };
-    setTimeout(() => {
+    this.toastTimeoutId = setTimeout(() => {
       this.enrollNotification = null;
+      this.toastTimeoutId = null;
     }, 4500);
   }
 

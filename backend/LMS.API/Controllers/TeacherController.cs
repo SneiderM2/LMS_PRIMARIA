@@ -19,17 +19,20 @@ public class TeacherController : ControllerBase
     private readonly LMSDbContext _context;
     private readonly ISemaforoService _semaforoService;
     private readonly IFileStorageService _fileStorage;
+    private readonly ConsentService _consent;
     private readonly ILogger<TeacherController> _logger;
 
     public TeacherController(
         LMSDbContext context,
         ISemaforoService semaforoService,
         IFileStorageService fileStorage,
+        ConsentService consent,
         ILogger<TeacherController> logger)
     {
         _context = context;
         _semaforoService = semaforoService;
         _fileStorage = fileStorage;
+        _consent = consent;
         _logger = logger;
     }
 
@@ -121,6 +124,10 @@ public class TeacherController : ControllerBase
             })
             .ToListAsync();
 
+        var accessor = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Docente";
+        await FileLogger.LogAsync("AUDIT",
+            $"[Ley 1581 / Ley 1098] Acceso a listado sensible de estudiantes menores ({students.Count} registros, filtro grado='{grade ?? "TODOS"}') por {accessor}.");
+
         return Ok(students);
     }
 
@@ -187,6 +194,20 @@ public class TeacherController : ControllerBase
         var lastName = parts.Length > 1 ? parts[1] : "";
         var avatarUrl = $"https://api.dicebear.com/7.x/bottts/svg?seed={Uri.EscapeDataString(cleanUsername)}";
 
+        var hasGuardianConsent = dto.GuardianAuthorization && !string.IsNullOrWhiteSpace(dto.GuardianFullName);
+        if (hasGuardianConsent)
+        {
+            var guardianCheck = ConsentService.ValidateGuardianConsent(
+                dto.GuardianAuthorization,
+                dto.GuardianFullName,
+                dto.GuardianDocument);
+
+            if (!guardianCheck.IsValid)
+            {
+                return BadRequest(new { code = "GUARDIAN_CONSENT_REQUIRED", message = guardianCheck.Message });
+            }
+        }
+
         var nuevoUsuario = new Usuario
         {
             Username = cleanUsername,
@@ -196,10 +217,24 @@ public class TeacherController : ControllerBase
             Apellido = lastName,
             AvatarUrl = avatarUrl,
             Activo = true,
-            FechaCreacion = DateTime.UtcNow
+            FechaCreacion = DateTime.UtcNow,
+            DataPolicyAccepted = hasGuardianConsent,
+            DataPolicyAcceptedAt = hasGuardianConsent ? DateTime.UtcNow : null,
+            DataPolicyVersion = hasGuardianConsent ? _consent.CurrentVersion : null
         };
         _context.Usuarios.Add(nuevoUsuario);
         await _context.SaveChangesAsync();
+
+        if (hasGuardianConsent)
+        {
+            nuevoUsuario.DataPolicyEvidence = _consent.BuildEvidence(
+                nuevoUsuario,
+                "teacher-portal-registration",
+                HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Request.Headers.UserAgent.ToString(),
+                dto.GuardianFullName,
+                dto.GuardianDocument);
+        }
 
         var alumno = new Alumno
         {
@@ -209,6 +244,10 @@ public class TeacherController : ControllerBase
         _context.Alumnos.Add(alumno);
 
         await _context.SaveChangesAsync();
+
+        var creator = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Docente";
+        await FileLogger.LogAsync("AUDIT",
+            $"[Ley 1581 / Ley 1098] Registro de estudiante menor {nuevoUsuario.Username} ({nuevoUsuario.FullName}, grado {grado.Nombre}) por {creator}. Consentimiento acudiente en registro: {hasGuardianConsent}.");
 
         var resultDto = new TeacherStudentDto
         {
@@ -483,6 +522,9 @@ public class TeacherController : ControllerBase
         }
 
         var statusList = _semaforoService.CalculateStatusList(students, activityMap);
+        var accessor = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Docente";
+        await FileLogger.LogAsync("AUDIT",
+            $"[Ley 1581 / Ley 1098] Consulta de semáforo escolar y seguimiento de actividad de menores ({statusList.Count} estudiantes, grado='{gradeLevel ?? "TODOS"}') por {accessor}.");
         return Ok(statusList);
     }
 
@@ -759,6 +801,9 @@ public class TeacherController : ControllerBase
             })
             .ToListAsync();
 
+        await FileLogger.LogAsync("AUDIT",
+            $"[Ley 1581 / Ley 1098] Consulta de entregas y archivos de estudiantes ({submissions.Count} entregas para tarea ID {taskId}) por {currentUser.Username}.");
+
         return Ok(submissions);
     }
 
@@ -808,6 +853,9 @@ public class TeacherController : ControllerBase
         entrega.Estado = "CALIFICADA";
 
         await _context.SaveChangesAsync();
+
+        await FileLogger.LogAsync("AUDIT",
+            $"[Ley 1581 / Ley 1098] Calificación de entrega ID {entrega.Id} del estudiante {entrega.Alumno.Usuario.Username} (Nota: {dto.Grade}) por {currentUser.Username}.");
 
         return Ok(new
         {

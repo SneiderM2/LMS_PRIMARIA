@@ -149,6 +149,9 @@ public class AdminController : ControllerBase
             })
             .ToListAsync();
 
+        await FileLogger.LogAsync("AUDIT",
+            $"[Ley 1581 / Ley 1098] Consulta administrativa de directorio de usuarios y datos de menores ({users.Count} registros, rol='{role ?? "ALL"}', búsqueda='{search ?? ""}') por {User.Identity?.Name ?? "Admin"}.");
+
         return Ok(users);
     }
 

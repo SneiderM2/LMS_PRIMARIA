@@ -32,24 +32,27 @@
   </div>
 
   <!-- Alertas informativas / errores -->
-  <div *ngIf="errorMessage()" class="alert alert-danger">
-    <span>⚠️</span>
+  <div *ngIf="errorMessage()" class="alert alert-danger" role="alert" aria-live="assertive">
+    <span aria-hidden="true">⚠️</span>
     <div class="alert-content">
       <strong>Aviso del Sistema:</strong>
       <p>{{ errorMessage() }}</p>
     </div>
   </div>
 
-  <div *ngIf="successMessage()" class="alert alert-success">
-    <span>✅</span>
+  <div *ngIf="successMessage()" class="alert alert-success" role="status" aria-live="polite">
+    <span aria-hidden="true">✅</span>
     <div class="alert-content">
       <p>{{ successMessage() }}</p>
     </div>
   </div>
 
   <!-- Pestañas Principales -->
-  <div class="inspector-tabs">
+  <div class="inspector-tabs" role="tablist" aria-label="Vistas del inspector de auditoría">
     <button 
+      type="button"
+      role="tab"
+      [attr.aria-selected]="activeTab() === 'audit'"
       class="tab-btn" 
       [class.active]="activeTab() === 'audit'" 
       (click)="selectTab('audit')">
@@ -57,6 +60,9 @@
       <span *ngIf="auditTotalCount() > 0" class="tab-pill tab-pill-audit">{{ auditTotalCount() }}</span>
     </button>
     <button 
+      type="button"
+      role="tab"
+      [attr.aria-selected]="activeTab() === 'logs'"
       class="tab-btn" 
       [class.active]="activeTab() === 'logs'" 
       (click)="selectTab('logs')">

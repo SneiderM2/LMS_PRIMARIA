@@ -1,6 +1,7 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subject, takeUntil } from 'rxjs';
 import { SystemFilesService, LogFileInfo, ParsedLogEntry, AuditLogItem } from '../../../core/services/system-files.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
@@ -12,7 +13,7 @@ import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
   templateUrl: './system-inspector.component.html',
   styleUrls: ['./system-inspector.component.css']
 })
-export class SystemInspectorComponent implements OnInit {
+export class SystemInspectorComponent implements OnInit, OnDestroy {
   // Pestañas Principales: 'audit' (Auditoría Global), 'logs' (Archivos tradicionales .log)
   public activeTab = signal<'audit' | 'logs'>('audit');
   public logViewMode = signal<'friendly' | 'raw'>('friendly');
@@ -48,6 +49,9 @@ export class SystemInspectorComponent implements OnInit {
   public successMessage = signal<string>('');
   public filterQuery = signal<string>('');
 
+  private readonly destroy$ = new Subject<void>();
+  private statusTimerId: ReturnType<typeof setTimeout> | null = null;
+
   constructor(
     private systemFilesService: SystemFilesService,
     public authService: AuthService
@@ -56,6 +60,15 @@ export class SystemInspectorComponent implements OnInit {
   ngOnInit(): void {
     this.loadGlobalAudit();
     this.loadLogsList();
+  }
+
+  ngOnDestroy(): void {
+    if (this.statusTimerId) {
+      clearTimeout(this.statusTimerId);
+      this.statusTimerId = null;
+    }
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   // Verifica si el usuario actual tiene permisos de administración
@@ -95,17 +108,19 @@ export class SystemInspectorComponent implements OnInit {
       keyword: this.auditKeyword(),
       from: this.auditFromDate(),
       to: this.auditToDate()
-    }).subscribe({
-      next: (res) => {
-        this.auditLogs.set(res.items || []);
-        this.auditTotalCount.set(res.totalCount || 0);
-        this.isAuditLoading.set(false);
-      },
-      error: (err) => {
-        this.isAuditLoading.set(false);
-        this.errorMessage.set('Error al consultar auditoría: ' + (err.error?.message || err.message));
-      }
-    });
+    })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.auditLogs.set(res.items || []);
+          this.auditTotalCount.set(res.totalCount || 0);
+          this.isAuditLoading.set(false);
+        },
+        error: (err) => {
+          this.isAuditLoading.set(false);
+          this.errorMessage.set('Error al consultar auditoría: ' + (err.error?.message || err.message));
+        }
+      });
   }
 
   public applyAuditFilters(): void {
@@ -152,24 +167,26 @@ export class SystemInspectorComponent implements OnInit {
   }
 
   public loadLogsList(): void {
-    this.systemFilesService.getLogsList().subscribe({
-      next: (res) => {
-        this.logFiles.set(res.files || []);
-        if (res.files && res.files.length > 0 && !this.selectedLogName()) {
-          const target = res.files.some(f => f.name === 'app-audit.log') 
-            ? 'app-audit.log' 
-            : res.files.some(f => f.name === 'access.log') 
-              ? 'access.log' 
-              : res.files[0].name;
-          this.selectedLogName.set(target);
+    this.systemFilesService.getLogsList()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.logFiles.set(res.files || []);
+          if (res.files && res.files.length > 0 && !this.selectedLogName()) {
+            const target = res.files.some(f => f.name === 'app-audit.log') 
+              ? 'app-audit.log' 
+              : res.files.some(f => f.name === 'access.log') 
+                ? 'access.log' 
+                : res.files[0].name;
+            this.selectedLogName.set(target);
+          }
+        },
+        error: (err) => {
+          if (err.status === 403) {
+            this.errorMessage.set('Acceso restringido: No tienes permisos para consultar los registros del servidor.');
+          }
         }
-      },
-      error: (err) => {
-        if (err.status === 403) {
-          this.errorMessage.set('Acceso restringido: No tienes permisos para consultar los registros del servidor.');
-        }
-      }
-    });
+      });
   }
 
   public loadLog(fileName: string): void {
@@ -193,33 +210,37 @@ export class SystemInspectorComponent implements OnInit {
       this.selectedSeverity(),
       this.searchUser(),
       this.selectedDate()
-    ).subscribe({
-      next: (entries) => {
-        this.parsedLogs.set(entries);
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        this.isLoading.set(false);
-        this.errorMessage.set('Error al parsear el archivo de log: ' + (err.error?.message || err.message));
-      }
-    });
+    )
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (entries) => {
+          this.parsedLogs.set(entries);
+          this.isLoading.set(false);
+        },
+        error: (err) => {
+          this.isLoading.set(false);
+          this.errorMessage.set('Error al parsear el archivo de log: ' + (err.error?.message || err.message));
+        }
+      });
   }
 
   public loadRawLog(fileName: string): void {
     this.isLoading.set(true);
     this.errorMessage.set('');
-    this.systemFilesService.getLogContent(fileName).subscribe({
-      next: (res) => {
-        this.currentContent.set(res.content);
-        this.fileSize.set(res.size);
-        this.lastModified.set(res.lastModified);
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        this.isLoading.set(false);
-        this.errorMessage.set(`Error al leer archivo '${fileName}': ` + (err.error?.message || err.message));
-      }
-    });
+    this.systemFilesService.getLogContent(fileName)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.currentContent.set(res.content);
+          this.fileSize.set(res.size);
+          this.lastModified.set(res.lastModified);
+          this.isLoading.set(false);
+        },
+        error: (err) => {
+          this.isLoading.set(false);
+          this.errorMessage.set(`Error al leer archivo '${fileName}': ` + (err.error?.message || err.message));
+        }
+      });
   }
 
   public refreshCurrent(): void {
@@ -242,16 +263,22 @@ export class SystemInspectorComponent implements OnInit {
       return;
     }
 
-    this.systemFilesService.clearLog(fileName).subscribe({
-      next: (res) => {
-        this.successMessage.set(res.message);
-        this.refreshCurrent();
-        setTimeout(() => this.successMessage.set(''), 4000);
-      },
-      error: (err) => {
-        this.errorMessage.set('Error al limpiar el log: ' + (err.error?.message || err.message));
-      }
-    });
+    this.systemFilesService.clearLog(fileName)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.successMessage.set(res.message);
+          this.refreshCurrent();
+          if (this.statusTimerId) clearTimeout(this.statusTimerId);
+          this.statusTimerId = setTimeout(() => {
+            this.successMessage.set('');
+            this.statusTimerId = null;
+          }, 4000);
+        },
+        error: (err) => {
+          this.errorMessage.set('Error al limpiar el log: ' + (err.error?.message || err.message));
+        }
+      });
   }
 
   public copyToClipboard(): void {
@@ -261,7 +288,11 @@ export class SystemInspectorComponent implements OnInit {
 
     navigator.clipboard.writeText(textToCopy).then(() => {
       this.successMessage.set('Contenido copiado al portapapeles');
-      setTimeout(() => this.successMessage.set(''), 3000);
+      if (this.statusTimerId) clearTimeout(this.statusTimerId);
+      this.statusTimerId = setTimeout(() => {
+        this.successMessage.set('');
+        this.statusTimerId = null;
+      }, 3000);
     });
   }
 

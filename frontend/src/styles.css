@@ -783,3 +783,40 @@ body {
   box-shadow: none !important;
 }
 
+/* ==========================================================================
+   Accesibilidad NTC 5854 / WCAG 2.1 AA (Skip Link & Focus Visible)
+   ========================================================================== */
+.skip-link {
+  position: absolute;
+  top: -60px;
+  left: 16px;
+  z-index: 100000;
+  background: #0284c7;
+  color: #ffffff;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  box-shadow: var(--shadow-lg);
+  transition: top 0.2s ease-in-out;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 16px;
+  outline: 3px solid #facc15;
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid #0284c7;
+  outline-offset: 2px;
+}
+
+

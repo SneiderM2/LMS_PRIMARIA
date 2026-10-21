@@ -24,9 +24,12 @@
   </header>
 
   <!-- PESTAÑAS PRINCIPALES DEL PORTAL DOCENTE -->
-  <nav class="portal-nav-tabs">
-    <div class="tabs-container">
+  <nav class="portal-nav-tabs" aria-label="Secciones del portal docente">
+    <div class="tabs-container" role="tablist">
       <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'activities'"
         class="portal-tab-btn"
         [class.active]="activeTab === 'activities'"
         (click)="switchTab('activities')">
@@ -36,12 +39,18 @@
         </span>
       </button>
       <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'semaforo'"
         class="portal-tab-btn"
         [class.active]="activeTab === 'semaforo'"
         (click)="switchTab('semaforo')">
         {{ 'teacher.tabSemaforo' | translate }}
       </button>
       <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'students'"
         class="portal-tab-btn"
         [class.active]="activeTab === 'students'"
         (click)="switchTab('students')">
@@ -51,12 +60,12 @@
   </nav>
 
   <!-- Toast flotante de notificación -->
-  <div *ngIf="enrollNotification" class="toast-notification animate-fade-in" [ngClass]="'toast-' + enrollNotification.type">
-    <span class="toast-icon">{{ enrollNotification.type === 'success' ? '✅' : enrollNotification.type === 'info' ? 'ℹ️' : '⚠️' }}</span>
+  <div *ngIf="enrollNotification" class="toast-notification animate-fade-in" [ngClass]="'toast-' + enrollNotification.type" role="status" aria-live="polite">
+    <span class="toast-icon" aria-hidden="true">{{ enrollNotification.type === 'success' ? '✅' : enrollNotification.type === 'info' ? 'ℹ️' : '⚠️' }}</span>
     <span>{{ enrollNotification.message }}</span>
   </div>
 
-  <main class="main-container">
+  <main id="main-content" class="main-container">
 
     <!-- ========================================================================= -->
     <!-- PESTAÑA 1: GESTIÓN DE ACTIVIDADES, TAREAS Y CALIFICACIONES (CRUD)          -->
@@ -551,14 +560,14 @@
   <!-- ========================================================= -->
   <!-- MODAL / CAJÓN DE ENTREGAS Y CALIFICACIÓN (NEW!)           -->
   <!-- ========================================================= -->
-  <div *ngIf="showSubmissionsModal" class="modal-overlay" (click)="closeSubmissionsModal()">
+  <div *ngIf="showSubmissionsModal" class="modal-overlay" (click)="closeSubmissionsModal()" role="dialog" aria-modal="true" aria-labelledby="submissions-modal-title">
     <div class="modal-content modal-content-lg glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <div>
-          <h2>{{ 'teacher.modalSubmissionsTitle' | translate }} {{ selectedActivityForSubmissions?.title }}</h2>
+          <h2 id="submissions-modal-title">{{ 'teacher.modalSubmissionsTitle' | translate }} {{ selectedActivityForSubmissions?.title }}</h2>
           <span class="header-subinfo">{{ selectedActivityForSubmissions?.courseName }} • {{ selectedActivityForSubmissions?.gradeName }}</span>
         </div>
-        <button class="btn-close" (click)="closeSubmissionsModal()">✕</button>
+        <button type="button" class="btn-close" (click)="closeSubmissionsModal()" aria-label="Cerrar ventana de entregas">✕</button>
       </div>
 
       <div class="modal-body">
@@ -784,15 +793,15 @@
   </div>
 
   <!-- MODAL CREAR ALUMNO -->
-  <div *ngIf="showCreateStudentModal" class="modal-overlay" (click)="closeCreateStudentModal()">
+  <div *ngIf="showCreateStudentModal" class="modal-overlay" (click)="closeCreateStudentModal()" role="dialog" aria-modal="true" aria-labelledby="create-student-modal-title">
     <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>{{ 'teacher.createStudentTitle' | translate }}</h2>
-        <button class="btn-close" (click)="closeCreateStudentModal()">✕</button>
+        <h2 id="create-student-modal-title">{{ 'teacher.createStudentTitle' | translate }}</h2>
+        <button type="button" class="btn-close" (click)="closeCreateStudentModal()" aria-label="Cerrar ventana de registro">✕</button>
       </div>
       <div class="modal-body">
         <form (ngSubmit)="saveStudent()">
-          <div *ngIf="createStudentError" class="alert alert-danger" style="margin-bottom: 1rem;">
+          <div *ngIf="createStudentError" class="alert alert-danger" style="margin-bottom: 1rem;" role="alert" aria-live="assertive">
             ⚠️ {{ createStudentError }}
           </div>
           <div class="form-group">
@@ -818,7 +827,7 @@
             <div class="form-group col">
               <label>{{ 'teacher.studentPassLabel' | translate }}</label>
               <input type="password" [(ngModel)]="newStudent.password" name="sPass" class="form-input"
-                minlength="12" maxlength="128" placeholder="Mínimo 12 caracteres (opcional)"
+                minlength="8" maxlength="128" placeholder="Mín. 8 caract. (Aa1!) u opcional"
                 autocomplete="new-password" />
             </div>
           </div>

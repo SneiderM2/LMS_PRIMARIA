@@ -77,7 +77,7 @@ public class RegisterRequestDto
     public string FullName { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "La contraseña es requerida")]
-    [MinLength(12, ErrorMessage = "La contraseña debe tener al menos 12 caracteres")]
+    [MinLength(8, ErrorMessage = "La contraseña debe tener al menos 8 caracteres, incluyendo mayúscula, minúscula, número y carácter especial")]
     [MaxLength(128)]
     public string Password { get; set; } = string.Empty;
 
@@ -130,4 +130,18 @@ public class UserDto
     public bool DataPolicyAccepted { get; set; } = false;
     public string? DataPolicyVersion { get; set; }
     public bool RequiresPolicyAcceptance { get; set; } = false;
+}
+
+public class ChangePasswordDto
+{
+    [Required(ErrorMessage = "La contraseña actual es requerida")]
+    [MaxLength(128)]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "La nueva contraseña es requerida")]
+    [MinLength(8, ErrorMessage = "La nueva contraseña debe tener al menos 8 caracteres, incluyendo mayúscula, minúscula, número y carácter especial")]
+    [MaxLength(128)]
+    public string NewPassword { get; set; } = string.Empty;
+
+    public string? ConfirmNewPassword { get; set; }
 }

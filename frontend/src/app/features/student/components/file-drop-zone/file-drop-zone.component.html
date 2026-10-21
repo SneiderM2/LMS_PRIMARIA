@@ -1,7 +1,7 @@
-<div class="dropzone-modal-backdrop" (click)="cancelled.emit()">
+<div class="dropzone-modal-backdrop" (click)="cancelled.emit()" role="dialog" aria-modal="true" aria-labelledby="dropzone-dialog-title">
   <div class="dropzone-card" (click)="$event.stopPropagation()">
     <!-- Confeti festivo generado por CSS -->
-    <div class="confetti-container" *ngIf="showConfetti">
+    <div class="confetti-container" *ngIf="showConfetti" aria-hidden="true">
       <div class="confetti c1"></div>
       <div class="confetti c2"></div>
       <div class="confetti c3"></div>
@@ -15,18 +15,18 @@
     <!-- Cabecera del modal -->
     <div class="modal-header">
       <div class="title-group">
-        <span class="header-icon">🚀</span>
+        <span class="header-icon" aria-hidden="true">🚀</span>
         <div>
-          <h2>{{ 'student.dropTitle' | translate }}</h2>
+          <h2 id="dropzone-dialog-title">{{ 'student.dropTitle' | translate }}</h2>
           <p class="subtitle">{{ assignmentTitle }}</p>
         </div>
       </div>
-      <button class="btn-close" (click)="cancelled.emit()" [attr.aria-label]="'common.close' | translate">✕</button>
+      <button type="button" class="btn-close" (click)="cancelled.emit()" [attr.aria-label]="'common.close' | translate">✕</button>
     </div>
 
     <!-- Estado de éxito al finalizar -->
-    <div class="success-screen" *ngIf="uploadSuccess">
-      <div class="celebrate-emoji bounce-animation">🎉⭐🎈</div>
+    <div class="success-screen" *ngIf="uploadSuccess" role="status" aria-live="polite">
+      <div class="celebrate-emoji bounce-animation" aria-hidden="true">🎉⭐🎈</div>
       <h3 class="success-title">{{ 'student.dropMissionAccomplished' | translate }}</h3>
       <p class="success-desc">{{ 'student.dropMissionDesc' | translate }}</p>
     </div>
@@ -37,19 +37,25 @@
       <!-- Zona Drag & Drop activa si no hay archivo seleccionado -->
       <div *ngIf="!selectedFile"
            class="drop-area"
+           role="button"
+           tabindex="0"
+           aria-label="Zona para arrastrar o seleccionar archivo de evidencia escolar"
            [class.dragging]="isDragging"
            (dragover)="onDragOver($event)"
            (dragleave)="onDragLeave($event)"
            (drop)="onDrop($event)"
-           (click)="fileInput.click()">
+           (click)="fileInput.click()"
+           (keydown.enter)="fileInput.click()"
+           (keydown.space)="$event.preventDefault(); fileInput.click()">
         
         <input #fileInput
                type="file"
                style="display: none"
+               aria-label="Seleccionar archivo de tarea"
                (change)="onFileSelected($event)"
-               accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" />
+               accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" />
 
-        <div class="drop-illustration">
+        <div class="drop-illustration" aria-hidden="true">
           <span class="icon-cloud" [class.shake]="isDragging">📂</span>
           <span class="icon-sparkle">✨</span>
         </div>
@@ -67,8 +73,8 @@
       </div>
 
       <!-- Archivo Seleccionado con Previsualización -->
-      <div *ngIf="selectedFile" class="file-preview-card">
-        <div class="file-icon-box">
+      <div *ngIf="selectedFile" class="file-preview-card" role="region" aria-label="Archivo seleccionado">
+        <div class="file-icon-box" aria-hidden="true">
           <span class="big-file-icon">📑</span>
         </div>
         <div class="file-details">
@@ -76,14 +82,14 @@
           <span class="file-size">📦 {{ formatFileSize(selectedFile.size) }}</span>
           <span class="file-ready">{{ 'student.dropFileReady' | translate }}</span>
         </div>
-        <button class="btn-remove" (click)="removeFile()" [title]="'student.dropRemove' | translate">
+        <button type="button" class="btn-remove" (click)="removeFile()" [title]="'student.dropRemove' | translate" [attr.aria-label]="'student.dropRemove' | translate">
           {{ 'student.dropRemove' | translate }}
         </button>
       </div>
 
       <!-- Alerta de Error -->
-      <div *ngIf="errorMessage" class="error-alert">
-        <span class="alert-icon">⚠️</span>
+      <div *ngIf="errorMessage" class="error-alert" role="alert" aria-live="assertive">
+        <span class="alert-icon" aria-hidden="true">⚠️</span>
         <span>{{ errorMessage }}</span>
       </div>
 

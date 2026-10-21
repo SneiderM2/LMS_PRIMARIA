@@ -1,5 +1,8 @@
+<!-- Enlace de accesibilidad NTC 5854 / WCAG 2.1 AA para navegación por teclado -->
+<a class="skip-link" href="#main-content">Saltar al contenido principal</a>
+
 <!-- Banner Informativo de Cold Start (Render Free Tier) -->
-<div *ngIf="serverStatus.isWakingUp()" class="cold-start-banner animate-fade-in" role="alert">
+<div *ngIf="serverStatus.isWakingUp()" class="cold-start-banner animate-fade-in" role="alert" aria-live="polite">
   <div class="cold-start-container">
     <div class="cold-start-icon">⏳</div>
     <div class="cold-start-info">

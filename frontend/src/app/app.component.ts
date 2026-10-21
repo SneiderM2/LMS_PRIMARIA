@@ -1,6 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { Subject, takeUntil } from 'rxjs';
 import { ThemeToggleComponent } from './shared/components/theme-toggle/theme-toggle.component';
 import { LanguageSelectorComponent } from './shared/components/language-selector/language-selector.component';
 import { DataPolicyModalComponent } from './shared/components/data-policy-modal/data-policy-modal.component';
@@ -26,10 +27,11 @@ import { environment } from '../environments/environment';
   ],
   templateUrl: './app.component.html'
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   title = 'lms-primaria-frontend';
 
   public policySubmitting = false;
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
     public authService: AuthService,
@@ -41,6 +43,11 @@ export class AppComponent implements OnInit {
     if (this.authService.isAuthenticated()) {
       this.sessionTimeoutService.startMonitoring();
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   public get showPolicyModal(): boolean {
@@ -68,15 +75,17 @@ export class AppComponent implements OnInit {
   public onPolicyAccepted(payload: ConsentPayload): void {
     this.policySubmitting = true;
 
-    this.authService.acceptDataPolicy(payload).subscribe({
-      next: () => {
-        this.policySubmitting = false;
-        this.sessionTimeoutService.startMonitoring();
-      },
-      error: (err) => {
-        this.policySubmitting = false;
-        console.error('Error al registrar consentimiento:', err);
-      }
-    });
+    this.authService.acceptDataPolicy(payload)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.policySubmitting = false;
+          this.sessionTimeoutService.startMonitoring();
+        },
+        error: (err) => {
+          this.policySubmitting = false;
+          console.error('Error al registrar consentimiento:', err);
+        }
+      });
   }
 }

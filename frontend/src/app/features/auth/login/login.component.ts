@@ -1,7 +1,8 @@
-import { Component, OnInit, AfterViewInit, NgZone } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { UserRole } from '../../../core/models/user.model';
 import { SessionTimeoutService } from '../../../core/services/session-timeout.service';
@@ -19,8 +20,14 @@ declare const grecaptcha: any;
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css']
 })
-export class LoginComponent implements OnInit, AfterViewInit {
+export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   public activeTab: 'login' | 'register' = 'login';
+
+  private readonly destroy$ = new Subject<void>();
+  private grecaptchaIntervalId: ReturnType<typeof setInterval> | null = null;
+  private googleIntervalId: ReturnType<typeof setInterval> | null = null;
+  private googleTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private tabSwitchTimerId: ReturnType<typeof setTimeout> | null = null;
 
   // Campos de Iniciar Sesión
   public id = '';
@@ -80,29 +87,42 @@ export class LoginComponent implements OnInit, AfterViewInit {
     this.warmupBackend();
 
     // 2. Si viene redirigido por inactividad de sesión
-    this.route.queryParams.subscribe(params => {
-      if (params['sessionExpired'] === 'true') {
-        this.errorMessage = '⏱️ Tu sesión ha expirado por inactividad (5 minutos). Por favor ingresa nuevamente.';
-      } else if (params['duplicateSession'] === 'true') {
-        this.errorMessage = '⚠️ Tu sesión se ha cerrado porque se inició sesión en otro dispositivo.';
-      }
-    });
+    this.route.queryParams
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(params => {
+        if (params['sessionExpired'] === 'true') {
+          this.errorMessage = '⏱️ Tu sesión ha expirado por inactividad (5 minutos). Por favor ingresa nuevamente.';
+        } else if (params['duplicateSession'] === 'true') {
+          this.errorMessage = '⚠️ Tu sesión se ha cerrado porque se inició sesión en otro dispositivo.';
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+    if (this.grecaptchaIntervalId) clearInterval(this.grecaptchaIntervalId);
+    if (this.googleIntervalId) clearInterval(this.googleIntervalId);
+    if (this.googleTimeoutId) clearTimeout(this.googleTimeoutId);
+    if (this.tabSwitchTimerId) clearTimeout(this.tabSwitchTimerId);
   }
 
   private warmupBackend(): void {
-    this.authService.warmup().subscribe({
-      next: () => {
-        this.ngZone.run(() => {
-          this.isServerReady = true;
-          this.isServerWarming = false;
-        });
-      },
-      error: () => {
-        this.ngZone.run(() => {
-          this.isServerWarming = false;
-        });
-      }
-    });
+    this.authService.warmup()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.ngZone.run(() => {
+            this.isServerReady = true;
+            this.isServerWarming = false;
+          });
+        },
+        error: () => {
+          this.ngZone.run(() => {
+            this.isServerWarming = false;
+          });
+        }
+      });
   }
 
   ngAfterViewInit(): void {
@@ -128,16 +148,16 @@ export class LoginComponent implements OnInit, AfterViewInit {
 
     let attempts = 0;
     const maxAttempts = 15; // ~4.5 segundos
-    const checkGrecaptcha = setInterval(() => {
+    this.grecaptchaIntervalId = setInterval(() => {
       attempts++;
       if (typeof grecaptcha !== 'undefined' && grecaptcha.render) {
-        clearInterval(checkGrecaptcha);
+        if (this.grecaptchaIntervalId) clearInterval(this.grecaptchaIntervalId);
         this.renderLoginCaptcha(siteKey);
         if (this.activeTab === 'register') {
           this.renderRegisterCaptcha(siteKey);
         }
       } else if (attempts >= maxAttempts) {
-        clearInterval(checkGrecaptcha);
+        if (this.grecaptchaIntervalId) clearInterval(this.grecaptchaIntervalId);
         console.warn('[reCAPTCHA] SDK no disponible tras tiempo límite de espera.');
         this.ngZone.run(() => {
           this.captchaLoadError = true;
@@ -221,9 +241,9 @@ export class LoginComponent implements OnInit, AfterViewInit {
   }
 
   private initGoogleSignIn(): void {
-    const checkGoogle = setInterval(() => {
+    this.googleIntervalId = setInterval(() => {
       if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-        clearInterval(checkGoogle);
+        if (this.googleIntervalId) clearInterval(this.googleIntervalId);
         try {
           const clientId = environment.googleClientId;
           if (clientId) {
@@ -249,35 +269,39 @@ export class LoginComponent implements OnInit, AfterViewInit {
       }
     }, 300);
 
-    setTimeout(() => clearInterval(checkGoogle), 6000);
+    this.googleTimeoutId = setTimeout(() => {
+      if (this.googleIntervalId) clearInterval(this.googleIntervalId);
+    }, 6000);
   }
 
   public handleGoogleCredential(idToken: string): void {
     this.isLoading = true;
     this.errorMessage = null;
 
-    this.authService.loginWithGoogle(idToken, this.honeypotTrap).subscribe({
-      next: () => {
-        this.isLoading = false;
-        this.sessionTimeoutService.startMonitoring();
-      },
-      error: (err: any) => {
-        this.isLoading = false;
-        if (err?.status === 409 && err?.error?.code === 'ACTIVE_SESSION') {
-          // Hay una sesión activa en otro lugar → mostrar modal de confirmación
-          this.pendingForceLoginType = 'google';
-          this.pendingGoogleToken = idToken;
-          this.activeSessionInfo = {
-            message: err.error.message,
-            sessionStartedAt: err.error.sessionStartedAt,
-            deviceHint: err.error.deviceHint
-          };
-          this.showActiveSessionModal = true;
-        } else {
-          this.errorMessage = err?.error?.message || 'No fue posible iniciar sesión con Google.';
+    this.authService.loginWithGoogle(idToken, this.honeypotTrap)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.isLoading = false;
+          this.sessionTimeoutService.startMonitoring();
+        },
+        error: (err: any) => {
+          this.isLoading = false;
+          if (err?.status === 409 && err?.error?.code === 'ACTIVE_SESSION') {
+            // Hay una sesión activa en otro lugar → mostrar modal de confirmación
+            this.pendingForceLoginType = 'google';
+            this.pendingGoogleToken = idToken;
+            this.activeSessionInfo = {
+              message: err.error.message,
+              sessionStartedAt: err.error.sessionStartedAt,
+              deviceHint: err.error.deviceHint
+            };
+            this.showActiveSessionModal = true;
+          } else {
+            this.errorMessage = err?.error?.message || 'No fue posible iniciar sesión con Google.';
+          }
         }
-      }
-    });
+      });
   }
 
   public switchTab(tab: 'login' | 'register'): void {
@@ -286,7 +310,8 @@ export class LoginComponent implements OnInit, AfterViewInit {
     this.successMessage = null;
     this.captchaToken = '';
     this.isDevCaptchaActive = false;
-    setTimeout(() => {
+    if (this.tabSwitchTimerId) clearTimeout(this.tabSwitchTimerId);
+    this.tabSwitchTimerId = setTimeout(() => {
       this.ensureRecaptchaForTab(tab);
     }, 100);
   }
@@ -327,7 +352,9 @@ export class LoginComponent implements OnInit, AfterViewInit {
       password: this.password,
       honeypotTrap: this.honeypotTrap,
       captchaToken: this.captchaToken
-    }, forceLogin).subscribe({
+    }, forceLogin)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
       next: () => {
         this.isLoading = false;
         this.sessionTimeoutService.startMonitoring();
@@ -393,16 +420,18 @@ export class LoginComponent implements OnInit, AfterViewInit {
     this.errorMessage = null;
 
     if (this.pendingForceLoginType === 'google' && this.pendingGoogleToken) {
-      this.authService.loginWithGoogle(this.pendingGoogleToken, this.honeypotTrap, true).subscribe({
-        next: () => {
-          this.isLoading = false;
-          this.sessionTimeoutService.startMonitoring();
-        },
-        error: (err: any) => {
-          this.isLoading = false;
-          this.errorMessage = err?.error?.message || 'No fue posible iniciar sesión con Google.';
-        }
-      });
+      this.authService.loginWithGoogle(this.pendingGoogleToken, this.honeypotTrap, true)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: () => {
+            this.isLoading = false;
+            this.sessionTimeoutService.startMonitoring();
+          },
+          error: (err: any) => {
+            this.isLoading = false;
+            this.errorMessage = err?.error?.message || 'No fue posible iniciar sesión con Google.';
+          }
+        });
     } else {
       this.doLogin(true);
     }
@@ -417,14 +446,37 @@ export class LoginComponent implements OnInit, AfterViewInit {
     this.isLoading = false;
   }
 
+  private validateNormalizedPassword(pwd: string): string | null {
+    if (pwd.length < 8) {
+      return 'La contraseña debe tener al menos 8 caracteres 🔒';
+    }
+    if (/\s/.test(pwd)) {
+      return 'La contraseña no debe contener espacios en blanco 🔒';
+    }
+    if (!/[A-Z]/.test(pwd)) {
+      return 'La contraseña debe incluir al menos una letra mayúscula (A-Z) 🔒';
+    }
+    if (!/[a-z]/.test(pwd)) {
+      return 'La contraseña debe incluir al menos una letra minúscula (a-z) 🔒';
+    }
+    if (!/[0-9]/.test(pwd)) {
+      return 'La contraseña debe incluir al menos un número (0-9) 🔒';
+    }
+    if (!/[^A-Za-z0-9\s]/.test(pwd)) {
+      return 'La contraseña debe incluir al menos un carácter especial (ej. !@#$%&*+-_?) 🔒';
+    }
+    return null;
+  }
+
   public onRegister(): void {
     if (!this.regId.trim() || !this.regFullName.trim() || !this.regPassword.trim()) {
       this.errorMessage = 'Por favor completa todos los campos requeridos 📝';
       return;
     }
 
-    if (this.regPassword.length < 12) {
-      this.errorMessage = 'La contraseña debe tener al menos 12 caracteres, combinando letras y números 🔒';
+    const pwdError = this.validateNormalizedPassword(this.regPassword);
+    if (pwdError) {
+      this.errorMessage = pwdError;
       return;
     }
 
@@ -481,7 +533,9 @@ export class LoginComponent implements OnInit, AfterViewInit {
       dataPolicyVersion: environment.dataPolicyVersion,
       honeypotTrap: this.regHoneypot,
       captchaToken: this.captchaToken
-    }).subscribe({
+    })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
       next: () => {
         this.isLoading = false;
         this.successMessage = '¡Cuenta creada con éxito! Ingresando a tu aula... 🎉';

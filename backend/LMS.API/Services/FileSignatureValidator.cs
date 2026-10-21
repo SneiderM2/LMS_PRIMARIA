@@ -31,10 +31,58 @@ public static class FileSignatureValidator
         [".doc"] = "application/msword"
     };
 
+    private static readonly Dictionary<string, string[]> AllowedMimeTypesByExtension = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".pdf"] = new[] { "application/pdf" },
+        [".jpg"] = new[] { "image/jpeg", "image/pjpeg", "image/jpg" },
+        [".jpeg"] = new[] { "image/jpeg", "image/pjpeg", "image/jpg" },
+        [".png"] = new[] { "image/png", "image/x-png" },
+        [".webp"] = new[] { "image/webp" },
+        [".docx"] = new[]
+        {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/octet-stream"
+        },
+        [".doc"] = new[]
+        {
+            "application/msword",
+            "application/vnd.ms-word",
+            "application/x-msword",
+            "application/octet-stream"
+        }
+    };
+
     public static IReadOnlyCollection<string> AllowedExtensions => AllowedSignatures.Keys;
 
     public static bool IsAllowedExtension(string? extension)
         => !string.IsNullOrWhiteSpace(extension) && AllowedSignatures.ContainsKey(extension);
+
+    /// <summary>
+    /// Valida que el Content-Type (MIME-type) declarado en la subida corresponda a la lista
+    /// blanca permitida para la extensión del archivo.
+    /// </summary>
+    public static bool IsAllowedMimeType(string? declaredContentType, string? extension)
+    {
+        if (string.IsNullOrWhiteSpace(declaredContentType) || string.IsNullOrWhiteSpace(extension))
+        {
+            return false;
+        }
+
+        if (!AllowedMimeTypesByExtension.TryGetValue(extension.Trim(), out var allowedMimes))
+        {
+            return false;
+        }
+
+        var normalizedMime = declaredContentType.Split(';', 2)[0].Trim();
+        if (string.IsNullOrWhiteSpace(normalizedMime))
+        {
+            return false;
+        }
+
+        return allowedMimes.Any(m => string.Equals(m, normalizedMime, StringComparison.OrdinalIgnoreCase));
+    }
 
     public static string GetContentType(string extension)
         => ContentTypes.TryGetValue(extension, out var contentType) ? contentType : "application/octet-stream";

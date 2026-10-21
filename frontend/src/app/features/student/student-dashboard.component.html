@@ -24,9 +24,12 @@
   </header>
 
   <!-- Pestañas de Navegación del Estudiante -->
-  <nav class="student-tabs-bar">
-    <div class="tabs-container">
+  <nav class="student-tabs-bar" aria-label="Secciones del portal estudiantil">
+    <div class="tabs-container" role="tablist">
       <button 
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'activities'"
         class="student-tab-btn" 
         [class.active]="activeTab === 'activities'"
         (click)="switchTab('activities')">
@@ -36,6 +39,9 @@
         </span>
       </button>
       <button 
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'courses'"
         class="student-tab-btn" 
         [class.active]="activeTab === 'courses'"
         (click)="switchTab('courses')">
@@ -48,12 +54,12 @@
   </nav>
 
   <!-- Notificación Toast -->
-  <div *ngIf="notificationMessage" class="student-toast animate-fade-in" [ngClass]="'toast-' + notificationType">
-    <span class="toast-icon">{{ notificationType === 'success' ? '🎉' : notificationType === 'info' ? 'ℹ️' : '⚠️' }}</span>
+  <div *ngIf="notificationMessage" class="student-toast animate-fade-in" [ngClass]="'toast-' + notificationType" role="status" aria-live="polite">
+    <span class="toast-icon" aria-hidden="true">{{ notificationType === 'success' ? '🎉' : notificationType === 'info' ? 'ℹ️' : '⚠️' }}</span>
     <span class="toast-text">{{ notificationMessage }}</span>
   </div>
 
-  <main class="student-container">
+  <main id="main-content" class="student-container">
     
     <!-- Hero Banner de Bienvenida -->
     <section class="welcome-hero glass-panel">
@@ -325,11 +331,11 @@
   </main>
 
   <!-- Modal para arrastrar y soltar la tarea -->
-  <div *ngIf="showDropZone" class="modal-overlay" (click)="closeSubmissionModal()">
+  <div *ngIf="showDropZone" class="modal-overlay" (click)="closeSubmissionModal()" role="dialog" aria-modal="true" aria-labelledby="submit-modal-title">
     <div class="modal-content glass-panel" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>{{ 'student.modalSubmitTitle' | translate }}</h2>
-        <button class="btn-close" (click)="closeSubmissionModal()">✕</button>
+        <h2 id="submit-modal-title">{{ 'student.modalSubmitTitle' | translate }}</h2>
+        <button type="button" class="btn-close" (click)="closeSubmissionModal()" aria-label="Cerrar ventana de entrega">✕</button>
       </div>
 
       <div class="modal-body">
@@ -342,7 +348,9 @@
           *ngIf="activeAssignmentId"
           [assignmentId]="activeAssignmentId"
           [assignmentTitle]="activeAssignmentTitle"
+          (submitted)="onAssignmentSubmitted()"
           (submissionComplete)="onAssignmentSubmitted()"
+          (cancelled)="closeSubmissionModal()"
         ></app-file-drop-zone>
       </div>
     </div>

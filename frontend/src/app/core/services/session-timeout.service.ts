@@ -1,4 +1,4 @@
-import { Injectable, NgZone, inject } from '@angular/core';
+import { Injectable, NgZone, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject, Subscription, timer, interval } from 'rxjs';
 import { AuthService } from './auth.service';
@@ -6,13 +6,17 @@ import { AuthService } from './auth.service';
 @Injectable({
   providedIn: 'root'
 })
-export class SessionTimeoutService {
+export class SessionTimeoutService implements OnDestroy {
   // Requerimientos del sprint: 2.5 minutos para aviso, 5 minutos para cierre total
   private readonly WARNING_MS = 2.5 * 60 * 1000; // 150 segundos
   private readonly LOGOUT_MS = 5 * 60 * 1000;    // 300 segundos
 
   // Polling de sesión única: cada 45 segundos verifica que no haya doble sesión
   private readonly SESSION_POLL_INTERVAL_MS = 45 * 1000;
+
+  // Throttle de eventos de actividad del usuario (evita recrear suscripciones RxJS cientos de veces por segundo)
+  private readonly ACTIVITY_THROTTLE_MS = 2000;
+  private lastActivityResetAt = 0;
 
   public sessionWarning$ = new Subject<{ show: boolean; remainingSeconds: number }>();
   public isWarningActive = false;
@@ -21,6 +25,7 @@ export class SessionTimeoutService {
   private logoutTimerSub?: Subscription;
   private countdownSub?: Subscription;
   private sessionPollSub?: Subscription;
+  private validateReqSub?: Subscription;
 
   private userActivityEvents = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click'];
   private activityListener = () => this.handleUserActivity();
@@ -33,9 +38,14 @@ export class SessionTimeoutService {
     private authService: AuthService
   ) {}
 
+  ngOnDestroy(): void {
+    this.stopMonitoring();
+  }
+
   public startMonitoring(): void {
     if (this.isMonitoring) return;
     this.isMonitoring = true;
+    this.lastActivityResetAt = Date.now();
     this.attachActivityListeners();
     this.resetTimers();
     this.startSessionPolling();
@@ -46,6 +56,7 @@ export class SessionTimeoutService {
     this.detachActivityListeners();
     this.clearTimers();
     this.sessionPollSub?.unsubscribe();
+    this.validateReqSub?.unsubscribe();
     this.isWarningActive = false;
     this.sessionWarning$.next({ show: false, remainingSeconds: 0 });
   }
@@ -55,6 +66,7 @@ export class SessionTimeoutService {
    */
   public stayConnected(): void {
     this.isWarningActive = false;
+    this.lastActivityResetAt = Date.now();
     this.sessionWarning$.next({ show: false, remainingSeconds: 0 });
     this.resetTimers();
   }
@@ -64,6 +76,12 @@ export class SessionTimeoutService {
     // se requiere que el usuario haga clic explícito en "Seguir conectado"
     if (this.isWarningActive) return;
 
+    const now = Date.now();
+    if (now - this.lastActivityResetAt < this.ACTIVITY_THROTTLE_MS) {
+      return;
+    }
+
+    this.lastActivityResetAt = now;
     this.resetTimers();
   }
 
@@ -108,7 +126,8 @@ export class SessionTimeoutService {
             return;
           }
           // La respuesta 401 es manejada por el jwt.interceptor automáticamente
-          this.authService.validateSession().subscribe({ error: () => {} });
+          this.validateReqSub?.unsubscribe();
+          this.validateReqSub = this.authService.validateSession().subscribe({ error: () => {} });
         });
       });
     });

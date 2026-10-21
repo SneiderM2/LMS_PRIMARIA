@@ -1,12 +1,13 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace LMS.API.Middleware;
 
 /// <summary>
-/// Middleware que captura excepciones no controladas, las registra en el sistema
-/// de logs y devuelve una respuesta JSON estandarizada.
-/// Equivalente a las directivas ErrorDocument del .htaccess para Apache.
+/// Middleware global de manejo de excepciones bajo el estándar RFC 7807 (Problem Details for HTTP APIs).
+/// Captura excepciones no controladas, las registra en el sistema de auditoría/logs y devuelve
+/// una respuesta estructurada "application/problem+json" sin filtrar trazas sensibles en producción.
 /// </summary>
 public class GlobalExceptionMiddleware
 {
@@ -40,37 +41,55 @@ public class GlobalExceptionMiddleware
         // Registrar en archivo de log
         await FileLogger.ExceptionAsync(ex, $"{context.Request.Method} {context.Request.Path}");
 
-        var (statusCode, title) = ex switch
+        var (statusCode, problemType, title) = ex switch
         {
-            UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "No autorizado"),
-            KeyNotFoundException        => (HttpStatusCode.NotFound, "Recurso no encontrado"),
-            ArgumentException           => (HttpStatusCode.BadRequest, "Solicitud inválida"),
-            InvalidOperationException   => (HttpStatusCode.Conflict, "Operación no válida"),
-            _                           => (HttpStatusCode.InternalServerError, "Error interno del servidor")
+            UnauthorizedAccessException => (
+                HttpStatusCode.Unauthorized,
+                "https://tools.ietf.org/html/rfc9110#section-15.5.2",
+                "No autorizado"),
+            KeyNotFoundException => (
+                HttpStatusCode.NotFound,
+                "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                "Recurso no encontrado"),
+            ArgumentException => (
+                HttpStatusCode.BadRequest,
+                "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+                "Solicitud inválida"),
+            InvalidOperationException => (
+                HttpStatusCode.Conflict,
+                "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                "Operación no válida"),
+            _ => (
+                HttpStatusCode.InternalServerError,
+                "https://tools.ietf.org/html/rfc9110#section-15.6.1",
+                "Error interno del servidor")
         };
 
-        context.Response.ContentType = "application/json; charset=utf-8";
+        var userMessage = _env.IsDevelopment()
+            ? ex.Message
+            : "Ocurrió un error inesperado al procesar la solicitud. Intente de nuevo más tarde.";
+
+        context.Response.ContentType = "application/problem+json; charset=utf-8";
         context.Response.StatusCode = (int)statusCode;
+        context.Response.Headers["X-Trace-Id"] = context.TraceIdentifier;
 
         var response = new ErrorResponse
         {
-            Status = (int)statusCode,
+            Type = problemType,
             Title = title,
-            Message = _env.IsDevelopment() ? ex.Message : "Ocurrió un error inesperado. Intente de nuevo más tarde.",
+            Status = (int)statusCode,
+            Detail = _env.IsDevelopment() ? $"{ex.Message} | {ex.StackTrace}" : userMessage,
+            Instance = context.Request.Path.Value ?? "/",
+            Message = userMessage,
             Timestamp = DateTime.UtcNow,
             Path = $"{context.Request.Method} {context.Request.Path}",
             TraceId = context.TraceIdentifier
         };
 
-        // En desarrollo incluir stack trace
-        if (_env.IsDevelopment())
-        {
-            response.Detail = ex.StackTrace;
-        }
-
         var json = JsonSerializer.Serialize(response, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             WriteIndented = true
         });
 
@@ -79,17 +98,20 @@ public class GlobalExceptionMiddleware
 }
 
 /// <summary>
-/// Modelo de respuesta estandarizada para errores HTTP.
+/// Modelo de respuesta estandarizada bajo RFC 7807 (Problem Details for HTTP APIs),
+/// manteniendo propiedades de extensión compatibles con los clientes Angular existentes.
 /// </summary>
 public class ErrorResponse
 {
-    public int Status { get; set; }
+    public string Type { get; set; } = "about:blank";
     public string Title { get; set; } = string.Empty;
+    public int Status { get; set; }
+    public string? Detail { get; set; }
+    public string Instance { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; }
     public string Path { get; set; } = string.Empty;
     public string TraceId { get; set; } = string.Empty;
-    public string? Detail { get; set; }
 }
 
 /// <summary>

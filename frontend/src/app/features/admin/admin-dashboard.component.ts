@@ -1,7 +1,8 @@
-import { Component, OnInit, ElementRef, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { AdminService, AdminMetrics, AdminUser, CreateAdminUserDto, UpdateAdminUserDto, AdminCourse, CreateAdminCourseDto, UpdateAdminCourseDto } from '../../core/services/admin.service';
 import { SystemInspectorComponent } from './system-inspector/system-inspector.component';
@@ -16,7 +17,7 @@ import { LanguageSelectorComponent } from '../../shared/components/language-sele
   templateUrl: './admin-dashboard.component.html',
   styleUrls: ['./admin-dashboard.component.css']
 })
-export class AdminDashboardComponent implements OnInit {
+export class AdminDashboardComponent implements OnInit, OnDestroy {
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   // Pestañas: 'overview' (Usuarios), 'courses' (Materias/Cursos), 'inspector' (Auditoría/Logs)
@@ -103,6 +104,8 @@ export class AdminDashboardComponent implements OnInit {
   // Toast Flotante
   public toastMessage: string | null = null;
   public toastType: 'success' | 'info' | 'warning' = 'info';
+  private readonly destroy$ = new Subject<void>();
+  private toastTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     public authService: AuthService,
@@ -115,6 +118,15 @@ export class AdminDashboardComponent implements OnInit {
     this.loadMetrics();
     this.loadUsers();
     this.loadAdminCourses();
+  }
+
+  ngOnDestroy(): void {
+    if (this.toastTimeoutId) {
+      clearTimeout(this.toastTimeoutId);
+      this.toastTimeoutId = null;
+    }
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   public setSection(section: 'overview' | 'courses' | 'inspector'): void {
@@ -130,15 +142,17 @@ export class AdminDashboardComponent implements OnInit {
   // --- Métricas Globales ---
   public loadMetrics(): void {
     this.isLoadingMetrics = true;
-    this.adminService.getMetrics().subscribe({
-      next: (m) => {
-        this.metrics = m;
-        this.isLoadingMetrics = false;
-      },
-      error: () => {
-        this.isLoadingMetrics = false;
-      }
-    });
+    this.adminService.getMetrics()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (m) => {
+          this.metrics = m;
+          this.isLoadingMetrics = false;
+        },
+        error: () => {
+          this.isLoadingMetrics = false;
+        }
+      });
   }
 
   public getSystemStatusKey(status?: string): string {
@@ -152,16 +166,18 @@ export class AdminDashboardComponent implements OnInit {
   // --- Usuarios CRUD ---
   public loadUsers(): void {
     this.isLoadingUsers = true;
-    this.adminService.getUsers(this.roleFilter, this.userSearchQuery).subscribe({
-      next: (data) => {
-        this.users = this.sortUsers(data);
-        this.applyUserFilters();
-        this.isLoadingUsers = false;
-      },
-      error: () => {
-        this.isLoadingUsers = false;
-      }
-    });
+    this.adminService.getUsers(this.roleFilter, this.userSearchQuery)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (data) => {
+          this.users = this.sortUsers(data);
+          this.applyUserFilters();
+          this.isLoadingUsers = false;
+        },
+        error: () => {
+          this.isLoadingUsers = false;
+        }
+      });
   }
 
   public filterByRole(role: string): void {
@@ -275,6 +291,16 @@ export class AdminDashboardComponent implements OnInit {
     this.showCreateUserModal = false;
   }
 
+  private isNormalizedPassword(password: string): boolean {
+    return (
+      password.length >= 8 &&
+      /[A-ZÁÉÍÓÚÑ]/.test(password) &&
+      /[a-záéíóúñ]/.test(password) &&
+      /\d/.test(password) &&
+      /[^A-Za-z0-9\s]/.test(password)
+    );
+  }
+
   public saveNewUser(): void {
     if (!this.newUser.username.trim() || !this.newUser.nombre.trim() || !this.newUser.apellido.trim()) {
       this.createUserError = 'Documento, Nombre y Apellido son obligatorios.';
@@ -282,32 +308,34 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     const password = (this.newUser.password || '').trim();
-    if (password.length > 0 && password.length < 12) {
-      this.createUserError = 'La contraseña debe tener al menos 12 caracteres, combinando letras y números.';
+    if (password.length > 0 && !this.isNormalizedPassword(password)) {
+      this.createUserError = 'La contraseña debe tener al menos 8 caracteres, incluyendo mayúscula, minúscula, número y carácter especial.';
       return;
     }
 
     this.isCreatingUser = true;
     this.createUserError = null;
 
-    this.adminService.createUser(this.newUser).subscribe({
-      next: (created) => {
-        this.isCreatingUser = false;
-        this.closeCreateUserModal();
+    this.adminService.createUser(this.newUser)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (created) => {
+          this.isCreatingUser = false;
+          this.closeCreateUserModal();
 
-        const message = created.temporaryPassword
-          ? `Usuario ${created.fullName} creado. Contraseña temporal: ${created.temporaryPassword} — entrégala de forma segura.`
-          : `Usuario ${created.fullName} registrado correctamente. 🎉`;
+          const message = created.temporaryPassword
+            ? `Usuario ${created.fullName} creado. Contraseña temporal: ${created.temporaryPassword} — entrégala de forma segura.`
+            : `Usuario ${created.fullName} registrado correctamente. 🎉`;
 
-        this.showToast(message, 'success');
-        this.loadUsers();
-        this.loadMetrics();
-      },
-      error: (err) => {
-        this.isCreatingUser = false;
-        this.createUserError = err?.error?.message || 'Error al crear la cuenta de usuario.';
-      }
-    });
+          this.showToast(message, 'success');
+          this.loadUsers();
+          this.loadMetrics();
+        },
+        error: (err) => {
+          this.isCreatingUser = false;
+          this.createUserError = err?.error?.message || 'Error al crear la cuenta de usuario.';
+        }
+      });
   }
 
   public openEditUserModal(user: AdminUser): void {
@@ -329,19 +357,27 @@ export class AdminDashboardComponent implements OnInit {
   public saveEditUser(): void {
     if (!this.selectedUserToEdit) return;
 
+    const resetPass = (this.editUserForm.password || '').trim();
+    if (resetPass.length > 0 && !this.isNormalizedPassword(resetPass)) {
+      alert('La nueva contraseña debe tener mínimo 8 caracteres e incluir mayúscula, minúscula, número y carácter especial.');
+      return;
+    }
+
     this.isEditingUser = true;
-    this.adminService.updateUser(this.selectedUserToEdit.id, this.editUserForm).subscribe({
-      next: (res) => {
-        this.isEditingUser = false;
-        this.closeEditUserModal();
-        this.showToast(res.message, 'success');
-        this.loadUsers();
-      },
-      error: (err) => {
-        this.isEditingUser = false;
-        alert('Error al actualizar usuario: ' + (err?.error?.message || err.message));
-      }
-    });
+    this.adminService.updateUser(this.selectedUserToEdit.id, this.editUserForm)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.isEditingUser = false;
+          this.closeEditUserModal();
+          this.showToast(res.message, 'success');
+          this.loadUsers();
+        },
+        error: (err) => {
+          this.isEditingUser = false;
+          alert('Error al actualizar usuario: ' + (err?.error?.message || err.message));
+        }
+      });
   }
 
   public toggleUserStatus(user: AdminUser): void {
@@ -350,32 +386,36 @@ export class AdminDashboardComponent implements OnInit {
       return;
     }
 
-    this.adminService.toggleUserStatus(user.id).subscribe({
-      next: (res) => {
-        user.activo = res.activo;
-        this.showToast(res.message, 'info');
-        this.applyUserFilters();
-        this.loadMetrics();
-      },
-      error: (err) => {
-        alert('Error al cambiar el estado del usuario: ' + (err?.error?.message || err.message));
-      }
-    });
+    this.adminService.toggleUserStatus(user.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          user.activo = res.activo;
+          this.showToast(res.message, 'info');
+          this.applyUserFilters();
+          this.loadMetrics();
+        },
+        error: (err) => {
+          alert('Error al cambiar el estado del usuario: ' + (err?.error?.message || err.message));
+        }
+      });
   }
 
   // --- Cursos CRUD ---
   public loadAdminCourses(): void {
     this.isLoadingCourses = true;
-    this.adminService.getCourses().subscribe({
-      next: (data) => {
-        this.courses = data;
-        this.applyCourseFilters();
-        this.isLoadingCourses = false;
-      },
-      error: () => {
-        this.isLoadingCourses = false;
-      }
-    });
+    this.adminService.getCourses()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (data) => {
+          this.courses = data;
+          this.applyCourseFilters();
+          this.isLoadingCourses = false;
+        },
+        error: () => {
+          this.isLoadingCourses = false;
+        }
+      });
   }
 
   public applyCourseFilters(): void {
@@ -414,19 +454,21 @@ export class AdminDashboardComponent implements OnInit {
     this.isCreatingCourse = true;
     this.createCourseError = null;
 
-    this.adminService.createCourse(this.newCourse).subscribe({
-      next: (created) => {
-        this.isCreatingCourse = false;
-        this.closeCreateCourseModal();
-        this.showToast(`Materia ${created.nombre} (${created.grado}) creada exitosamente. 📘`, 'success');
-        this.loadAdminCourses();
-        this.loadMetrics();
-      },
-      error: (err) => {
-        this.isCreatingCourse = false;
-        this.createCourseError = err?.error?.message || 'Error al registrar el curso.';
-      }
-    });
+    this.adminService.createCourse(this.newCourse)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (created) => {
+          this.isCreatingCourse = false;
+          this.closeCreateCourseModal();
+          this.showToast(`Materia ${created.nombre} (${created.grado}) creada exitosamente. 📘`, 'success');
+          this.loadAdminCourses();
+          this.loadMetrics();
+        },
+        error: (err) => {
+          this.isCreatingCourse = false;
+          this.createCourseError = err?.error?.message || 'Error al registrar el curso.';
+        }
+      });
   }
 
   public openEditCourseModal(course: AdminCourse): void {
@@ -450,34 +492,38 @@ export class AdminDashboardComponent implements OnInit {
     if (!this.selectedCourseToEdit) return;
     this.isEditingCourse = true;
 
-    this.adminService.updateCourse(this.selectedCourseToEdit.id, this.editCourseForm).subscribe({
-      next: (res) => {
-        this.isEditingCourse = false;
-        this.closeEditCourseModal();
-        this.showToast(res.message, 'success');
-        this.loadAdminCourses();
-      },
-      error: (err) => {
-        this.isEditingCourse = false;
-        alert('Error al editar curso: ' + (err?.error?.message || err.message));
-      }
-    });
+    this.adminService.updateCourse(this.selectedCourseToEdit.id, this.editCourseForm)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.isEditingCourse = false;
+          this.closeEditCourseModal();
+          this.showToast(res.message, 'success');
+          this.loadAdminCourses();
+        },
+        error: (err) => {
+          this.isEditingCourse = false;
+          alert('Error al editar curso: ' + (err?.error?.message || err.message));
+        }
+      });
   }
 
   public toggleCourseStatus(course: AdminCourse): void {
     const action = course.activo ? 'suspender' : 'reactivar';
     if (!confirm(`¿Deseas ${action} la materia "${course.nombre}"?`)) return;
 
-    this.adminService.toggleCourseStatus(course.id).subscribe({
-      next: (res) => {
-        course.activo = res.activo;
-        this.showToast(res.message, 'info');
-        this.loadMetrics();
-      },
-      error: (err) => {
-        alert('Error al cambiar estado del curso: ' + (err?.error?.message || err.message));
-      }
-    });
+    this.adminService.toggleCourseStatus(course.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          course.activo = res.activo;
+          this.showToast(res.message, 'info');
+          this.loadMetrics();
+        },
+        error: (err) => {
+          alert('Error al cambiar estado del curso: ' + (err?.error?.message || err.message));
+        }
+      });
   }
 
   // --- Funcionalidades de Respaldos (Backup BD) ---
@@ -487,30 +533,32 @@ export class AdminDashboardComponent implements OnInit {
     this.isDownloadingBackup = true;
     this.showToast('Generando dump SQL de la base de datos Supabase... Por favor espera.', 'info');
 
-    this.adminService.downloadDatabaseBackup().subscribe({
-      next: (blob: Blob) => {
-        this.isDownloadingBackup = false;
-        const now = new Date();
-        const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const fileName = `backup_lms_supabase_${timestamp}.sql`;
+    this.adminService.downloadDatabaseBackup()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (blob: Blob) => {
+          this.isDownloadingBackup = false;
+          const now = new Date();
+          const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          const fileName = `backup_lms_supabase_${timestamp}.sql`;
 
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
+          const blobUrl = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(blobUrl);
 
-        this.showToast('Copia de seguridad SQL descargada exitosamente 💾', 'success');
-      },
-      error: (err) => {
-        this.isDownloadingBackup = false;
-        console.error('Error al descargar copia de seguridad:', err);
-        this.showToast('No fue posible generar el backup de la base de datos. Verifica la conexión con Supabase.', 'warning');
-      }
-    });
+          this.showToast('Copia de seguridad SQL descargada exitosamente 💾', 'success');
+        },
+        error: (err) => {
+          this.isDownloadingBackup = false;
+          console.error('Error al descargar copia de seguridad:', err);
+          this.showToast('No fue posible generar el backup de la base de datos. Verifica la conexión con Supabase.', 'warning');
+        }
+      });
   }
 
   public triggerRestore(): void {
@@ -574,35 +622,41 @@ export class AdminDashboardComponent implements OnInit {
     (window as any).__swReloadBlocked = true;
     this.showToast('Subiendo y ejecutando script de restauración en Supabase PostgreSQL... Por favor espera.', 'info');
 
-    this.adminService.restoreBackup(file).subscribe({
-      next: (res: { message?: string; fileName?: string; restoredAt?: string }) => {
-        this.isRestoringBackup = false;
-        (window as any).__swReloadBlocked = false;
-        this.showToast(res?.message || '✅ Base de datos restaurada exitosamente.', 'success');
-        target.value = '';
-        // Recargar datos directamente en memoria sin recargar la página del navegador (evita 404 en SPA)
-        this.loadMetrics();
-        this.loadUsers();
-        this.loadAdminCourses();
-      },
-      error: (err: any) => {
-        this.isRestoringBackup = false;
-        (window as any).__swReloadBlocked = false;
-        console.error('Error al restaurar backup:', err);
-        const errorMsg = err?.error?.message || err?.error?.detail || err?.message || 'Error al comunicarse con el servidor.';
-        this.showToast(`❌ Error al restaurar: ${errorMsg}`, 'warning');
-        alert(`❌ No fue posible restaurar la base de datos:\n\n${errorMsg}`);
-        target.value = '';
-      }
-    });
+    this.adminService.restoreBackup(file)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res: { message?: string; fileName?: string; restoredAt?: string }) => {
+          this.isRestoringBackup = false;
+          (window as any).__swReloadBlocked = false;
+          this.showToast(res?.message || '✅ Base de datos restaurada exitosamente.', 'success');
+          target.value = '';
+          // Recargar datos directamente en memoria sin recargar la página del navegador (evita 404 en SPA)
+          this.loadMetrics();
+          this.loadUsers();
+          this.loadAdminCourses();
+        },
+        error: (err: any) => {
+          this.isRestoringBackup = false;
+          (window as any).__swReloadBlocked = false;
+          console.error('Error al restaurar backup:', err);
+          const errorMsg = err?.error?.message || err?.error?.detail || err?.message || 'Error al comunicarse con el servidor.';
+          this.showToast(`❌ Error al restaurar: ${errorMsg}`, 'warning');
+          alert(`❌ No fue posible restaurar la base de datos:\n\n${errorMsg}`);
+          target.value = '';
+        }
+      });
   }
 
   // --- Toasts, Reportes y Navegación ---
   public showToast(message: string, type: 'success' | 'info' | 'warning'): void {
+    if (this.toastTimeoutId) {
+      clearTimeout(this.toastTimeoutId);
+    }
     this.toastMessage = message;
     this.toastType = type;
-    setTimeout(() => {
+    this.toastTimeoutId = setTimeout(() => {
       this.toastMessage = null;
+      this.toastTimeoutId = null;
     }, 4500);
   }
 

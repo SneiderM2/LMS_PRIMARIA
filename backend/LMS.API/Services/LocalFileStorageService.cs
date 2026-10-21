@@ -72,13 +72,18 @@ public sealed class LocalFileStorageService : IFileStorageService
             return Fail($"Formato no permitido. Formatos aceptados: {string.Join(", ", FileSignatureValidator.AllowedExtensions)}");
         }
 
+        if (!FileSignatureValidator.IsAllowedMimeType(file.ContentType, extension))
+        {
+            return Fail($"El tipo MIME del archivo ('{file.ContentType ?? "desconocido"}') no es válido o no corresponde a la extensión {extension}.");
+        }
+
         try
         {
             await using (var signatureStream = file.OpenReadStream())
             {
                 if (!await FileSignatureValidator.HasValidSignatureAsync(signatureStream, extension, cancellationToken))
                 {
-                    return Fail("El contenido del archivo no corresponde a un formato permitido. Verifica que no esté dañado o renombrado.");
+                    return Fail("El contenido binario (Magic Bytes) del archivo no corresponde a un formato permitido. Verifica que no esté dañado o renombrado.");
                 }
             }
         }

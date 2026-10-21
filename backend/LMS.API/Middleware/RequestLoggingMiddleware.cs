@@ -218,9 +218,13 @@ public class RequestLoggingMiddleware
         else if (statusCode >= 400)
             level = "WARNING";
         else if (method != "GET"
-                 || path.Contains("/auth/")
-                 || path.Contains("/admin/")
-                 || path.Contains("/systemfiles/"))
+                 || path.Contains("/auth/", StringComparison.OrdinalIgnoreCase)
+                 || path.Contains("/admin/", StringComparison.OrdinalIgnoreCase)
+                 || path.Contains("/systemfiles/", StringComparison.OrdinalIgnoreCase)
+                 || path.Contains("/privacy/", StringComparison.OrdinalIgnoreCase)
+                 || path.Contains("/files/", StringComparison.OrdinalIgnoreCase)
+                 || path.Contains("/teacher/students", StringComparison.OrdinalIgnoreCase)
+                 || path.Contains("/teacher/submissions", StringComparison.OrdinalIgnoreCase))
             level = "AUDIT";
         else
             level = "INFO";
@@ -393,6 +397,30 @@ public class RequestLoggingMiddleware
                 _       => "Usuario: Consulta de Perfil Personal"
             };
         }
+
+        // ════════════════════════════════════════════════════════════════════
+        //  PRIVACIDAD Y ACCESO A DATOS SENSIBLES DE MENORES (Ley 1581 / Ley 1098)
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/privacy/my-data"))
+        {
+            return method == "PUT"
+                ? "Privacidad (Ley 1581): Rectificación de Datos Personales del Titular"
+                : "Privacidad (Ley 1581): Exportación / Acceso a Datos Personales del Titular";
+        }
+        if (p.Contains("/privacy/consent") || p.Contains("/auth/accept-data-policy"))
+            return "Privacidad (Ley 1581 / Ley 1098): Registro de Consentimiento Informado y Acudiente";
+        if (p.Contains("/privacy/delete-account"))
+            return "Privacidad (Ley 1581): Supresión y Anonimización de Cuenta";
+        if (p.Contains("/teacher/students-status"))
+            return "Auditoría (Ley 1098): Acceso a Estado de Semáforo y Actividad de Estudiantes Menores";
+        if (p.Contains("/teacher/students"))
+        {
+            return method == "POST"
+                ? "Auditoría (Ley 1098): Registro de Estudiante Menor por Docente"
+                : "Auditoría (Ley 1098): Consulta de Datos Sensibles de Estudiantes Menores";
+        }
+        if (p.Contains("/files/submissions"))
+            return "Auditoría (Ley 1098): Acceso/Descarga de Evidencia Escolar de Estudiante Menor";
 
         // ════════════════════════════════════════════════════════════════════
         //  CURSOS / MATERIAS

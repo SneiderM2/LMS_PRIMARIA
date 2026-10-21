@@ -130,14 +130,17 @@ public class PrivacyController : ControllerBase
 
         if (_privacy.RequireGuardianConsentForMinors && isStudent)
         {
-            if (!dto.GuardianAuthorization
-                || string.IsNullOrWhiteSpace(dto.GuardianFullName)
-                || dto.GuardianFullName.Trim().Length < 5)
+            var guardianValidation = ConsentService.ValidateGuardianConsent(
+                dto.GuardianAuthorization,
+                dto.GuardianFullName,
+                dto.GuardianDocument);
+
+            if (!guardianValidation.IsValid)
             {
                 return BadRequest(new
                 {
                     code = "GUARDIAN_CONSENT_REQUIRED",
-                    message = "Para estudiantes menores de edad se requiere el nombre y la autorización del padre, madre o acudiente (Ley 1581 de 2012, art. 7)."
+                    message = guardianValidation.Message
                 });
             }
         }

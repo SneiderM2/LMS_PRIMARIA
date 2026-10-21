@@ -59,4 +59,20 @@ public class FileSignatureValidatorTests
         Assert.Equal("application/pdf", FileSignatureValidator.GetContentType(".pdf"));
         Assert.Equal("application/octet-stream", FileSignatureValidator.GetContentType(".exe"));
     }
+
+    [Theory]
+    [InlineData("application/pdf", ".pdf", true)]
+    [InlineData("image/jpeg", ".jpg", true)]
+    [InlineData("image/png", ".png", true)]
+    [InlineData("image/webp", ".webp", true)]
+    [InlineData("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx", true)]
+    [InlineData("application/msword", ".doc", true)]
+    [InlineData("text/html", ".pdf", false)]
+    [InlineData("image/png", ".pdf", false)]
+    [InlineData("application/x-msdownload", ".exe", false)]
+    [InlineData("", ".pdf", false)]
+    public void Validates_declared_mime_type_against_extension(string mimeType, string extension, bool expected)
+    {
+        Assert.Equal(expected, FileSignatureValidator.IsAllowedMimeType(mimeType, extension));
+    }
 }

@@ -1,47 +1,47 @@
 <div class="login-wrapper">
   <!-- Ilustraciones flotantes de fondo -->
-  <div class="floating-bg-item bg-star-1">⭐</div>
-  <div class="floating-bg-item bg-rocket">🚀</div>
-  <div class="floating-bg-item bg-pencil">✏️</div>
-  <div class="floating-bg-item bg-globe">🌍</div>
-  <div class="floating-bg-item bg-star-2">✨</div>
+  <div class="floating-bg-item bg-star-1" aria-hidden="true">⭐</div>
+  <div class="floating-bg-item bg-rocket" aria-hidden="true">🚀</div>
+  <div class="floating-bg-item bg-pencil" aria-hidden="true">✏️</div>
+  <div class="floating-bg-item bg-globe" aria-hidden="true">🌍</div>
+  <div class="floating-bg-item bg-star-2" aria-hidden="true">✨</div>
 
   <div class="login-container">
-    <div class="login-card">
+    <main id="main-content" class="login-card">
 
       <!-- Encabezado con Mascota Escolar -->
       <div class="login-header">
-        <div class="mascot-badge bounce-animation">
+        <div class="mascot-badge bounce-animation" aria-hidden="true">
           <span class="mascot-emoji">🎒</span>
         </div>
         <h1 class="portal-title">{{ 'login.title' | translate }}</h1>
         <p class="portal-subtitle">{{ 'login.subtitle' | translate }}</p>
 
         <!-- Indicador de conexión instantánea del servidor -->
-        <div class="server-status-pill" [class.ready]="isServerReady" [class.warming]="isServerWarming && !isServerReady">
-          <span class="status-dot"></span>
+        <div class="server-status-pill" [class.ready]="isServerReady" [class.warming]="isServerWarming && !isServerReady" role="status" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
           <span class="status-text">{{ isServerReady ? '⚡ Conexión instantánea activa' : '⏳ Sincronizando con el servidor escolar...' }}</span>
         </div>
       </div>
 
       <!-- Selector de Pestañas: Iniciar Sesión / Crear Cuenta -->
-      <div class="auth-tabs">
-        <button type="button" class="tab-btn" [class.active]="activeTab === 'login'" (click)="switchTab('login')">
+      <div class="auth-tabs" role="tablist" aria-label="Opciones de acceso a la plataforma">
+        <button type="button" role="tab" [attr.aria-selected]="activeTab === 'login'" class="tab-btn" [class.active]="activeTab === 'login'" (click)="switchTab('login')">
           {{ 'login.tabSignIn' | translate }}
         </button>
-        <button type="button" class="tab-btn" [class.active]="activeTab === 'register'" (click)="switchTab('register')">
+        <button type="button" role="tab" [attr.aria-selected]="activeTab === 'register'" class="tab-btn" [class.active]="activeTab === 'register'" (click)="switchTab('register')">
           {{ 'login.tabSignUp' | translate }}
         </button>
       </div>
 
       <!-- Banner de Mensajes de Error o Éxito -->
-      <div *ngIf="errorMessage" class="error-banner">
-        <span class="error-icon">⚠️</span>
+      <div *ngIf="errorMessage" class="error-banner" role="alert" aria-live="assertive">
+        <span class="error-icon" aria-hidden="true">⚠️</span>
         <span>{{ errorMessage }}</span>
       </div>
 
-      <div *ngIf="successMessage" class="success-banner">
-        <span class="success-icon">🎉</span>
+      <div *ngIf="successMessage" class="success-banner" role="status" aria-live="polite">
+        <span class="success-icon" aria-hidden="true">🎉</span>
         <span>{{ successMessage }}</span>
       </div>
 
@@ -135,19 +135,19 @@
         <!-- Selección de Rol / Perfil -->
         <div class="form-group">
           <label class="section-label">
-            <span class="label-icon">👤</span> {{ 'login.selectProfile' | translate }}
+            <span class="label-icon" aria-hidden="true">👤</span> {{ 'login.selectProfile' | translate }}
           </label>
-          <div class="role-selector-grid">
-            <button type="button" class="role-card" [class.selected]="regRole === 'Student'"
+          <div class="role-selector-grid" role="radiogroup" aria-label="Seleccionar perfil de usuario">
+            <button type="button" role="radio" [attr.aria-checked]="regRole === 'Student'" class="role-card" [class.selected]="regRole === 'Student'"
               (click)="regRole = 'Student'">
-              <span class="role-emoji">🎒</span>
+              <span class="role-emoji" aria-hidden="true">🎒</span>
               <span class="role-title">{{ 'login.profileStudent' | translate }}</span>
               <span class="role-sub">{{ 'login.profileStudentSub' | translate }}</span>
             </button>
 
-            <button type="button" class="role-card" [class.selected]="regRole === 'Teacher'"
+            <button type="button" role="radio" [attr.aria-checked]="regRole === 'Teacher'" class="role-card" [class.selected]="regRole === 'Teacher'"
               (click)="regRole = 'Teacher'">
-              <span class="role-emoji">👩‍🏫</span>
+              <span class="role-emoji" aria-hidden="true">👩‍🏫</span>
               <span class="role-title">{{ 'login.profileTeacher' | translate }}</span>
               <span class="role-sub">{{ 'login.profileTeacherSub' | translate }}</span>
             </button>
@@ -205,23 +205,25 @@
 
         <!-- Autorización del acudiente (menores de edad) -->
         <div *ngIf="regRole === 'Student'" class="form-group guardian-register-box">
-          <label class="section-label">
-            <span class="label-icon">👨‍👩‍👧</span> Autorización del padre, madre o acudiente
+          <label for="regGuardianName" class="section-label">
+            <span class="label-icon" aria-hidden="true">👨‍👩‍👧</span> Autorización del padre, madre o acudiente (Ley 1581 de 2012 / Ley 1098 de 2006)
           </label>
 
           <div class="input-box">
-            <input type="text" name="regGuardianName" [(ngModel)]="regGuardianName"
+            <input id="regGuardianName" type="text" name="regGuardianName" [(ngModel)]="regGuardianName"
+              aria-label="Nombre completo del padre, madre o acudiente"
               placeholder="Nombre completo del acudiente" maxlength="150" autocomplete="name" />
           </div>
 
           <div class="input-box" style="margin-top: 0.5rem;">
-            <input type="text" name="regGuardianDocument" [(ngModel)]="regGuardianDocument"
+            <input id="regGuardianDocument" type="text" name="regGuardianDocument" [(ngModel)]="regGuardianDocument"
+              aria-label="Documento del acudiente (opcional)"
               placeholder="Documento del acudiente (opcional, se almacena enmascarado)" maxlength="30" inputmode="numeric" />
           </div>
 
           <label class="policy-check-inline">
             <input type="checkbox" name="regGuardianAuth" [(ngModel)]="regGuardianAuth" />
-            <span>Declaro ser el acudiente y autorizo el tratamiento de los datos del menor (Ley 1581 de 2012, art. 7).</span>
+            <span>Declaro ser el acudiente y autorizo el tratamiento de los datos del menor (Ley 1581 de 2012, art. 7 y Ley 1098 de 2006).</span>
           </label>
         </div>
 
@@ -229,18 +231,19 @@
         <div class="form-row-2">
           <div class="form-group">
             <label for="regPassword">
-              <span class="label-icon">🔒</span> {{ 'login.regPasswordLabel' | translate }}
+              <span class="label-icon" aria-hidden="true">🔒</span> {{ 'login.regPasswordLabel' | translate }}
             </label>
             <div class="input-box">
               <input id="regPassword" type="password" name="regPassword" [(ngModel)]="regPassword"
-                [placeholder]="'login.regPasswordPlaceholder' | translate" minlength="12" maxlength="128" required />
+                [placeholder]="'login.regPasswordPlaceholder' | translate" minlength="8" maxlength="128" required
+                aria-describedby="regPasswordHint" />
             </div>
-            <small class="field-hint">Mínimo 12 caracteres, con letras y números.</small>
+            <small id="regPasswordHint" class="field-hint">Mínimo 8 caracteres, incluyendo mayúscula, minúscula, número y carácter especial.</small>
           </div>
 
           <div class="form-group">
             <label for="regConfirmPassword">
-              <span class="label-icon">🔐</span> {{ 'login.regConfirmPasswordLabel' | translate }}
+              <span class="label-icon" aria-hidden="true">🔐</span> {{ 'login.regConfirmPasswordLabel' | translate }}
             </label>
             <div class="input-box">
               <input id="regConfirmPassword" type="password" name="regConfirmPassword" [(ngModel)]="regConfirmPassword"
@@ -301,7 +304,7 @@
 
       </form>
 
-    </div>
+    </main>
 
     <!-- Pie de página escolar -->
     <div class="login-footer">
@@ -310,10 +313,10 @@
   </div>
 
   <!-- ===== MODAL: Sesión activa en otro dispositivo ===== -->
-  <div class="session-modal-overlay" *ngIf="showActiveSessionModal" (click)="onCancelForceLogin()">
+  <div class="session-modal-overlay" *ngIf="showActiveSessionModal" (click)="onCancelForceLogin()" role="dialog" aria-modal="true" aria-labelledby="active-session-modal-title">
     <div class="session-modal-card" (click)="$event.stopPropagation()">
-      <div class="session-modal-icon">📱</div>
-      <h2 class="session-modal-title">{{ 'session.modalTitle' | translate }}</h2>
+      <div class="session-modal-icon" aria-hidden="true">📱</div>
+      <h2 id="active-session-modal-title" class="session-modal-title">{{ 'session.modalTitle' | translate }}</h2>
       <p class="session-modal-desc">
         {{ 'session.modalDesc' | translate }}
       </p>

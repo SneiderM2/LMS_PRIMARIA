@@ -1,5 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Subject, takeUntil } from 'rxjs';
 import { StudentService, StudentMetrics, StudentCoursesCatalog } from '../../core/services/student.service';
 import { AuthService } from '../../core/services/auth.service';
 import { FileDownloadService } from '../../core/services/file-download.service';
@@ -15,7 +16,7 @@ import { LanguageSelectorComponent } from '../../shared/components/language-sele
   templateUrl: './student-dashboard.component.html',
   styleUrls: ['./student-dashboard.component.css']
 })
-export class StudentDashboardComponent implements OnInit {
+export class StudentDashboardComponent implements OnInit, OnDestroy {
   public contents: Content[] = [];
   public filteredContents: Content[] = [];
   public isLoading = true;
@@ -54,6 +55,9 @@ export class StudentDashboardComponent implements OnInit {
     { name: 'Artes y Creatividad', icon: '🎨', color: '#a855f7' }
   ];
 
+  private readonly destroy$ = new Subject<void>();
+  private toastTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
   constructor(
     public authService: AuthService,
     private studentService: StudentService,
@@ -64,6 +68,15 @@ export class StudentDashboardComponent implements OnInit {
     this.loadDashboard();
     this.loadMetrics();
     this.loadCourses();
+  }
+
+  ngOnDestroy(): void {
+    if (this.toastTimeoutId) {
+      clearTimeout(this.toastTimeoutId);
+      this.toastTimeoutId = null;
+    }
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   public switchTab(tab: 'activities' | 'courses'): void {
@@ -78,50 +91,58 @@ export class StudentDashboardComponent implements OnInit {
 
   public loadDashboard(): void {
     this.isLoading = true;
-    this.studentService.getDashboard().subscribe({
-      next: (items) => {
-        this.contents = items;
-        this.applySubjectFilter();
-        this.isLoading = false;
-      },
-      error: () => {
-        this.isLoading = false;
-      }
-    });
+    this.studentService.getDashboard()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (items) => {
+          this.contents = items;
+          this.applySubjectFilter();
+          this.isLoading = false;
+        },
+        error: () => {
+          this.isLoading = false;
+        }
+      });
   }
 
   public loadMetrics(): void {
-    this.studentService.getMetrics().subscribe({
-      next: (m) => {
-        this.metrics = m;
-      }
-    });
+    this.studentService.getMetrics()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (m) => {
+          this.metrics = m;
+        }
+      });
   }
 
   public loadCourses(): void {
     this.coursesLoading = true;
-    this.studentService.getCourses().subscribe({
-      next: (res) => {
-        this.coursesCatalog = res;
-        this.coursesLoading = false;
-      },
-      error: () => {
-        this.coursesLoading = false;
-      }
-    });
+    this.studentService.getCourses()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.coursesCatalog = res;
+          this.coursesLoading = false;
+        },
+        error: () => {
+          this.coursesLoading = false;
+        }
+      });
   }
 
   public enrollInCourse(courseId: number): void {
-    this.studentService.enrollCourse(courseId).subscribe({
-      next: (res) => {
-        this.showToast(res.message, 'success');
-        this.loadCourses();
-        this.loadMetrics();
-      },
-      error: (err) => {
-        this.showToast('Error al inscribir clase: ' + (err.error?.message || err.message), 'warning');
-      }
-    });
+    this.studentService.enrollCourse(courseId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.showToast(res.message, 'success');
+          this.loadCourses();
+          this.loadMetrics();
+        },
+        error: (err) => {
+          this.showToast('Error al inscribir clase: ' + (err.error?.message || err.message), 'warning');
+        }
+      });
   }
 
   public withdrawFromCourse(courseId: number, courseName: string): void {
@@ -129,23 +150,29 @@ export class StudentDashboardComponent implements OnInit {
       return;
     }
 
-    this.studentService.withdrawCourse(courseId).subscribe({
-      next: (res) => {
-        this.showToast(res.message, 'info');
-        this.loadCourses();
-        this.loadMetrics();
-      },
-      error: (err) => {
-        this.showToast('Error al retirar la clase: ' + (err.error?.message || err.message), 'warning');
-      }
-    });
+    this.studentService.withdrawCourse(courseId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.showToast(res.message, 'info');
+          this.loadCourses();
+          this.loadMetrics();
+        },
+        error: (err) => {
+          this.showToast('Error al retirar la clase: ' + (err.error?.message || err.message), 'warning');
+        }
+      });
   }
 
   private showToast(msg: string, type: 'success' | 'info' | 'warning' = 'info'): void {
+    if (this.toastTimeoutId) {
+      clearTimeout(this.toastTimeoutId);
+    }
     this.notificationMessage = msg;
     this.notificationType = type;
-    setTimeout(() => {
+    this.toastTimeoutId = setTimeout(() => {
       this.notificationMessage = '';
+      this.toastTimeoutId = null;
     }, 4500);
   }
 

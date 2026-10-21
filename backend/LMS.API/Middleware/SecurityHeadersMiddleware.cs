@@ -24,6 +24,7 @@ public class SecurityHeadersMiddleware
         headers["Content-Security-Policy"] = isFileDownload
             ? "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
             : "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox";
+        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload";
         headers["X-Frame-Options"] = "DENY";
         headers["X-Content-Type-Options"] = "nosniff";
         headers["Referrer-Policy"] = "no-referrer";
