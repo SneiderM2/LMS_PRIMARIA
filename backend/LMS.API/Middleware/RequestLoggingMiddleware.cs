@@ -75,6 +75,12 @@ public class AuditLogResult
 /// </summary>
 public class RequestLoggingMiddleware
 {
+    public const string AuditActionKey = "LMS_AuditAction";
+    public const string AuditDetailsKey = "LMS_AuditDetails";
+    public const string AuditUserIdKey = "LMS_AuditUserId";
+    public const string AuditUserEmailKey = "LMS_AuditUserEmail";
+    public const string AuditUserRoleKey = "LMS_AuditUserRole";
+
     private readonly RequestDelegate _next;
     private readonly ILogger<RequestLoggingMiddleware> _logger;
 
@@ -82,6 +88,53 @@ public class RequestLoggingMiddleware
     {
         _next = next;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Permite a los controladores enriquecer el registro de auditoría y los archivos .log
+    /// con detalles de negocio específicos (ej. título de tarea, nota asignada, archivo subido, usuario autenticado).
+    /// </summary>
+    public static void SetAuditContext(
+        HttpContext? ctx,
+        string? action = null,
+        string? details = null,
+        string? userId = null,
+        string? userEmail = null,
+        string? userRole = null)
+    {
+        if (ctx == null) return;
+
+        if (!string.IsNullOrWhiteSpace(action))
+        {
+            ctx.Items[AuditActionKey] = action;
+        }
+
+        if (!string.IsNullOrWhiteSpace(details))
+        {
+            if (ctx.Items.TryGetValue(AuditDetailsKey, out var existing) && existing is string prev && !string.IsNullOrWhiteSpace(prev))
+            {
+                ctx.Items[AuditDetailsKey] = $"{prev} | {details}";
+            }
+            else
+            {
+                ctx.Items[AuditDetailsKey] = details;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            ctx.Items[AuditUserIdKey] = userId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(userEmail))
+        {
+            ctx.Items[AuditUserEmailKey] = userEmail;
+        }
+
+        if (!string.IsNullOrWhiteSpace(userRole))
+        {
+            ctx.Items[AuditUserRoleKey] = userRole;
+        }
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -119,11 +172,14 @@ public class RequestLoggingMiddleware
             // 1. Logs de texto estructurados obligatorios (access.log, audit.log y error.log)
             try
             {
-                var structuredLine = FormatStructuredLog(context, requestTime, statusCode, caughtException);
+                var structuredLine = FormatStructuredLog(context, requestTime, statusCode, elapsedMs, caughtException);
                 await FileLogger.WriteAsync("access", structuredLine);
 
-                // Si es un evento de modificación (POST, PUT, DELETE, PATCH) o endpoint administrativo/docente, registrar en audit.log
-                if (structuredLine.Contains(" | [AUDIT] | ") || context.Request.Method is "POST" or "PUT" or "DELETE" or "PATCH")
+                // Si es un evento de modificación (POST, PUT, DELETE, PATCH), endpoint administrativo/docente o tiene contexto de auditoría, registrar en audit.log
+                if (structuredLine.Contains(" | [AUDIT] | ")
+                    || context.Request.Method is "POST" or "PUT" or "DELETE" or "PATCH"
+                    || context.Items.ContainsKey(AuditActionKey)
+                    || context.Items.ContainsKey(AuditDetailsKey))
                 {
                     await FileLogger.WriteAsync("audit", structuredLine);
                 }
@@ -173,42 +229,42 @@ public class RequestLoggingMiddleware
         Exception? ex)
     {
         // ── IP real considerando proxies (Render / Nginx / Cloudflare) ──────────
-        var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0";
-        foreach (var header in new[] { "CF-Connecting-IP", "X-Real-IP", "X-Forwarded-For" })
-        {
-            if (ctx.Request.Headers.TryGetValue(header, out var hVal) && !string.IsNullOrWhiteSpace(hVal))
-            {
-                ip = hVal.ToString().Split(',')[0].Trim();
-                break;
-            }
-        }
-
+        var ip = ResolveClientIp(ctx);
         var method  = ctx.Request.Method;
         var path    = ctx.Request.Path.Value ?? string.Empty;
         var qs      = RedactQueryString(path, ctx.Request.QueryString.Value ?? string.Empty);
 
-        // ── Claims del usuario autenticado ────────────────────────────────────
+        // ── Claims del usuario autenticado o asignados en contexto de auditoría ──
         var user = ctx.User;
-        string? userId    = null;
-        string? userEmail = null;
-        string? userRole  = null;
+        string? userId    = ctx.Items.TryGetValue(AuditUserIdKey, out var uIdObj) ? uIdObj as string : null;
+        string? userEmail = ctx.Items.TryGetValue(AuditUserEmailKey, out var uEmailObj) ? uEmailObj as string : null;
+        string? userRole  = ctx.Items.TryGetValue(AuditUserRoleKey, out var uRoleObj) ? uRoleObj as string : null;
         string? userName  = null;
 
         if (user.Identity?.IsAuthenticated == true)
         {
-            userId    = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                        ?? user.FindFirst("sub")?.Value
-                        ?? user.Identity.Name;
+            userId    ??= user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                          ?? user.FindFirst("user_id")?.Value
+                          ?? user.FindFirst("sub")?.Value
+                          ?? user.Identity.Name;
 
-            userEmail = user.FindFirst(ClaimTypes.Email)?.Value
-                        ?? (user.Identity.Name?.Contains('@') == true ? user.Identity.Name : null);
+            userEmail ??= user.FindFirst(ClaimTypes.Email)?.Value
+                          ?? user.FindFirst(ClaimTypes.Name)?.Value
+                          ?? user.Identity.Name;
 
-            userRole  = user.FindFirst(ClaimTypes.Role)?.Value
-                        ?? user.FindFirst("role")?.Value;
+            userRole  ??= user.FindFirst(ClaimTypes.Role)?.Value
+                          ?? user.FindFirst("role")?.Value;
 
-            userName  = user.FindFirst(ClaimTypes.GivenName)?.Value
-                        ?? user.FindFirst("name")?.Value
-                        ?? user.Identity.Name;
+            userName    = user.FindFirst(ClaimTypes.GivenName)?.Value
+                          ?? user.FindFirst("name")?.Value
+                          ?? user.Identity.Name;
+        }
+
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(userRole))
+        {
+            var (resolvedId, resolvedRole) = ResolveUserIdentity(ctx);
+            if (resolvedId != "ANONYMOUS") userId ??= resolvedId;
+            if (resolvedRole != "NO_ROLE") userRole ??= resolvedRole;
         }
 
         // ── Nivel de severidad ────────────────────────────────────────────────
@@ -218,43 +274,65 @@ public class RequestLoggingMiddleware
         else if (statusCode >= 400)
             level = "WARNING";
         else if (method != "GET"
+                 || ctx.Items.ContainsKey(AuditActionKey)
+                 || ctx.Items.ContainsKey(AuditDetailsKey)
                  || path.Contains("/auth/", StringComparison.OrdinalIgnoreCase)
                  || path.Contains("/admin/", StringComparison.OrdinalIgnoreCase)
                  || path.Contains("/systemfiles/", StringComparison.OrdinalIgnoreCase)
                  || path.Contains("/privacy/", StringComparison.OrdinalIgnoreCase)
                  || path.Contains("/files/", StringComparison.OrdinalIgnoreCase)
                  || path.Contains("/teacher/students", StringComparison.OrdinalIgnoreCase)
-                 || path.Contains("/teacher/submissions", StringComparison.OrdinalIgnoreCase))
+                 || path.Contains("/teacher/submissions", StringComparison.OrdinalIgnoreCase)
+                 || path.Contains("/student/upload-assignment", StringComparison.OrdinalIgnoreCase))
             level = "AUDIT";
         else
             level = "INFO";
 
         // ── Acción descriptiva ────────────────────────────────────────────────
-        var action = ResolveActionName(method, path, statusCode, qs);
+        var action = ctx.Items.TryGetValue(AuditActionKey, out var customAction) && customAction is string ca && !string.IsNullOrWhiteSpace(ca)
+            ? ca
+            : ResolveActionName(method, path, statusCode, qs);
 
-        // ── Detalles de error ────────────────────────────────────────────────
-        string? details = null;
+        // ── Detalles enriquecidos ─────────────────────────────────────────────
+        var customDetails = ctx.Items.TryGetValue(AuditDetailsKey, out var cdObj) ? cdObj as string : null;
+        var userAgent = Truncate(ctx.Request.Headers["User-Agent"].ToString(), 120);
+        var detailsParts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(customDetails))
+            detailsParts.Add(customDetails);
+
+        if (!string.IsNullOrWhiteSpace(userName) && userName != userEmail)
+            detailsParts.Add($"Actor: {userName} ({userRole ?? "SinRol"})");
+        else if (!string.IsNullOrWhiteSpace(userEmail) || !string.IsNullOrWhiteSpace(userId))
+            detailsParts.Add($"Actor ID: {userId ?? "-"} ({userEmail ?? "N/A"} / {userRole ?? "SinRol"})");
+
+        detailsParts.Add($"HTTP {statusCode} en {elapsedMs}ms");
+
+        if (!string.IsNullOrEmpty(qs))
+            detailsParts.Add($"Query: {qs}");
+
+        if (!string.IsNullOrWhiteSpace(userAgent))
+            detailsParts.Add($"Agente: {userAgent}");
+
         if (ex != null)
-            details = $"{ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}";
-        else if (statusCode >= 400)
-            details = $"HTTP {statusCode} — {method} {path}{qs}";
-        else if (!string.IsNullOrEmpty(qs) && level == "AUDIT")
-            details = $"Parámetros: {qs}";
+            detailsParts.Add($"Excepción: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
+
+        var details = string.Join(" | ", detailsParts);
 
         return new AuditLogEntry
         {
-            Timestamp = time.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
-            Level     = level,
-            Method    = method,
-            Path      = path + qs,
+            Timestamp  = time.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+            Level      = level,
+            Method     = method,
+            Path       = path + qs,
             StatusCode = statusCode,
-            ElapsedMs = elapsedMs,
-            Ip        = ip,
-            UserId    = userId,
-            UserEmail = userEmail,
-            UserRole  = userRole,
-            Action    = action,
-            Details   = details
+            ElapsedMs  = elapsedMs,
+            Ip         = ip,
+            UserId     = userId,
+            UserEmail  = userEmail ?? userName,
+            UserRole   = userRole,
+            Action     = action,
+            Details    = details
         };
     }
 
@@ -423,50 +501,53 @@ public class RequestLoggingMiddleware
             return "Auditoría (Ley 1098): Acceso/Descarga de Evidencia Escolar de Estudiante Menor";
 
         // ════════════════════════════════════════════════════════════════════
+        //  MÉTRICAS Y PANELES DE CONTROL (ESTUDIANTE / DOCENTE / ADMIN)
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/student/dashboard"))
+            return "Estudiante: Carga Integral de Misiones y Contenidos del Aula";
+        if (p.Contains("/student/metrics"))
+            return "Estudiante: Consulta de Métricas y Promedio Acumulado";
+        if (p.Contains("/student/upload-assignment"))
+            return "Estudiante: Entrega de Evidencia / Archivo de Tarea";
+        if (p.Contains("/teacher/metrics"))
+            return "Docente: Consulta de Indicadores y Pendientes por Calificar";
+        if (p.Contains("/teacher/content"))
+            return "Docente: Publicación de Nueva Tarea o Material de Clase";
+        if (p.Contains("/admin/metrics"))
+            return "Admin: Consulta de Métricas Globales del Sistema";
+        if (p.Contains("/files/upload-resource"))
+            return "Docente/Admin: Subida de Archivo Guía / Recurso Educativo";
+        if (p.Contains("/files/resources"))
+            return "Académico: Descarga de Guía / Recurso Educativo";
+
+        // ════════════════════════════════════════════════════════════════════
         //  CURSOS / MATERIAS
         // ════════════════════════════════════════════════════════════════════
         if (p.Contains("/cursos") || p.Contains("/courses") || p.Contains("/materias"))
         {
+            if (p.Contains("/unenroll") || p.Contains("/desinscribir"))
+                return "Académico: Baja / Retiro de Estudiante en Curso";
             if (p.Contains("/enroll") || p.Contains("/inscribir") || p.Contains("/enrollment"))
                 return method == "POST" ? "Académico: Inscripción de Estudiante en Curso" : "Académico: Consulta de Inscripciones";
-            if (p.Contains("/unenroll") || p.Contains("/desinscribir"))
-                return "Académico: Baja de Estudiante en Curso";
             if (p.Contains("/students") || p.Contains("/estudiantes"))
-                return "Académico: Consulta de Estudiantes del Curso";
+                return "Académico: Consulta de Estudiantes Matriculados en Curso";
             return method switch
             {
                 "POST"   => "Gestión Académica: Creación de Nueva Materia/Curso",
                 "PUT"    => "Gestión Académica: Edición de Materia/Curso",
-                "PATCH"  => "Gestión Académica: Modificación Parcial de Materia/Curso",
+                "PATCH"  => "Gestión Académica: Cambio de Estado de Materia/Curso",
                 "DELETE" => "Gestión Académica: Eliminación de Materia/Curso",
-                _        => "Académico: Consulta de Cursos"
+                _        => "Académico: Consulta de Catálogo de Cursos"
             };
         }
 
         // ════════════════════════════════════════════════════════════════════
-        //  ACTIVIDADES / TAREAS
-        // ════════════════════════════════════════════════════════════════════
-        if (p.Contains("/actividades") || p.Contains("/tasks") || p.Contains("/assignments"))
-        {
-            if (p.Contains("/publish") || p.Contains("/publicar"))
-                return "Docente: Publicación de Actividad/Tarea";
-            return method switch
-            {
-                "POST"   => "Docente: Creación de Nueva Actividad/Tarea",
-                "PUT"    => "Docente: Edición de Actividad/Tarea",
-                "PATCH"  => "Docente: Modificación Parcial de Actividad",
-                "DELETE" => "Docente: Eliminación de Actividad/Tarea",
-                _        => "Académico: Consulta de Actividades/Tareas"
-            };
-        }
-
-        // ════════════════════════════════════════════════════════════════════
-        //  ENTREGAS / SUBMISSIONS
+        //  ENTREGAS / SUBMISSIONS (Evaluar antes de /activities para /activities/{id}/submissions)
         // ════════════════════════════════════════════════════════════════════
         if (p.Contains("/entregas") || p.Contains("/submissions"))
         {
             if (p.Contains("/grade") || p.Contains("/calificar") || p.Contains("/review"))
-                return method == "POST" || method == "PUT" ? "Docente: Calificación de Entrega" : "Docente: Revisión de Entregas";
+                return method == "POST" || method == "PUT" ? "Docente: Calificación y Retroalimentación de Entrega" : "Docente: Revisión de Entregas";
             if (p.Contains("/file") || p.Contains("/archivo"))
                 return method == "POST" ? "Estudiante: Subida de Archivo de Tarea" : "Académico: Consulta de Archivo de Entrega";
             return method switch
@@ -474,7 +555,26 @@ public class RequestLoggingMiddleware
                 "POST"   => "Estudiante: Envío de Tarea / Entrega Académica",
                 "PUT"    => "Estudiante: Actualización de Entrega Enviada",
                 "DELETE" => "Estudiante: Retiro de Entrega Enviada",
-                _        => "Académico: Consulta de Entregas"
+                _        => "Docente: Consulta de Entregas de Actividad"
+            };
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        //  ACTIVIDADES / TAREAS
+        // ════════════════════════════════════════════════════════════════════
+        if (p.Contains("/actividades") || p.Contains("/activities") || p.Contains("/tasks") || p.Contains("/assignments"))
+        {
+            if (p.Contains("/toggle-status"))
+                return "Docente: Archivo / Reactivación de Actividad Escolar";
+            if (p.Contains("/publish") || p.Contains("/publicar"))
+                return "Docente: Publicación de Actividad/Tarea";
+            return method switch
+            {
+                "POST"   => "Docente: Creación de Nueva Actividad/Tarea",
+                "PUT"    => "Docente: Edición de Actividad/Tarea",
+                "PATCH"  => "Docente: Modificación de Estado de Actividad",
+                "DELETE" => "Docente: Eliminación de Actividad/Tarea",
+                _        => "Académico: Consulta de Actividades y Tareas"
             };
         }
 
@@ -579,38 +679,53 @@ public class RequestLoggingMiddleware
     }
 
     /// <summary>
-    /// Formato estructurado obligatorio:
-    /// [TIMESTAMP] | [NIVEL: AUDIT/INFO/ERROR] | [USER_ID / ROL] | [MÉTODO HTTP] | [RUTA/ENDPOINT] | [STATUS CODE] | [IP]
+    /// Formato estructurado obligatorio y enriquecido:
+    /// [TIMESTAMP] | [NIVEL: AUDIT/INFO/WARNING/ERROR] | [USER_ID / ROL] | [MÉTODO HTTP] | [RUTA/ENDPOINT] | [STATUS CODE] | [IP] | [ELAPSEDms] | ACCIÓN — DETALLES
     /// </summary>
-    private static string FormatStructuredLog(HttpContext ctx, DateTime time, int statusCode, Exception? ex)
+    private static string FormatStructuredLog(HttpContext ctx, DateTime time, int statusCode, long elapsedMs, Exception? ex)
     {
         var ip = ResolveClientIp(ctx);
         var method = ctx.Request.Method.ToUpperInvariant();
-        var path = SafeRequestPath(ctx);
+        var rawPath = ctx.Request.Path.Value ?? string.Empty;
+        var qs = RedactQueryString(rawPath, ctx.Request.QueryString.Value ?? string.Empty);
+        var path = rawPath + qs;
         var (userId, userRole) = ResolveUserIdentity(ctx);
         var level = DetermineLogLevel(method, path, statusCode, ex);
         var timestamp = time.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 
-        return $"[{timestamp}] | [{level}] | [{userId} / {userRole}] | [{method}] | [{path}] | [{statusCode}] | [{ip}]";
+        var action = ctx.Items.TryGetValue(AuditActionKey, out var customAction) && customAction is string ca && !string.IsNullOrWhiteSpace(ca)
+            ? ca
+            : ResolveActionName(method, rawPath, statusCode, qs);
+
+        var customDetails = ctx.Items.TryGetValue(AuditDetailsKey, out var cdObj) && cdObj is string cd && !string.IsNullOrWhiteSpace(cd)
+            ? $" — {cd}"
+            : string.Empty;
+
+        return $"[{timestamp}] | [{level}] | [{userId} / {userRole}] | [{method}] | [{path}] | [{statusCode}] | [{ip}] | [{elapsedMs}ms] | {action}{customDetails}";
     }
 
     /// <summary>
-    /// Extrae automáticamente la identidad del usuario (Claims NameIdentifier / Role) desde HttpContext.User
-    /// o decodificando el encabezado Authorization Bearer JWT.
+    /// Extrae automáticamente la identidad del usuario (Claims NameIdentifier / Role) desde HttpContext.User,
+    /// contexto de auditoría o decodificando el encabezado Authorization Bearer JWT.
     /// </summary>
     public static (string UserId, string Role) ResolveUserIdentity(HttpContext ctx)
     {
-        string? userId = null;
-        string? role = null;
+        string? userId = ctx.Items.TryGetValue(AuditUserIdKey, out var uIdObj) ? uIdObj as string : null;
+        string? userEmail = ctx.Items.TryGetValue(AuditUserEmailKey, out var uEmailObj) ? uEmailObj as string : null;
+        string? role = ctx.Items.TryGetValue(AuditUserRoleKey, out var uRoleObj) ? uRoleObj as string : null;
 
         if (ctx.User?.Identity?.IsAuthenticated == true)
         {
-            userId = ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            userId ??= ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                      ?? ctx.User.FindFirst("user_id")?.Value
                      ?? ctx.User.FindFirst("sub")?.Value
                      ?? ctx.User.Identity.Name;
 
-            role = ctx.User.FindFirst(ClaimTypes.Role)?.Value
+            userEmail ??= ctx.User.FindFirst(ClaimTypes.Email)?.Value
+                     ?? ctx.User.FindFirst(ClaimTypes.Name)?.Value
+                     ?? ctx.User.Identity.Name;
+
+            role ??= ctx.User.FindFirst(ClaimTypes.Role)?.Value
                    ?? ctx.User.FindFirst("role")?.Value;
         }
 
@@ -629,6 +744,7 @@ public class RequestLoggingMiddleware
                     {
                         var jwt = handler.ReadJwtToken(tokenStr);
                         userId ??= jwt.Claims.FirstOrDefault(c => c.Type is ClaimTypes.NameIdentifier or "sub" or "user_id")?.Value;
+                        userEmail ??= jwt.Claims.FirstOrDefault(c => c.Type is ClaimTypes.Email or ClaimTypes.Name or "unique_name")?.Value;
                         role ??= jwt.Claims.FirstOrDefault(c => c.Type is ClaimTypes.Role or "role")?.Value;
                     }
                 }
@@ -639,20 +755,26 @@ public class RequestLoggingMiddleware
             }
         }
 
-        return (userId ?? "ANONYMOUS", role ?? "NO_ROLE");
+        var userDisplay = !string.IsNullOrWhiteSpace(userEmail) && !string.IsNullOrWhiteSpace(userId) && userEmail != userId
+            ? $"{userId}:{userEmail}"
+            : (userId ?? userEmail ?? "ANONYMOUS");
+
+        return (userDisplay, role ?? "NO_ROLE");
     }
 
     private static string DetermineLogLevel(string method, string path, int statusCode, Exception? ex)
     {
         if (statusCode >= 500 || ex != null)
             return "ERROR";
+        if (statusCode >= 400)
+            return "WARNING";
         if (method is "POST" or "PUT" or "DELETE" or "PATCH"
             || path.Contains("/auth/", StringComparison.OrdinalIgnoreCase)
             || path.Contains("/admin/", StringComparison.OrdinalIgnoreCase)
-            || path.Contains("/teacher/", StringComparison.OrdinalIgnoreCase))
+            || path.Contains("/teacher/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/privacy/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/files/", StringComparison.OrdinalIgnoreCase))
             return "AUDIT";
-        if (statusCode >= 400)
-            return "WARNING";
         return "INFO";
     }
 

@@ -696,3 +696,24 @@
   flex-wrap: wrap;
 }
 
+.metric-interactive {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.metric-interactive:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.subdetail-action {
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.subdetail-action:hover {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+

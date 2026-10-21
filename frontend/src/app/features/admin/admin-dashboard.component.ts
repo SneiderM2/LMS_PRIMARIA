@@ -139,6 +139,25 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
+  public onAdminKpiClick(target: 'all-users' | 'teachers' | 'students' | 'inspector' | 'courses'): void {
+    if (target === 'courses') {
+      this.setSection('courses');
+      return;
+    }
+    if (target === 'inspector') {
+      this.setSection('inspector');
+      return;
+    }
+    this.activeSection = 'overview';
+    if (target === 'teachers') {
+      this.filterByRole('Teacher');
+    } else if (target === 'students') {
+      this.filterByRole('Student');
+    } else {
+      this.filterByRole('ALL');
+    }
+  }
+
   // --- Métricas Globales ---
   public loadMetrics(): void {
     this.isLoadingMetrics = true;

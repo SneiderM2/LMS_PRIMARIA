@@ -602,7 +602,15 @@ public class TeacherController : ControllerBase
             await _context.SaveChangesAsync();
         }
 
-        var curso = await _context.Cursos
+        Curso? curso = null;
+        if (dto.CourseId.HasValue && dto.CourseId.Value > 0)
+        {
+            curso = await _context.Cursos
+                .Include(c => c.Grado)
+                .FirstOrDefaultAsync(c => c.Id == dto.CourseId.Value);
+        }
+
+        curso ??= await _context.Cursos
             .FirstOrDefaultAsync(c => c.DocenteId == currentUser.Id && c.Nombre == dto.Subject && c.GradoId == grado.Id)
             ?? await _context.Cursos.FirstOrDefaultAsync(c => c.Nombre == dto.Subject && c.GradoId == grado.Id)
             ?? await _context.Cursos.FirstOrDefaultAsync(c => c.DocenteId == currentUser.Id);
@@ -649,29 +657,52 @@ public class TeacherController : ControllerBase
             dto.Type.Equals("Tarea", StringComparison.OrdinalIgnoreCase) ||
             dto.Type.Equals("Task", StringComparison.OrdinalIgnoreCase))
         {
+            var maxScore = dto.MaxScore.HasValue && dto.MaxScore.Value > 0 ? dto.MaxScore.Value : 5.00m;
+            var packedDesc = TaskDescriptionMetadata.Pack(dto.Description, dto.FileUrl);
+            var (cleanDesc, attachedUrl) = TaskDescriptionMetadata.Unpack(packedDesc);
+
             var tarea = new Tarea
             {
                 CursoId = curso.Id,
                 Titulo = dto.Title.Trim(),
-                Descripcion = dto.Description.Trim(),
+                Descripcion = packedDesc,
                 FechaPublicacion = DateTime.UtcNow,
                 FechaLimite = dto.DueDate.HasValue ? DateTime.SpecifyKind(dto.DueDate.Value, DateTimeKind.Utc) : DateTime.UtcNow.AddDays(7),
-                PuntajeMaximo = 100.00m,
+                PuntajeMaximo = maxScore,
                 Activo = true
             };
             _context.Tareas.Add(tarea);
             await _context.SaveChangesAsync();
 
+            var detailsMsg = $"Docente {teacherName} ({currentUser.Username}) publicó Tarea #{tarea.Id} '{tarea.Titulo}' en '{curso.Nombre}' ({grado.Nombre}) | Nota Máx: {tarea.PuntajeMaximo:0.##} | Vence: {tarea.FechaLimite:yyyy-MM-dd}" +
+                             (!string.IsNullOrWhiteSpace(attachedUrl) ? $" | Guía adjunta: {attachedUrl}" : "");
+            RequestLoggingMiddleware.SetAuditContext(
+                HttpContext,
+                action: "Docente: Publicación de Nueva Tarea Escolar",
+                details: detailsMsg);
+            await FileLogger.LogAsync("AUDIT", detailsMsg, new
+            {
+                taskId = tarea.Id,
+                title = tarea.Titulo,
+                courseId = curso.Id,
+                courseName = curso.Nombre,
+                maxScore = tarea.PuntajeMaximo,
+                dueDate = tarea.FechaLimite,
+                hasGuide = !string.IsNullOrWhiteSpace(attachedUrl)
+            });
+
             var resultDto = new ContentDto
             {
                 Id = tarea.Id.ToString(),
                 RealId = tarea.Id,
+                CourseId = curso.Id,
                 Title = tarea.Titulo,
-                Description = tarea.Descripcion ?? string.Empty,
+                Description = cleanDesc,
                 Type = "Assignment",
                 Subject = curso.Nombre,
-                FileUrl = dto.FileUrl,
+                FileUrl = attachedUrl,
                 DueDate = tarea.FechaLimite,
+                MaxScore = tarea.PuntajeMaximo,
                 GradeLevel = grado.Nombre,
                 CreatedByUserId = currentUser.Username,
                 CreatedByUserName = teacherName,
@@ -700,10 +731,26 @@ public class TeacherController : ControllerBase
             _context.Materiales.Add(material);
             await _context.SaveChangesAsync();
 
+            var detailsMsg = $"Docente {teacherName} ({currentUser.Username}) publicó Material #{material.Id} ({tipoMaterial}) '{material.Titulo}' en '{curso.Nombre}' ({grado.Nombre})";
+            RequestLoggingMiddleware.SetAuditContext(
+                HttpContext,
+                action: "Docente: Publicación de Material de Estudio",
+                details: detailsMsg);
+            await FileLogger.LogAsync("AUDIT", detailsMsg, new
+            {
+                materialId = material.Id,
+                title = material.Titulo,
+                type = tipoMaterial,
+                courseId = curso.Id,
+                courseName = curso.Nombre,
+                resourceUrl = material.RecursoUrl
+            });
+
             var resultDto = new ContentDto
             {
                 Id = $"mat-{material.Id}",
                 RealId = material.Id,
+                CourseId = curso.Id,
                 Title = material.Titulo,
                 Description = material.Descripcion ?? string.Empty,
                 Type = dto.Type,
@@ -780,29 +827,47 @@ public class TeacherController : ControllerBase
             query = query.Where(e => e.Tarea.Curso.DocenteId == currentUser.Id);
         }
 
-        var submissions = await query
+        var rawSubmissions = await query
             .OrderByDescending(e => e.FechaEntrega)
-            .Select(e => new StudentSubmissionDto
+            .ToListAsync();
+
+        var submissions = rawSubmissions.Select(e =>
+        {
+            var latestFile = e.Archivos.OrderByDescending(a => a.FechaSubida).FirstOrDefault();
+            return new StudentSubmissionDto
             {
                 SubmissionId = e.Id,
                 Id = e.Id.ToString(),
                 AssignmentId = e.TareaId.ToString(),
                 StudentId = e.Alumno.Usuario.Username,
+                StudentUsername = e.Alumno.Usuario.Username,
                 StudentName = !string.IsNullOrWhiteSpace(e.Alumno.Usuario.FullName) 
                     ? e.Alumno.Usuario.FullName 
                     : e.Alumno.Usuario.Username,
-                StudentAvatarUrl = e.Alumno.Usuario.AvatarUrl,
-                FileUrl = e.Archivos.FirstOrDefault() != null ? e.Archivos.First().RutaArchivo : string.Empty,
-                OriginalFileName = e.Archivos.FirstOrDefault() != null ? e.Archivos.First().NombreOriginal : "tarea.pdf",
+                StudentAvatarUrl = !string.IsNullOrEmpty(e.Alumno.Usuario.AvatarUrl)
+                    ? e.Alumno.Usuario.AvatarUrl
+                    : $"https://api.dicebear.com/7.x/bottts/svg?seed={e.Alumno.Usuario.Username}",
+                FileUrl = latestFile?.RutaArchivo ?? string.Empty,
+                OriginalFileName = latestFile?.NombreOriginal ?? "tarea.pdf",
+                FileSize = latestFile != null ? (long)latestFile.TamanoBytes : null,
+                StudentComment = e.ContenidoTexto,
                 SubmittedAt = e.FechaEntrega,
+                GradedAt = e.FechaCalificacion,
                 Feedback = e.Retroalimentacion,
                 Grade = e.Calificacion,
+                MaxScore = e.Tarea.PuntajeMaximo,
+                DueDate = e.Tarea.FechaLimite,
+                IsLate = e.FechaEntrega > e.Tarea.FechaLimite,
                 Status = e.Estado
-            })
-            .ToListAsync();
+            };
+        }).ToList();
 
-        await FileLogger.LogAsync("AUDIT",
-            $"[Ley 1581 / Ley 1098] Consulta de entregas y archivos de estudiantes ({submissions.Count} entregas para tarea ID {taskId}) por {currentUser.Username}.");
+        var auditMsg = $"[Ley 1581 / Ley 1098] Consulta de entregas y evidencias de estudiantes ({submissions.Count} entregas para tarea ID {taskId}) por {currentUser.Username}.";
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            action: "Docente: Consulta de Entregas y Evidencias Escolares",
+            details: auditMsg);
+        await FileLogger.LogAsync("AUDIT", auditMsg);
 
         return Ok(submissions);
     }
@@ -839,7 +904,8 @@ public class TeacherController : ControllerBase
             });
         }
 
-        if (dto.Grade < 0 || dto.Grade > entrega.Tarea.PuntajeMaximo)
+        var allowedMax = Math.Max(entrega.Tarea.PuntajeMaximo, 5.0m);
+        if (dto.Grade < 0 || dto.Grade > allowedMax)
         {
             return BadRequest(new
             {
@@ -854,14 +920,33 @@ public class TeacherController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        await FileLogger.LogAsync("AUDIT",
-            $"[Ley 1581 / Ley 1098] Calificación de entrega ID {entrega.Id} del estudiante {entrega.Alumno.Usuario.Username} (Nota: {dto.Grade}) por {currentUser.Username}.");
+        var studentDisplay = !string.IsNullOrWhiteSpace(entrega.Alumno.Usuario.FullName)
+            ? $"{entrega.Alumno.Usuario.FullName} ({entrega.Alumno.Usuario.Username})"
+            : entrega.Alumno.Usuario.Username;
+        var gradeAuditMsg = $"[Ley 1581 / Ley 1098] Docente {currentUser.Username} calificó entrega #{entrega.Id} de {studentDisplay} en Tarea '{entrega.Tarea.Titulo}' ({entrega.Tarea.Curso.Nombre}) | Nota: {dto.Grade:0.##}/{entrega.Tarea.PuntajeMaximo:0.##}" +
+                            (!string.IsNullOrWhiteSpace(entrega.Retroalimentacion) ? $" | Retroalimentación: '{entrega.Retroalimentacion}'" : "");
+
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            action: "Docente: Calificación y Retroalimentación de Entrega",
+            details: gradeAuditMsg);
+        await FileLogger.LogAsync("AUDIT", gradeAuditMsg, new
+        {
+            submissionId = entrega.Id,
+            taskId = entrega.TareaId,
+            taskTitle = entrega.Tarea.Titulo,
+            studentUsername = entrega.Alumno.Usuario.Username,
+            grade = entrega.Calificacion,
+            maxScore = entrega.Tarea.PuntajeMaximo,
+            gradedBy = currentUser.Username
+        });
 
         return Ok(new
         {
-            message = $"¡Entrega calificada exitosamente con {dto.Grade}! ⭐",
+            message = $"¡Entrega calificada exitosamente con {dto.Grade:0.##}! ⭐",
             submissionId = entrega.Id,
             grade = entrega.Calificacion,
+            gradedAt = entrega.FechaCalificacion,
             feedback = entrega.Retroalimentacion,
             status = entrega.Estado
         });
@@ -1037,6 +1122,7 @@ public class TeacherController : ControllerBase
 
         var coursesQuery = _context.Cursos
             .Include(c => c.Grado)
+            .Include(c => c.Inscripciones.Where(i => i.Estado == "ACTIVA"))
             .Where(c => c.Activo);
 
         if (isTeacher)
@@ -1064,6 +1150,7 @@ public class TeacherController : ControllerBase
         foreach (var t in tareas)
         {
             var course = coursesMap.GetValueOrDefault(t.CursoId);
+            var (cleanDesc, attachedUrl) = TaskDescriptionMetadata.Unpack(t.Descripcion);
             result.Add(new TeacherActivityDto
             {
                 Id = t.Id,
@@ -1072,13 +1159,16 @@ public class TeacherController : ControllerBase
                 CourseName = course?.Nombre ?? "Curso",
                 GradeName = course?.Grado.Nombre ?? "",
                 Title = t.Titulo,
-                Description = t.Descripcion,
+                Description = cleanDesc,
                 CreatedAt = t.FechaPublicacion,
                 DueDate = t.FechaLimite,
                 MaxScore = t.PuntajeMaximo,
                 IsActive = t.Activo,
                 SubmissionsCount = t.Entregas.Count,
-                PendingGradingCount = t.Entregas.Count(e => !e.Calificacion.HasValue)
+                PendingGradingCount = t.Entregas.Count(e => !e.Calificacion.HasValue),
+                EnrolledStudentsCount = course?.Inscripciones.Count ?? 0,
+                ResourceUrl = attachedUrl,
+                ResourceType = !string.IsNullOrWhiteSpace(attachedUrl) ? "GUIA" : null
             });
         }
 
@@ -1100,6 +1190,7 @@ public class TeacherController : ControllerBase
                 IsActive = m.Activo,
                 SubmissionsCount = 0,
                 PendingGradingCount = 0,
+                EnrolledStudentsCount = course?.Inscripciones.Count ?? 0,
                 ResourceUrl = m.RecursoUrl,
                 ResourceType = m.Tipo
             });
@@ -1117,6 +1208,8 @@ public class TeacherController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateActivity(int id, [FromQuery] string kind, [FromBody] UpdateActivityDto dto)
     {
+        var actor = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Docente";
+
         if (string.Equals(kind, "Material", StringComparison.OrdinalIgnoreCase))
         {
             var material = await _context.Materiales.FindAsync(id);
@@ -1134,6 +1227,11 @@ public class TeacherController : ControllerBase
                 material.RecursoUrl = dto.ResourceUrl;
             }
             await _context.SaveChangesAsync();
+
+            var msg = $"Docente {actor} actualizó el Material #{material.Id} '{material.Titulo}' (Curso ID:{material.CursoId})";
+            RequestLoggingMiddleware.SetAuditContext(HttpContext, action: "Docente: Edición de Material de Estudio", details: msg);
+            await FileLogger.LogAsync("AUDIT", msg);
+
             return Ok(new { message = "Material actualizado exitosamente." });
         }
         else
@@ -1151,12 +1249,22 @@ public class TeacherController : ControllerBase
                 return BadRequest(new { message = "El puntaje máximo debe estar entre 0.01 y 1000." });
             }
 
+            var (_, existingResourceUrl) = TaskDescriptionMetadata.Unpack(tarea.Descripcion);
+            var targetResourceUrl = dto.ResourceUrl != null
+                ? (string.IsNullOrWhiteSpace(dto.ResourceUrl) ? null : dto.ResourceUrl.Trim())
+                : existingResourceUrl;
+
             tarea.Titulo = dto.Title.Trim();
-            tarea.Descripcion = dto.Description?.Trim();
+            tarea.Descripcion = TaskDescriptionMetadata.Pack(dto.Description, targetResourceUrl);
             if (dto.DueDate.HasValue) tarea.FechaLimite = DateTime.SpecifyKind(dto.DueDate.Value, DateTimeKind.Utc);
             if (dto.MaxScore.HasValue) tarea.PuntajeMaximo = dto.MaxScore.Value;
 
             await _context.SaveChangesAsync();
+
+            var msg = $"Docente {actor} actualizó la Tarea #{tarea.Id} '{tarea.Titulo}' | Nota Máx: {tarea.PuntajeMaximo:0.##} | Vence: {tarea.FechaLimite:yyyy-MM-dd}";
+            RequestLoggingMiddleware.SetAuditContext(HttpContext, action: "Docente: Edición de Tarea Escolar", details: msg);
+            await FileLogger.LogAsync("AUDIT", msg);
+
             return Ok(new { message = "Tarea actualizada exitosamente." });
         }
     }
@@ -1170,6 +1278,8 @@ public class TeacherController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ToggleActivityStatus(int id, [FromQuery] string kind)
     {
+        var actor = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Docente";
+
         if (string.Equals(kind, "Material", StringComparison.OrdinalIgnoreCase))
         {
             var material = await _context.Materiales.FindAsync(id);
@@ -1182,6 +1292,12 @@ public class TeacherController : ControllerBase
 
             material.Activo = !material.Activo;
             await _context.SaveChangesAsync();
+
+            var stateText = material.Activo ? "reactivó" : "archivó";
+            var msg = $"Docente {actor} {stateText} el Material #{material.Id} '{material.Titulo}'";
+            RequestLoggingMiddleware.SetAuditContext(HttpContext, action: "Docente: Cambio de Estado de Material", details: msg);
+            await FileLogger.LogAsync("AUDIT", msg);
+
             return Ok(new { message = material.Activo ? "Material activado." : "Material archivado.", isActive = material.Activo });
         }
         else
@@ -1196,7 +1312,13 @@ public class TeacherController : ControllerBase
 
             tarea.Activo = !tarea.Activo;
             await _context.SaveChangesAsync();
-            return Ok(new { message = tarea.Activo ? "Tarea activada." : "Tarea archivada.", isActive = tarea.Activo });
+
+            var stateText = tarea.Activo ? "reactivó" : "archivó";
+            var msg = $"Docente {actor} {stateText} la Tarea #{tarea.Id} '{tarea.Titulo}'";
+            RequestLoggingMiddleware.SetAuditContext(HttpContext, action: "Docente: Cambio de Estado de Tarea", details: msg);
+            await FileLogger.LogAsync("AUDIT", msg);
+
+            return Ok(new { message = tarea.Activo ? "Tarea activada." : "Tarea archivado.", isActive = tarea.Activo });
         }
     }
 }

@@ -10,6 +10,9 @@ public class UploadAssignmentDto
 
     [Required(ErrorMessage = "Por favor selecciona o arrastra el archivo de tu tarea")]
     public IFormFile File { get; set; } = null!;
+
+    [MaxLength(1500)]
+    public string? StudentComment { get; set; }
 }
 
 public class UploadResultDto

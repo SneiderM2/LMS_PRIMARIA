@@ -13,6 +13,21 @@
     </div>
 
     <div class="header-actions">
+      <span *ngIf="lastRefreshedAt()" class="last-sync-badge" title="Hora de última sincronización">
+        🕒 {{ lastRefreshedAt() }}
+      </span>
+
+      <button
+        type="button"
+        class="btn btn-sm"
+        [class.btn-live-active]="autoRefreshEnabled()"
+        [class.btn-secondary]="!autoRefreshEnabled()"
+        (click)="toggleAutoRefresh()"
+        title="Activar/Desactivar actualización automática cada 8 segundos">
+        <span>{{ autoRefreshEnabled() ? '🟢' : '⚡' }}</span>
+        {{ autoRefreshEnabled() ? 'En Vivo (ON)' : 'Tiempo Real' }}
+      </button>
+
       <button class="btn btn-secondary btn-sm" (click)="refreshCurrent()" [disabled]="isLoading() || isAuditLoading()" title="Actualizar datos">
         <span [class.spin]="isLoading() || isAuditLoading()">🔄</span> {{ 'audit.refresh' | translate }}
       </button>
@@ -75,6 +90,35 @@
   <!-- SECCIÓN 1: AUDITORÍA GLOBAL DE EVENTOS (app-audit.log ESTRUCTURADO) -->
   <!-- ================================================================= -->
   <div *ngIf="activeTab() === 'audit'" class="audit-section">
+    <!-- Tarjetas KPI rápidas de Auditoría -->
+    <div class="log-kpi-strip">
+      <button type="button" class="log-kpi-chip" [class.active]="auditSeverity() === 'ALL'" (click)="filterAuditBySeverityChip('ALL')">
+        <span class="kpi-dot dot-all">📊</span>
+        <span class="kpi-label">Total Eventos</span>
+        <strong class="kpi-count">{{ auditTotalCount() }}</strong>
+      </button>
+      <button type="button" class="log-kpi-chip chip-audit" [class.active]="auditSeverity() === 'AUDIT'" (click)="filterAuditBySeverityChip('AUDIT')">
+        <span class="kpi-dot">🟣</span>
+        <span class="kpi-label">AUDIT (Negocio/Ley 1581)</span>
+        <strong class="kpi-count">{{ auditPageStats.audit }}</strong>
+      </button>
+      <button type="button" class="log-kpi-chip chip-info" [class.active]="auditSeverity() === 'INFO'" (click)="filterAuditBySeverityChip('INFO')">
+        <span class="kpi-dot">🟢</span>
+        <span class="kpi-label">INFO (Consultas)</span>
+        <strong class="kpi-count">{{ auditPageStats.info }}</strong>
+      </button>
+      <button type="button" class="log-kpi-chip chip-warn" [class.active]="auditSeverity() === 'WARNING'" (click)="filterAuditBySeverityChip('WARNING')">
+        <span class="kpi-dot">🟡</span>
+        <span class="kpi-label">WARNING (Alertas 4xx)</span>
+        <strong class="kpi-count">{{ auditPageStats.warning }}</strong>
+      </button>
+      <button type="button" class="log-kpi-chip chip-err" [class.active]="auditSeverity() === 'ERROR'" (click)="filterAuditBySeverityChip('ERROR')">
+        <span class="kpi-dot">🔴</span>
+        <span class="kpi-label">ERROR (Fallos 5xx)</span>
+        <strong class="kpi-count">{{ auditPageStats.error }}</strong>
+      </button>
+    </div>
+
     <!-- Barra de Filtros Avanzados -->
     <div class="friendly-filters-bar audit-filters-grid">
       <!-- Buscador por palabra clave -->
@@ -204,6 +248,7 @@
               <td class="cell-message">
                 <strong>{{ entry.action }}</strong>
                 <div class="sub-path">{{ entry.path }}</div>
+                <div *ngIf="entry.details" class="inline-log-detail-preview">{{ entry.details }}</div>
               </td>
               <td class="cell-user">
                 <div class="user-cell-meta">
@@ -311,6 +356,35 @@
 
     <!-- Módulo de Logs Amigable -->
     <div *ngIf="logViewMode() === 'friendly'" class="friendly-logs-section">
+      <!-- Tarjetas KPI rápidas del archivo .log seleccionado -->
+      <div class="log-kpi-strip log-kpi-strip-inner">
+        <button type="button" class="log-kpi-chip" [class.active]="selectedSeverity() === 'ALL'" (click)="filterParsedBySeverityChip('ALL')">
+          <span class="kpi-dot">📄</span>
+          <span class="kpi-label">{{ selectedLogName() }}</span>
+          <strong class="kpi-count">{{ parsedLogStats.total }}</strong>
+        </button>
+        <button type="button" class="log-kpi-chip chip-audit" [class.active]="selectedSeverity() === 'AUDIT'" (click)="filterParsedBySeverityChip('AUDIT')">
+          <span class="kpi-dot">🟣</span>
+          <span class="kpi-label">AUDIT</span>
+          <strong class="kpi-count">{{ parsedLogStats.audit }}</strong>
+        </button>
+        <button type="button" class="log-kpi-chip chip-info" [class.active]="selectedSeverity() === 'INFO'" (click)="filterParsedBySeverityChip('INFO')">
+          <span class="kpi-dot">🟢</span>
+          <span class="kpi-label">INFO</span>
+          <strong class="kpi-count">{{ parsedLogStats.info }}</strong>
+        </button>
+        <button type="button" class="log-kpi-chip chip-warn" [class.active]="selectedSeverity() === 'WARNING'" (click)="filterParsedBySeverityChip('WARNING')">
+          <span class="kpi-dot">🟡</span>
+          <span class="kpi-label">WARNING</span>
+          <strong class="kpi-count">{{ parsedLogStats.warning }}</strong>
+        </button>
+        <button type="button" class="log-kpi-chip chip-err" [class.active]="selectedSeverity() === 'ERROR'" (click)="filterParsedBySeverityChip('ERROR')">
+          <span class="kpi-dot">🔴</span>
+          <span class="kpi-label">ERROR</span>
+          <strong class="kpi-count">{{ parsedLogStats.error }}</strong>
+        </button>
+      </div>
+
       <div class="friendly-filters-bar">
         <div class="filter-item">
           <label>Severidad:</label>
@@ -319,7 +393,8 @@
             (ngModelChange)="selectedSeverity.set($event); loadParsedLogs()"
             class="form-select">
             <option value="ALL">Todas las severidades</option>
-            <option value="INFO">🟢 INFO (Acceso)</option>
+            <option value="AUDIT">🟣 AUDIT (Dominio / Ley 1581)</option>
+            <option value="INFO">🟢 INFO (Acceso / Sistema)</option>
             <option value="WARNING">🟡 WARNING (Alertas / 4xx)</option>
             <option value="ERROR">🔴 ERROR (Fallos / 5xx)</option>
           </select>
@@ -335,11 +410,11 @@
         </div>
 
         <div class="filter-item filter-search">
-          <label>Usuario / Carnet:</label>
+          <label>Usuario / Carnet / Acción:</label>
           <div class="search-wrap">
             <input 
               type="text" 
-              placeholder="Buscar por usuario o ID..."
+              placeholder="Buscar por usuario, carnet, endpoint o mensaje..."
               [ngModel]="searchUser()" 
               (ngModelChange)="searchUser.set($event)"
               (keyup.enter)="loadParsedLogs()"
@@ -363,36 +438,43 @@
         <table class="friendly-table">
           <thead>
             <tr>
-              <th style="width: 175px;">Fecha y Hora</th>
+              <th style="width: 170px;">Fecha y Hora</th>
               <th style="width: 110px;">Severidad</th>
-              <th style="width: 160px;">Usuario</th>
-              <th>Evento / Mensaje</th>
-              <th style="width: 100px;">IP / Estado</th>
+              <th style="width: 165px;">Actor / Rol</th>
+              <th>Evento / Acción Registrada en .log</th>
+              <th style="width: 135px;">IP / Estado / Latencia</th>
               <th style="width: 110px; text-align: center;">Detalles</th>
             </tr>
           </thead>
           <tbody>
             <ng-container *ngFor="let entry of parsedLogs()">
-              <tr [class.row-expanded]="expandedLogId() === entry.id">
+              <tr [class.row-expanded]="expandedLogId() === entry.id" [class.row-audit-error]="entry.level === 'ERROR'">
                 <td class="cell-time">{{ entry.timestamp }}</td>
                 <td>
                   <span 
                     class="badge-severity" 
                     [class.badge-info]="entry.level === 'INFO'"
+                    [class.badge-audit]="entry.level === 'AUDIT'"
                     [class.badge-warning]="entry.level === 'WARNING'"
                     [class.badge-error]="entry.level === 'ERROR'">
-                    {{ entry.level === 'INFO' ? '🟢 INFO' : (entry.level === 'WARNING' ? '🟡 WARN' : '🔴 ERROR') }}
+                    {{ entry.level === 'INFO' ? '🟢 INFO' : (entry.level === 'AUDIT' ? '🟣 AUDIT' : (entry.level === 'WARNING' ? '🟡 WARN' : '🔴 ERROR')) }}
                   </span>
                 </td>
                 <td class="cell-user">
                   <span class="user-pill-inline">{{ entry.user }}</span>
                 </td>
                 <td class="cell-message">
-                  <strong>{{ entry.message }}</strong>
+                  <div class="log-msg-head">
+                    <span *ngIf="entry.httpMethod" class="method-tag" [ngClass]="entry.httpMethod.toLowerCase()">{{ entry.httpMethod }}</span>
+                    <strong>{{ entry.message }}</strong>
+                  </div>
+                  <div *ngIf="entry.path" class="sub-path">{{ entry.path }}</div>
+                  <div *ngIf="entry.details" class="inline-log-detail-preview">{{ entry.details }}</div>
                 </td>
                 <td class="cell-meta">
-                  <span *ngIf="entry.statusCode" class="status-chip" [class.code-err]="entry.statusCode >= 400">{{ entry.statusCode }}</span>
-                  <span *ngIf="entry.elapsedMs" class="ms-chip">{{ entry.elapsedMs }}ms</span>
+                  <div *ngIf="entry.clientIp" class="cell-ip" style="margin-bottom: 0.2rem;"><code>{{ entry.clientIp }}</code></div>
+                  <span *ngIf="entry.statusCode" class="status-chip" [class.code-err]="entry.statusCode >= 400" [class.code-ok]="entry.statusCode < 400">{{ entry.statusCode }}</span>
+                  <span *ngIf="entry.elapsedMs !== undefined && entry.elapsedMs !== null" class="ms-chip">{{ entry.elapsedMs }}ms</span>
                 </td>
                 <td style="text-align: center;">
                   <button 
@@ -410,8 +492,8 @@
                 <td colspan="6" class="accordion-cell">
                   <div class="accordion-content">
                     <div class="accordion-header">
-                      <span class="acc-title">Traza y Contexto Técnico Sanitizado</span>
-                      <span class="acc-ip" *ngIf="entry.clientIp">IP: {{ entry.clientIp }}</span>
+                      <span class="acc-title">Traza y Contexto Técnico Registrado en {{ selectedLogName() }}</span>
+                      <span class="acc-ip" *ngIf="entry.clientIp">IP: {{ entry.clientIp }} | Usuario: {{ entry.user }}</span>
                     </div>
                     <pre class="sanitized-trace">{{ entry.details }}</pre>
                   </div>

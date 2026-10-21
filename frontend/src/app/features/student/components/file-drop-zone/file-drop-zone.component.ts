@@ -1,25 +1,30 @@
-import { Component, EventEmitter, Input, OnDestroy, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { StudentService } from '../../../../core/services/student.service';
+import { FileDownloadService } from '../../../../core/services/file-download.service';
+import { Content } from '../../../../core/models/content.model';
 import { TranslatePipe } from '../../../../shared/pipes/translate.pipe';
 
 @Component({
   selector: 'app-file-drop-zone',
   standalone: true,
-  imports: [CommonModule, TranslatePipe],
+  imports: [CommonModule, FormsModule, TranslatePipe],
   templateUrl: './file-drop-zone.component.html',
   styleUrls: ['./file-drop-zone.component.css']
 })
-export class FileDropZoneComponent implements OnDestroy {
+export class FileDropZoneComponent implements OnChanges, OnDestroy {
   @Input({ required: true }) assignmentId!: string;
   @Input() assignmentTitle: string = 'Mi Tarea';
+  @Input() assignment: Content | null = null;
   @Output() submitted = new EventEmitter<void>();
   @Output() submissionComplete = new EventEmitter<void>();
   @Output() cancelled = new EventEmitter<void>();
 
   public isDragging = false;
   public selectedFile: File | null = null;
+  public studentComment = '';
   public isUploading = false;
   public uploadSuccess = false;
   public errorMessage: string | null = null;
@@ -37,6 +42,8 @@ export class FileDropZoneComponent implements OnDestroy {
     'image/png',
     'image/x-png',
     'image/webp',
+    'image/gif',
+    'video/mp4',
     'application/msword',
     'application/vnd.ms-word',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -44,10 +51,19 @@ export class FileDropZoneComponent implements OnDestroy {
     'application/x-zip-compressed',
     'application/octet-stream'
   ];
-  private readonly allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx'];
-  private readonly maxSizeBytes = 25 * 1024 * 1024; // 25MB
+  private readonly allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.gif', '.doc', '.docx', '.mp4'];
+  private readonly maxSizeBytes = 10 * 1024 * 1024; // 10MB
 
-  constructor(private studentService: StudentService) {}
+  constructor(
+    private studentService: StudentService,
+    private fileDownloadService: FileDownloadService
+  ) {}
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['assignment'] && this.assignment?.mySubmission?.studentComment) {
+      this.studentComment = this.assignment.mySubmission.studentComment;
+    }
+  }
 
   ngOnDestroy(): void {
     this.destroy$.next();
@@ -145,6 +161,10 @@ export class FileDropZoneComponent implements OnDestroy {
           return hex.startsWith('89504E470D0A1A0A');
         case '.webp':
           return hex.startsWith('52494646') && hex.substring(16, 24) === '57454250';
+        case '.gif':
+          return hex.startsWith('47494638');
+        case '.mp4':
+          return hex.substring(8, 16) === '66747970';
         case '.docx':
           return hex.startsWith('504B0304') || hex.startsWith('504B0506') || hex.startsWith('504B0708');
         case '.doc':
@@ -163,13 +183,23 @@ export class FileDropZoneComponent implements OnDestroy {
     this.showConfetti = false;
   }
 
+  public downloadFile(url?: string, filename?: string): void {
+    if (!url) return;
+    this.fileDownloadService.downloadFile(url, filename || 'recurso');
+  }
+
+  public isOverdue(): boolean {
+    if (!this.assignment?.dueDate) return false;
+    return new Date(this.assignment.dueDate).getTime() < Date.now();
+  }
+
   public submitAssignment(): void {
     if (!this.selectedFile || !this.assignmentId) return;
 
     this.isUploading = true;
     this.errorMessage = null;
 
-    this.studentService.uploadAssignment(this.assignmentId, this.selectedFile)
+    this.studentService.uploadAssignment(this.assignmentId, this.selectedFile, this.studentComment)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (res) => {
@@ -202,7 +232,8 @@ export class FileDropZoneComponent implements OnDestroy {
     }, 4000);
   }
 
-  public formatFileSize(bytes: number): string {
+  public formatFileSize(bytes?: number): string {
+    if (!bytes) return '0 KB';
     if (bytes < 1024) return bytes + ' B';
     else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
     else return (bytes / 1048576).toFixed(1) + ' MB';

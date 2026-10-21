@@ -57,10 +57,13 @@ export class StudentService {
     return this.http.post<{ message: string }>(`${this.API_URL}/courses/${courseId}/withdraw`, {});
   }
 
-  public uploadAssignment(assignmentId: string, file: File): Observable<UploadResult> {
+  public uploadAssignment(assignmentId: string, file: File, studentComment?: string): Observable<UploadResult> {
     const formData = new FormData();
     formData.append('assignmentId', assignmentId);
     formData.append('file', file);
+    if (studentComment && studentComment.trim()) {
+      formData.append('studentComment', studentComment.trim());
+    }
 
     return this.http.post<UploadResult>(`${this.API_URL}/upload-assignment`, formData);
   }

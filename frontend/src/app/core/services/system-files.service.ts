@@ -26,7 +26,7 @@ export interface LogsListResponse {
 export interface ParsedLogEntry {
   id: string;
   timestamp: string;
-  level: 'INFO' | 'WARNING' | 'ERROR';
+  level: 'INFO' | 'AUDIT' | 'WARNING' | 'ERROR';
   user: string;
   message: string;
   details?: string;

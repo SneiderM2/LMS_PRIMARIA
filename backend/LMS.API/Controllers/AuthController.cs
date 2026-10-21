@@ -858,21 +858,15 @@ public class AuthController : ControllerBase
     {
         try
         {
-            await FileLogger.WriteAuditAsync(new AuditLogEntry
-            {
-                Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                Level = level,
-                Method = HttpContext.Request.Method,
-                Path = HttpContext.Request.Path.ToString(),
-                StatusCode = HttpContext.Response.StatusCode,
-                ElapsedMs = 0,
-                Ip = ClientIp ?? "0.0.0.0",
-                UserId = user?.Username,
-                UserEmail = user is not null && user.Username.Contains('@') ? user.Username : null,
-                UserRole = user?.Rol?.Nombre,
-                Action = action,
-                Details = details
-            });
+            RequestLoggingMiddleware.SetAuditContext(
+                HttpContext,
+                action: action,
+                details: details,
+                userId: user?.Id.ToString(),
+                userEmail: user?.Username,
+                userRole: user?.Rol?.Nombre);
+
+            await FileLogger.LogAsync(level, $"{action} — Usuario: {user?.Username ?? "Anónimo"} ({user?.FullName ?? "-"}) | {details ?? "Sin detalles adicionales"}");
         }
         catch (Exception ex)
         {

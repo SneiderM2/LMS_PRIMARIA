@@ -35,6 +35,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
   public activities: TeacherActivity[] = [];
   public filteredActivities: TeacherActivity[] = [];
   public activityStatusFilter: 'ALL' | 'ACTIVE' | 'ARCHIVED' = 'ALL';
+  public activityKindFilter: 'ALL' | 'Tarea' | 'Material' | 'PENDING_GRADING' = 'ALL';
   public activitySearchQuery: string = '';
   public isLoadingActivities = false;
 
@@ -42,6 +43,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
   public showCreateModal = false;
   public isSavingContent = false;
   public isUploadingResourceFile = false;
+  public uploadedResourceFileName = '';
   public newContent: CreateContent = {
     title: '',
     description: '',
@@ -49,18 +51,21 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
     subject: 'Matemáticas',
     gradeLevel: '1°',
     fileUrl: '',
-    dueDate: ''
+    dueDate: '',
+    maxScore: 5.0,
+    courseId: undefined
   };
 
   // Modal Editar Actividad
   public showEditModal = false;
   public isEditingActivity = false;
+  public isUploadingEditResourceFile = false;
   public selectedActivityToEdit: TeacherActivity | null = null;
   public editActivityForm: UpdateActivityDto = {
     title: '',
     description: '',
     dueDate: '',
-    maxScore: 100,
+    maxScore: 5.0,
     resourceUrl: ''
   };
 
@@ -68,6 +73,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
   public showSubmissionsModal = false;
   public selectedActivityForSubmissions: TeacherActivity | null = null;
   public submissionsList: StudentSubmission[] = [];
+  public submissionFilter: 'ALL' | 'PENDING' | 'GRADED' = 'ALL';
   public isLoadingSubmissions = false;
   public gradingSubmission: StudentSubmission | null = null;
   public gradeInput: number = 5.0;
@@ -197,22 +203,62 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
       });
   }
 
+  public onTeacherKpiClick(metric: 'students' | 'pendingGrading' | 'activeTasks' | 'semaforo'): void {
+    if (metric === 'students') {
+      this.switchTab('students');
+      return;
+    }
+    if (metric === 'semaforo') {
+      this.switchTab('semaforo');
+      return;
+    }
+    this.activeTab = 'activities';
+    this.activityStatusFilter = 'ACTIVE';
+    if (metric === 'pendingGrading') {
+      this.activityKindFilter = 'PENDING_GRADING';
+    } else {
+      this.activityKindFilter = 'Tarea';
+    }
+    this.applyActivityFilter();
+  }
+
   public setActivityFilter(filter: 'ALL' | 'ACTIVE' | 'ARCHIVED'): void {
     this.activityStatusFilter = filter;
     this.applyActivityFilter();
   }
 
+  public setActivityKindFilter(kind: 'ALL' | 'Tarea' | 'Material' | 'PENDING_GRADING'): void {
+    this.activityKindFilter = kind;
+    this.applyActivityFilter();
+  }
+
+  public get pendingGradingTasksCount(): number {
+    return this.activities.filter(a => a.kind === 'Tarea' && a.pendingGradingCount > 0).length;
+  }
+
   public applyActivityFilter(): void {
-    let list = this.activities;
+    let list = [...this.activities];
     if (this.activityStatusFilter === 'ACTIVE') {
       list = list.filter(a => a.isActive);
     } else if (this.activityStatusFilter === 'ARCHIVED') {
       list = list.filter(a => !a.isActive);
     }
 
+    if (this.activityKindFilter === 'Tarea') {
+      list = list.filter(a => a.kind === 'Tarea');
+    } else if (this.activityKindFilter === 'Material') {
+      list = list.filter(a => a.kind === 'Material');
+    } else if (this.activityKindFilter === 'PENDING_GRADING') {
+      list = list.filter(a => a.kind === 'Tarea' && a.pendingGradingCount > 0);
+    }
+
     if (this.activitySearchQuery.trim()) {
       const q = this.activitySearchQuery.toLowerCase().trim();
-      list = list.filter(a => a.title.toLowerCase().includes(q) || a.courseName.toLowerCase().includes(q));
+      list = list.filter(a =>
+        a.title.toLowerCase().includes(q) ||
+        a.courseName.toLowerCase().includes(q) ||
+        (a.description && a.description.toLowerCase().includes(q))
+      );
     }
 
     this.filteredActivities = list;
@@ -220,16 +266,42 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
 
   // Crear Actividad
   public openCreateModal(): void {
+    const defaultCourse = this.courses.length > 0 ? this.courses[0] : undefined;
+    this.uploadedResourceFileName = '';
     this.newContent = {
       title: '',
       description: '',
       type: 'Assignment',
-      subject: this.courses.length > 0 ? this.courses[0].nombre : 'Matemáticas',
-      gradeLevel: this.courses.length > 0 ? this.courses[0].grado : '1°',
+      subject: defaultCourse ? defaultCourse.nombre : 'Matemáticas',
+      gradeLevel: defaultCourse ? defaultCourse.grado : '1°',
+      courseId: defaultCourse ? defaultCourse.id : undefined,
       fileUrl: '',
+      maxScore: 5.0,
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10)
     };
     this.showCreateModal = true;
+  }
+
+  public onCourseSelectForContent(courseId?: number): void {
+    if (!courseId) return;
+    const found = this.courses.find(c => c.id === Number(courseId));
+    if (found) {
+      this.newContent.courseId = found.id;
+      this.newContent.subject = found.nombre;
+      this.newContent.gradeLevel = found.grado;
+    }
+  }
+
+  public appendInstructionTemplate(kind: 'steps' | 'rubric' | 'deliverable'): void {
+    const templates: Record<'steps' | 'rubric' | 'deliverable', string> = {
+      steps: '📌 PASOS DE LA MISIÓN:\n1. Lee con atención la guía de clase.\n2. Desarrolla los ejercicios propuestos en tu cuaderno o documento.\n3. Sube tu evidencia antes de la fecha límite.',
+      rubric: '⭐ CRITERIOS DE EVALUACIÓN:\n• Orden y presentación clara (30%)\n• Desarrollo completo de los ejercicios (50%)\n• Puntualidad en la entrega (20%)',
+      deliverable: '📎 ENTREGABLE ESPERADO:\nSube un archivo PDF, foto nítida (JPG/PNG) o documento Word con tu nombre y grado.'
+    };
+    const snippet = templates[kind];
+    this.newContent.description = this.newContent.description?.trim()
+      ? `${this.newContent.description.trim()}\n\n${snippet}`
+      : snippet;
   }
 
   public closeCreateModal(): void {
@@ -247,13 +319,39 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
         next: (res) => {
           this.isUploadingResourceFile = false;
           this.newContent.fileUrl = res.fileUrl;
-          this.showToast(`Archivo "${res.originalName}" subido exitosamente.`, 'success');
+          this.uploadedResourceFileName = res.originalName;
+          this.showToast(`Archivo guía "${res.originalName}" adjuntado exitosamente.`, 'success');
         },
         error: (err) => {
           this.isUploadingResourceFile = false;
           alert('Error al subir archivo: ' + (err.error?.message || err.message));
         }
       });
+  }
+
+  public onEditResourceFileSelected(event: any): void {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    this.isUploadingEditResourceFile = true;
+    this.teacherService.uploadResource(file)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.isUploadingEditResourceFile = false;
+          this.editActivityForm.resourceUrl = res.fileUrl;
+          this.showToast(`Guía "${res.originalName}" actualizada exitosamente.`, 'success');
+        },
+        error: (err) => {
+          this.isUploadingEditResourceFile = false;
+          alert('Error al subir archivo: ' + (err.error?.message || err.message));
+        }
+      });
+  }
+
+  public downloadResourceUrl(url?: string, filename?: string): void {
+    if (!url) return;
+    this.fileDownload.save(url, filename || 'guia-clase');
   }
 
   public saveContent(): void {
@@ -287,7 +385,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
       title: act.title,
       description: act.description || '',
       dueDate: act.dueDate ? new Date(act.dueDate).toISOString().substring(0, 10) : '',
-      maxScore: act.maxScore || 100,
+      maxScore: act.maxScore || 5.0,
       resourceUrl: act.resourceUrl || ''
     };
     this.showEditModal = true;
@@ -349,6 +447,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
   // --- Módulo de Entregas y Calificación ---
   public openSubmissionsModal(act: TeacherActivity): void {
     this.selectedActivityForSubmissions = act;
+    this.submissionFilter = 'ALL';
     this.showSubmissionsModal = true;
     this.gradingSubmission = null;
     this.loadSubmissions(act.id);
@@ -375,9 +474,53 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
       });
   }
 
+  public get filteredSubmissionsList(): StudentSubmission[] {
+    if (this.submissionFilter === 'PENDING') {
+      return this.submissionsList.filter(s => s.grade === null || s.grade === undefined);
+    }
+    if (this.submissionFilter === 'GRADED') {
+      return this.submissionsList.filter(s => s.grade !== null && s.grade !== undefined);
+    }
+    return this.submissionsList;
+  }
+
+  public get ungradedSubmissionsCount(): number {
+    return this.submissionsList.filter(s => s.grade === null || s.grade === undefined).length;
+  }
+
+  public get gradedSubmissionsCount(): number {
+    return this.submissionsList.filter(s => s.grade !== null && s.grade !== undefined).length;
+  }
+
+  public get averageSubmissionGrade(): string {
+    const graded = this.submissionsList.filter(s => s.grade !== null && s.grade !== undefined);
+    if (graded.length === 0) return '—';
+    const avg = graded.reduce((acc, cur) => acc + (cur.grade || 0), 0) / graded.length;
+    return avg.toFixed(1);
+  }
+
+  public getQuickGradePresets(): number[] {
+    const max = this.selectedActivityForSubmissions?.maxScore || 5.0;
+    if (max === 100) return [100, 90, 80, 70, 60];
+    if (max === 10) return [10, 9, 8, 7, 6];
+    return [5.0, 4.5, 4.0, 3.5, 3.0];
+  }
+
+  public setQuickGrade(score: number): void {
+    this.gradeInput = score;
+  }
+
+  public formatFileSize(bytes?: number): string {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
   public startGrading(sub: StudentSubmission): void {
     this.gradingSubmission = sub;
-    this.gradeInput = (sub.grade !== undefined && sub.grade !== null) ? sub.grade : 5.0;
+    const defaultMax = this.selectedActivityForSubmissions?.maxScore || 5.0;
+    this.gradeInput = (sub.grade !== undefined && sub.grade !== null) ? sub.grade : defaultMax;
     this.feedbackInput = sub.feedback || '';
   }
 
@@ -404,6 +547,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
             this.gradingSubmission.grade = res.grade;
             this.gradingSubmission.feedback = res.feedback;
             this.gradingSubmission.status = res.status;
+            this.gradingSubmission.gradedAt = new Date().toISOString();
           }
           this.gradingSubmission = null;
           this.loadAcademicMetrics();

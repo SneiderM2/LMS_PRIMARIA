@@ -888,3 +888,116 @@
   color: #f1f5f9;
 }
 
+/* ======================================================== */
+/* MEJORAS DE INTERACTIVIDAD Y VISIBILIDAD DE EVENTOS .LOG  */
+/* ======================================================== */
+.last-sync-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  font-family: monospace;
+}
+
+.btn-live-active {
+  background: #ecfdf5 !important;
+  color: #059669 !important;
+  border: 1px solid #6ee7b7 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.log-kpi-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.log-kpi-strip-inner {
+  padding: 0.85rem 1rem 0 1rem;
+  background: #f8fafc;
+}
+
+.log-kpi-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  font-size: 0.8rem;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.log-kpi-chip:hover {
+  transform: translateY(-1px);
+  border-color: #94a3b8;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.06);
+}
+
+.log-kpi-chip.active {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #312e81;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.log-kpi-chip .kpi-count {
+  background: #f1f5f9;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  color: #0f172a;
+}
+
+.log-kpi-chip.active .kpi-count {
+  background: #4f46e5;
+  color: #ffffff;
+}
+
+.log-msg-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.inline-log-detail-preview {
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  color: #475569;
+  background: #f8fafc;
+  border-left: 3px solid #6366f1;
+  padding: 0.28rem 0.55rem;
+  border-radius: 0 6px 6px 0;
+  line-height: 1.35;
+}
+
+.line-audit {
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.12);
+}
+
+:host-context(body.dark-mode) .inline-log-detail-preview {
+  background: rgba(30, 41, 59, 0.75);
+  color: #cbd5e1;
+  border-left-color: #818cf8;
+}
+
+:host-context(body.dark-mode) .log-kpi-chip {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+:host-context(body.dark-mode) .log-kpi-chip .kpi-count {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+

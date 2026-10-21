@@ -106,10 +106,10 @@
         </div>
       </section>
 
-      <!-- 4 Métricas Clave con Gradientes y Micro-animaciones -->
+      <!-- 4 Métricas Clave con Gradientes y Micro-animaciones (Interactivas) -->
       <section class="metrics-row">
         <!-- Usuarios Activos -->
-        <div class="metric-box box-total glass-panel">
+        <div class="metric-box box-total glass-panel metric-interactive" role="button" tabindex="0" (click)="onAdminKpiClick('all-users')" (keydown.enter)="onAdminKpiClick('all-users')" title="Filtrar directorio completo de usuarios">
           <div class="metric-top">
             <span class="box-icon">👥</span>
             <span class="metric-trend">{{ 'admin.metricActiveUsers' | translate }}</span>
@@ -117,13 +117,13 @@
           <span class="box-val">{{ metrics.totalActiveUsers }}</span>
           <span class="box-label">{{ 'admin.metricUsersLabel' | translate }}</span>
           <div class="metric-subdetail">
-            <span>👨‍🏫 <strong>{{ metrics.activeTeachersCount }}</strong> {{ 'admin.metricTeachersTag' | translate }}</span>
-            <span>🎒 <strong>{{ metrics.activeStudentsCount }}</strong> {{ 'admin.metricStudentsTag' | translate }}</span>
+            <span class="subdetail-action" (click)="$event.stopPropagation(); onAdminKpiClick('teachers')" title="Filtrar solo Docentes">👨‍🏫 <strong>{{ metrics.activeTeachersCount }}</strong> {{ 'admin.metricTeachersTag' | translate }}</span>
+            <span class="subdetail-action" (click)="$event.stopPropagation(); onAdminKpiClick('students')" title="Filtrar solo Estudiantes">🎒 <strong>{{ metrics.activeStudentsCount }}</strong> {{ 'admin.metricStudentsTag' | translate }}</span>
           </div>
         </div>
 
         <!-- Estado General del Sistema -->
-        <div class="metric-box box-green glass-panel">
+        <div class="metric-box box-green glass-panel metric-interactive" role="button" tabindex="0" (click)="onAdminKpiClick('inspector')" (keydown.enter)="onAdminKpiClick('inspector')" title="Abrir Inspector de Auditoría y Logs del Servidor">
           <div class="metric-top">
             <span class="box-icon">🖥️</span>
             <span class="metric-trend trend-green">{{ 'admin.metricOnline' | translate }}</span>
@@ -134,12 +134,12 @@
           <span class="box-label">{{ 'admin.metricServicesLabel' | translate }}</span>
           <div class="metric-subdetail">
             <span>{{ 'admin.metricLatency' | translate }}</span>
-            <span>{{ 'admin.metricApi' | translate }}</span>
+            <span>🔍 Ver Logs (.log)</span>
           </div>
         </div>
 
         <!-- Errores Recientes (24h) -->
-        <div class="metric-box box-red glass-panel">
+        <div class="metric-box box-red glass-panel metric-interactive" role="button" tabindex="0" (click)="onAdminKpiClick('inspector')" (keydown.enter)="onAdminKpiClick('inspector')" title="Inspeccionar errores y eventos en tiempo real">
           <div class="metric-top">
             <span class="box-icon">⚠️</span>
             <span class="metric-trend" [class.trend-red]="metrics.recentErrorsCount > 0" [class.trend-green]="metrics.recentErrorsCount === 0">
@@ -155,7 +155,7 @@
         </div>
 
         <!-- Cursos Activos -->
-        <div class="metric-box box-yellow glass-panel">
+        <div class="metric-box box-yellow glass-panel metric-interactive" role="button" tabindex="0" (click)="onAdminKpiClick('courses')" (keydown.enter)="onAdminKpiClick('courses')" title="Ir a Gestión de Cursos y Materias">
           <div class="metric-top">
             <span class="box-icon">📚</span>
             <span class="metric-trend trend-yellow">{{ 'admin.metricGrades' | translate }}</span>
@@ -164,7 +164,7 @@
           <span class="box-label">{{ 'admin.metricCoursesLabel' | translate }}</span>
           <div class="metric-subdetail">
             <span>{{ 'admin.metricEnrollments' | translate }}</span>
-            <span>{{ 'admin.metricContent' | translate }}</span>
+            <span>⚙️ Administrar</span>
           </div>
         </div>
       </section>

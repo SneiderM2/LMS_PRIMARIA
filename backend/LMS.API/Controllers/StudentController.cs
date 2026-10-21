@@ -94,20 +94,24 @@ public class StudentController : ControllerBase
         foreach (var t in tareas)
         {
             var myEntrega = t.Entregas.FirstOrDefault(e => e.AlumnoId == student.UsuarioId);
-            var myArchivo = myEntrega?.Archivos.FirstOrDefault();
+            var myArchivo = myEntrega?.Archivos.OrderByDescending(a => a.FechaSubida).FirstOrDefault();
             var teacherName = !string.IsNullOrWhiteSpace(t.Curso.Docente.FullName) 
                 ? t.Curso.Docente.FullName 
                 : t.Curso.Docente.Username;
+            var (cleanDesc, attachedGuideUrl) = TaskDescriptionMetadata.Unpack(t.Descripcion);
 
             result.Add(new ContentDto
             {
                 Id = t.Id.ToString(),
                 RealId = t.Id,
+                CourseId = t.CursoId,
                 Title = t.Titulo,
-                Description = t.Descripcion ?? string.Empty,
+                Description = cleanDesc,
                 Type = "Assignment",
                 Subject = t.Curso.Nombre,
+                FileUrl = attachedGuideUrl,
                 DueDate = t.FechaLimite,
+                MaxScore = t.PuntajeMaximo,
                 GradeLevel = t.Curso.Grado.Nombre,
                 CreatedByUserId = t.Curso.Docente.Username,
                 CreatedByUserName = teacherName,
@@ -119,13 +123,20 @@ public class StudentController : ControllerBase
                     Id = myEntrega.Id.ToString(),
                     AssignmentId = t.Id.ToString(),
                     StudentId = student.Usuario.Username,
+                    StudentUsername = student.Usuario.Username,
                     StudentName = studentFullName,
                     StudentAvatarUrl = student.Usuario.AvatarUrl,
                     FileUrl = myArchivo?.RutaArchivo ?? string.Empty,
                     OriginalFileName = myArchivo?.NombreOriginal ?? "archivo",
+                    FileSize = myArchivo != null ? (long)myArchivo.TamanoBytes : null,
+                    StudentComment = myEntrega.ContenidoTexto,
                     SubmittedAt = myEntrega.FechaEntrega,
+                    GradedAt = myEntrega.FechaCalificacion,
                     Feedback = myEntrega.Retroalimentacion,
                     Grade = myEntrega.Calificacion,
+                    MaxScore = t.PuntajeMaximo,
+                    DueDate = t.FechaLimite,
+                    IsLate = myEntrega.FechaEntrega > t.FechaLimite,
                     Status = myEntrega.Estado
                 }
             });
@@ -141,6 +152,7 @@ public class StudentController : ControllerBase
             {
                 Id = $"mat-{m.Id}",
                 RealId = m.Id,
+                CourseId = m.CursoId,
                 Title = m.Titulo,
                 Description = m.Descripcion ?? string.Empty,
                 Type = m.Tipo == "VIDEO" ? "Video" : "Pdf",
@@ -154,6 +166,10 @@ public class StudentController : ControllerBase
                 HasSubmitted = false
             });
         }
+
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            details: $"Alumno: {studentFullName} ({student.Usuario.Username}) | Grado: {student.Grado.Nombre} | Tareas: {tareas.Count}, Materiales: {materiales.Count}");
 
         return Ok(result.OrderByDescending(r => r.CreatedAt).ToList());
     }
@@ -215,7 +231,7 @@ public class StudentController : ControllerBase
             });
         }
 
-        // 2. Localizar la entrega existente y limitar el número de archivos.
+        // 2. Localizar la entrega existente y permitir reenvío limpiando el archivo más antiguo si alcanza el tope.
         var entrega = await _context.Entregas
             .Include(e => e.Archivos)
             .FirstOrDefaultAsync(e => e.TareaId == tarea.Id && e.AlumnoId == student.UsuarioId);
@@ -223,10 +239,8 @@ public class StudentController : ControllerBase
         var maxFiles = Math.Clamp(_storageOptions.MaxFilesPerSubmission, 1, 20);
         if (entrega != null && entrega.Archivos.Count >= maxFiles)
         {
-            return BadRequest(new
-            {
-                message = $"Ya alcanzaste el máximo de {maxFiles} archivos para esta entrega."
-            });
+            var oldest = entrega.Archivos.OrderBy(a => a.FechaSubida).First();
+            _context.ArchivosEntrega.Remove(oldest);
         }
 
         // 3. Guardar el archivo en almacenamiento privado con validación de firma real.
@@ -241,12 +255,17 @@ public class StudentController : ControllerBase
             return BadRequest(new { message = stored.ErrorMessage });
         }
 
+        var trimmedComment = string.IsNullOrWhiteSpace(request.StudentComment)
+            ? null
+            : request.StudentComment.Trim();
+
         if (entrega == null)
         {
             entrega = new Entrega
             {
                 TareaId = tarea.Id,
                 AlumnoId = student.UsuarioId,
+                ContenidoTexto = trimmedComment,
                 FechaEntrega = DateTime.UtcNow,
                 Estado = "ENVIADA"
             };
@@ -256,7 +275,14 @@ public class StudentController : ControllerBase
         else
         {
             entrega.FechaEntrega = DateTime.UtcNow;
-            entrega.Estado = "ENVIADA";
+            if (trimmedComment != null)
+            {
+                entrega.ContenidoTexto = trimmedComment;
+            }
+            if (entrega.Estado != "CALIFICADA")
+            {
+                entrega.Estado = "ENVIADA";
+            }
         }
 
         var archivo = new ArchivoEntrega
@@ -272,9 +298,29 @@ public class StudentController : ControllerBase
         _context.ArchivosEntrega.Add(archivo);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("[AUDIT] El Estudiante {Student} (ID: {StudentId}) entregó la tarea {TaskId} ('{TaskTitle}') en el curso {CourseId}",
-            student.Usuario.Username, student.UsuarioId, tarea.Id, tarea.Titulo, tarea.CursoId);
-        await FileLogger.LogAsync("AUDIT", $"El Estudiante {student.Usuario.Username} (ID: {student.UsuarioId}) entregó la tarea {tarea.Id} ('{tarea.Titulo}') en el curso {tarea.CursoId}");
+        var isLate = entrega.FechaEntrega > tarea.FechaLimite;
+        var auditSummary = $"Alumno: {studentFullName} ({student.Usuario.Username}, ID:{student.UsuarioId}) | Tarea #{tarea.Id}: '{tarea.Titulo}' (Curso: {tarea.Curso.Nombre}) | Archivo: '{stored.OriginalName}' ({stored.Size / 1024.0:F1} KB) | Puntualidad: {(isLate ? "Entrega Tardía" : "A Tiempo")}" +
+                           (trimmedComment != null ? $" | Nota del alumno: '{trimmedComment}'" : "");
+
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            action: "Estudiante: Entrega de Evidencia / Archivo de Tarea",
+            details: auditSummary);
+
+        _logger.LogInformation("[AUDIT] {Summary}", auditSummary);
+        await FileLogger.LogAsync("AUDIT", $"Estudiante {studentFullName} ({student.Usuario.Username}) entregó tarea #{tarea.Id} '{tarea.Titulo}'", new
+        {
+            studentId = student.UsuarioId,
+            studentUsername = student.Usuario.Username,
+            taskId = tarea.Id,
+            taskTitle = tarea.Titulo,
+            courseId = tarea.CursoId,
+            courseName = tarea.Curso.Nombre,
+            fileName = stored.OriginalName,
+            fileSizeKb = Math.Round(stored.Size / 1024.0, 2),
+            isLate,
+            hasComment = trimmedComment != null
+        });
 
         return Ok(new UploadResultDto
         {
@@ -286,11 +332,20 @@ public class StudentController : ControllerBase
                 Id = entrega.Id.ToString(),
                 AssignmentId = tarea.Id.ToString(),
                 StudentId = student.Usuario.Username,
+                StudentUsername = student.Usuario.Username,
                 StudentName = studentFullName,
                 StudentAvatarUrl = student.Usuario.AvatarUrl,
                 FileUrl = stored.Url,
                 OriginalFileName = stored.OriginalName,
+                FileSize = stored.Size,
+                StudentComment = entrega.ContenidoTexto,
                 SubmittedAt = entrega.FechaEntrega,
+                GradedAt = entrega.FechaCalificacion,
+                Feedback = entrega.Retroalimentacion,
+                Grade = entrega.Calificacion,
+                MaxScore = tarea.PuntajeMaximo,
+                DueDate = tarea.FechaLimite,
+                IsLate = isLate,
                 Status = entrega.Estado
             }
         });
@@ -463,6 +518,11 @@ public class StudentController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            action: "Estudiante: Inscripción Voluntaria en Curso",
+            details: $"Alumno ID:{student.UsuarioId} ({username}) se inscribió al curso #{course.Id} '{course.Nombre}'");
+        await FileLogger.LogAsync("AUDIT", $"Estudiante {username} (ID:{student.UsuarioId}) se inscribió al curso '{course.Nombre}' (ID:{course.Id})");
         return Ok(new { message = $"¡Te has inscrito exitosamente a {course.Nombre}! 🎒✨" });
     }
 
@@ -493,6 +553,12 @@ public class StudentController : ControllerBase
         // Desactivar lógicamente para preservar historial
         enrollment.Estado = "INACTIVA";
         await _context.SaveChangesAsync();
+
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            action: "Estudiante: Retiro Voluntario de Curso",
+            details: $"Alumno ID:{student.UsuarioId} ({username}) retiró el curso #{courseId} de su lista activa");
+        await FileLogger.LogAsync("AUDIT", $"Estudiante {username} (ID:{student.UsuarioId}) retiró el curso ID:{courseId}");
 
         return Ok(new { message = "Has retirado la clase de tu lista activa exitosamente." });
     }

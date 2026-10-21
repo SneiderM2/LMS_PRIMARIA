@@ -17,7 +17,15 @@
       <div class="title-group">
         <span class="header-icon" aria-hidden="true">🚀</span>
         <div>
-          <h2 id="dropzone-dialog-title">{{ 'student.dropTitle' | translate }}</h2>
+          <div class="mission-tags-row" *ngIf="assignment">
+            <span class="mission-subject-chip">📚 {{ assignment.subject }}</span>
+            <span class="mission-teacher-chip" *ngIf="assignment.createdByUserName">👩‍🏫 Profe: {{ assignment.createdByUserName }}</span>
+            <span class="mission-score-chip" *ngIf="assignment.maxScore">⭐ Máx: {{ assignment.maxScore }} pts</span>
+            <span class="mission-due-chip" *ngIf="assignment.dueDate" [class.overdue]="isOverdue()">
+              ⏰ {{ isOverdue() ? 'Plazo vencido:' : 'Vence:' }} {{ assignment.dueDate | date:'dd MMM yyyy' }}
+            </span>
+          </div>
+          <h2 id="dropzone-dialog-title">{{ assignment?.hasSubmitted ? '🔄 Actualizar Entrega de Misión' : ('student.dropTitle' | translate) }}</h2>
           <p class="subtitle">{{ assignmentTitle }}</p>
         </div>
       </div>
@@ -33,7 +41,40 @@
 
     <!-- Formulario / Zona de Arrastre -->
     <div class="dropzone-body" *ngIf="!uploadSuccess">
-      
+
+      <!-- Instrucciones completas del docente y guía adjunta -->
+      <div class="mission-instructions-panel" *ngIf="assignment">
+        <div class="instructions-header">
+          <span class="instructions-title">📋 Instrucciones del Docente</span>
+          <button *ngIf="assignment.fileUrl"
+                  type="button"
+                  class="btn-download-guide"
+                  (click)="downloadFile(assignment.fileUrl, assignment.title)">
+            📎 Descargar Guía / Material de Apoyo
+          </button>
+        </div>
+        <p class="instructions-text">{{ assignment.description || 'Sigue las indicaciones vistas en clase y sube tu evidencia en formato PDF, imagen o documento.' }}</p>
+      </div>
+
+      <!-- Resumen de entrega anterior si está reenviando -->
+      <div class="previous-submission-banner" *ngIf="assignment?.hasSubmitted && assignment?.mySubmission as prev">
+        <div class="prev-sub-info">
+          <span class="prev-sub-badge">✅ Entrega registrada el {{ prev.submittedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+          <span class="prev-sub-filename">📄 {{ prev.originalFileName }} <small *ngIf="prev.fileSize">({{ formatFileSize(prev.fileSize) }})</small></span>
+          <p class="prev-sub-comment" *ngIf="prev.studentComment">💬 Tu nota: "{{ prev.studentComment }}"</p>
+          <p class="prev-sub-grade" *ngIf="prev.grade !== null && prev.grade !== undefined">
+            🏆 Calificación actual: <strong>{{ prev.grade }} / {{ assignment?.maxScore || 5.0 }}</strong>
+            <span *ngIf="prev.feedback"> — "{{ prev.feedback }}"</span>
+          </p>
+        </div>
+        <button *ngIf="prev.fileUrl"
+                type="button"
+                class="btn-view-prev-file"
+                (click)="downloadFile(prev.fileUrl, prev.originalFileName)">
+          📥 Ver mi archivo
+        </button>
+      </div>
+
       <!-- Zona Drag & Drop activa si no hay archivo seleccionado -->
       <div *ngIf="!selectedFile"
            class="drop-area"
@@ -53,7 +94,7 @@
                style="display: none"
                aria-label="Seleccionar archivo de tarea"
                (change)="onFileSelected($event)"
-               accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" />
+               accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.mp4" />
 
         <div class="drop-illustration" aria-hidden="true">
           <span class="icon-cloud" [class.shake]="isDragging">📂</span>
@@ -63,12 +104,13 @@
         <h3 class="drop-title">
           {{ isDragging ? ('student.dropReleaseHere' | translate) : ('student.dropDragHere' | translate) }}
         </h3>
-        <p class="drop-subtitle">{{ 'student.dropClickToBrowse' | translate }}</p>
+        <p class="drop-subtitle">{{ 'student.dropClickToBrowse' | translate }} (Máx. 10 MB)</p>
 
         <div class="format-badges">
           <span class="format-badge">📄 PDF</span>
           <span class="format-badge">{{ 'student.dropPhotos' | translate }}</span>
           <span class="format-badge">{{ 'student.dropWord' | translate }}</span>
+          <span class="format-badge">🎬 MP4</span>
         </div>
       </div>
 
@@ -85,6 +127,19 @@
         <button type="button" class="btn-remove" (click)="removeFile()" [title]="'student.dropRemove' | translate" [attr.aria-label]="'student.dropRemove' | translate">
           {{ 'student.dropRemove' | translate }}
         </button>
+      </div>
+
+      <!-- Nota / Comentario opcional del estudiante para el docente -->
+      <div class="student-comment-box">
+        <label for="student-comment-input" class="comment-label">
+          💬 Mensaje o Nota para tu Profe <span class="optional-tag">(Opcional)</span>
+        </label>
+        <textarea id="student-comment-input"
+                  class="comment-textarea"
+                  rows="2"
+                  maxlength="1000"
+                  [(ngModel)]="studentComment"
+                  placeholder="Escribe aquí qué aprendiste, cómo hiciste tu tarea o cualquier duda para tu profe..."></textarea>
       </div>
 
       <!-- Alerta de Error -->

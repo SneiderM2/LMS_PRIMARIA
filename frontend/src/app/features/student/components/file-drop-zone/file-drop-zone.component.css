@@ -14,13 +14,195 @@
 .dropzone-card {
   position: relative;
   width: 100%;
-  max-width: 580px;
+  max-width: 680px;
+  max-height: 92vh;
   background: var(--bg-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg), 0 0 0 4px rgba(56, 189, 248, 0.3);
-  padding: 2rem;
-  overflow: hidden;
+  padding: 1.75rem 2rem;
+  overflow-y: auto;
   animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.mission-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.4rem;
+}
+
+.mission-subject-chip,
+.mission-teacher-chip,
+.mission-score-chip,
+.mission-due-chip {
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.mission-subject-chip {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.mission-teacher-chip {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.mission-score-chip {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.mission-due-chip {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.mission-due-chip.overdue {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.mission-instructions-panel {
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1rem 1.15rem;
+  margin-bottom: 1rem;
+}
+
+.instructions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.instructions-title {
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: #1e293b;
+}
+
+.btn-download-guide {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1.5px solid #93c5fd;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-download-guide:hover {
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
+.instructions-text {
+  font-size: 0.92rem;
+  color: #334155;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-line;
+}
+
+.previous-submission-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: #f0fdf4;
+  border: 2px solid #86efac;
+  border-radius: 14px;
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.prev-sub-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.prev-sub-badge {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #15803d;
+}
+
+.prev-sub-filename {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.prev-sub-comment,
+.prev-sub-grade {
+  font-size: 0.84rem;
+  color: #334155;
+  margin: 0.15rem 0 0;
+}
+
+.btn-view-prev-file {
+  background: #ffffff;
+  color: #15803d;
+  border: 1.5px solid #4ade80;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-view-prev-file:hover {
+  background: #dcfce7;
+}
+
+.student-comment-box {
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.comment-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 0.4rem;
+}
+
+.optional-tag {
+  font-weight: 600;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.comment-textarea {
+  width: 100%;
+  border: 2px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: #1e293b;
+  background: #ffffff;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.comment-textarea:focus {
+  outline: none;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
 }
 
 .modal-header {

@@ -76,6 +76,7 @@ public class TeacherActivityDto
     public bool IsActive { get; set; }
     public int SubmissionsCount { get; set; }
     public int PendingGradingCount { get; set; }
+    public int EnrolledStudentsCount { get; set; }
     public string? ResourceUrl { get; set; }
     public string? ResourceType { get; set; }
 }

@@ -382,28 +382,64 @@ public class SystemFilesController : ControllerBase
                     continue;
                 }
 
+                // Detectar si la línea es JSON estructurado (ej. app-audit.log)
+                var trimmedLine = line.Trim();
+                if (trimmedLine.StartsWith("{") && trimmedLine.EndsWith("}"))
+                {
+                    try
+                    {
+                        var auditItem = System.Text.Json.JsonSerializer.Deserialize<AuditLogEntry>(trimmedLine);
+                        if (auditItem != null)
+                        {
+                            var userStr = !string.IsNullOrWhiteSpace(auditItem.UserEmail)
+                                ? $"{auditItem.UserEmail} ({auditItem.UserRole ?? "-"})"
+                                : (!string.IsNullOrWhiteSpace(auditItem.UserId)
+                                    ? $"ID:{auditItem.UserId} ({auditItem.UserRole ?? "-"})"
+                                    : "Anónimo");
+
+                            var jsonEntry = new ParsedLogEntryDto
+                            {
+                                Id = string.IsNullOrWhiteSpace(auditItem.Id) ? $"log-{++counter}" : auditItem.Id,
+                                Timestamp = auditItem.Timestamp,
+                                Level = string.IsNullOrWhiteSpace(auditItem.Level) ? "INFO" : auditItem.Level.ToUpperInvariant(),
+                                User = userStr,
+                                Message = string.IsNullOrWhiteSpace(auditItem.Action)
+                                    ? $"{auditItem.Method} {auditItem.Path} (HTTP {auditItem.StatusCode})"
+                                    : auditItem.Action,
+                                Details = SanitizePath(auditItem.Details ?? string.Empty),
+                                ClientIp = auditItem.Ip,
+                                HttpMethod = auditItem.Method,
+                                Path = SanitizePath(auditItem.Path),
+                                StatusCode = auditItem.StatusCode,
+                                ElapsedMs = auditItem.ElapsedMs
+                            };
+
+                            if (!MatchesFilter(jsonEntry, level, user, date))
+                            {
+                                currentEntry = null;
+                                continue;
+                            }
+
+                            entries.Add(jsonEntry);
+                            currentEntry = jsonEntry;
+                            continue;
+                        }
+                    }
+                    catch
+                    {
+                        // Si no es JSON válido de AuditLogEntry, procesar como texto normal
+                    }
+                }
+
                 // Detectar si la línea comienza con marca de tiempo [YYYY-MM-DD HH:mm:ss]
                 if (line.StartsWith("[") && line.Length >= 21 && line[20] == ']')
                 {
                     var timestamp = line.Substring(1, 19);
-                    var remainder = line.Substring(22).Trim();
+                    var remainder = line.Substring(21).Trim();
 
                     var entry = ParseLogLine(timestamp, remainder, ++counter);
 
-                    // Filtrado
-                    if (!string.IsNullOrWhiteSpace(level) && !level.Equals("ALL", StringComparison.OrdinalIgnoreCase) && !entry.Level.Equals(level, StringComparison.OrdinalIgnoreCase))
-                    {
-                        currentEntry = null;
-                        continue;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(user) && !entry.User.Contains(user, StringComparison.OrdinalIgnoreCase))
-                    {
-                        currentEntry = null;
-                        continue;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(date) && !entry.Timestamp.StartsWith(date, StringComparison.OrdinalIgnoreCase))
+                    if (!MatchesFilter(entry, level, user, date))
                     {
                         currentEntry = null;
                         continue;
@@ -427,6 +463,23 @@ public class SystemFilesController : ControllerBase
         return Ok(entries);
     }
 
+    private static bool MatchesFilter(ParsedLogEntryDto entry, string? level, string? user, string? date)
+    {
+        if (!string.IsNullOrWhiteSpace(level) && !level.Equals("ALL", StringComparison.OrdinalIgnoreCase) && !entry.Level.Equals(level, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(user) &&
+            !entry.User.Contains(user, StringComparison.OrdinalIgnoreCase) &&
+            !entry.Message.Contains(user, StringComparison.OrdinalIgnoreCase) &&
+            !(entry.Details?.Contains(user, StringComparison.OrdinalIgnoreCase) ?? false))
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(date) && !entry.Timestamp.StartsWith(date, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return true;
+    }
+
     private static ParsedLogEntryDto ParseLogLine(string timestamp, string remainder, int index)
     {
         var entry = new ParsedLogEntryDto
@@ -436,6 +489,89 @@ public class SystemFilesController : ControllerBase
             Level = "INFO",
             User = "-"
         };
+
+        // Caso 0: Formato estructurado con tuberías (access.log, audit.log, error.log)
+        // Ejemplo: | [AUDIT] | [2:profe@scikids.edu / Teacher] | [POST] | [/api/teacher/content] | [200] | [127.0.0.1] | [14ms] | Docente: Publicación... — Tarea 'Misión 1'
+        var trimmedPipe = remainder.TrimStart('|').Trim();
+        if (remainder.StartsWith("|") || (trimmedPipe.StartsWith("[") && trimmedPipe.Contains("] | [")))
+        {
+            var tokens = trimmedPipe.Split('|').Select(t => t.Trim()).ToArray();
+            if (tokens.Length >= 6)
+            {
+                entry.Level = StripBrackets(tokens[0]).ToUpperInvariant();
+                if (string.IsNullOrWhiteSpace(entry.Level)) entry.Level = "INFO";
+
+                var rawUser = StripBrackets(tokens[1]);
+                entry.User = string.IsNullOrWhiteSpace(rawUser) || rawUser == "ANONYMOUS / NO_ROLE"
+                    ? "Anónimo"
+                    : rawUser;
+
+                entry.HttpMethod = StripBrackets(tokens[2]);
+                entry.Path = SanitizePath(StripBrackets(tokens[3]));
+
+                var statusStr = StripBrackets(tokens[4]);
+                if (int.TryParse(statusStr, out var stCode))
+                {
+                    entry.StatusCode = stCode;
+                    if (stCode >= 500) entry.Level = "ERROR";
+                    else if (stCode >= 400 && entry.Level == "INFO") entry.Level = "WARNING";
+                }
+
+                // tokens[5] puede ser "[127.0.0.1]" o "[127.0.0.1] (15ms)"
+                var ipField = tokens[5];
+                if (ipField.Contains("(") && ipField.Contains("ms)"))
+                {
+                    var parenIdx = ipField.IndexOf('(');
+                    entry.ClientIp = StripBrackets(ipField[..parenIdx].Trim());
+                    var msPart = ipField[(parenIdx + 1)..].Replace("ms)", "").Replace(")", "").Trim();
+                    if (long.TryParse(msPart, out var errMs)) entry.ElapsedMs = errMs;
+                }
+                else
+                {
+                    entry.ClientIp = StripBrackets(ipField);
+                }
+
+                int actionStartIndex = 6;
+                if (tokens.Length >= 7)
+                {
+                    var maybeMs = StripBrackets(tokens[6]);
+                    if (maybeMs.EndsWith("ms", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var numStr = maybeMs[..^2].Trim();
+                        if (long.TryParse(numStr, out var msVal))
+                        {
+                            entry.ElapsedMs = msVal;
+                            actionStartIndex = 7;
+                        }
+                    }
+                }
+
+                if (tokens.Length > actionStartIndex)
+                {
+                    var actionAndDetails = string.Join(" | ", tokens.Skip(actionStartIndex)).Trim();
+                    var sepIdx = actionAndDetails.IndexOf(" — ", StringComparison.Ordinal);
+                    if (sepIdx > 0)
+                    {
+                        entry.Message = SanitizePath(actionAndDetails[..sepIdx].Trim());
+                        entry.Details = SanitizePath(actionAndDetails[(sepIdx + 3)..].Trim());
+                    }
+                    else
+                    {
+                        entry.Message = SanitizePath(actionAndDetails);
+                        entry.Details = $"Endpoint: {entry.HttpMethod} {entry.Path} | Estado HTTP: {entry.StatusCode} | IP: {entry.ClientIp}" +
+                                        (entry.ElapsedMs.HasValue ? $" | Tiempo: {entry.ElapsedMs}ms" : "");
+                    }
+                }
+                else
+                {
+                    entry.Message = $"{entry.HttpMethod} {entry.Path} (HTTP {entry.StatusCode})";
+                    entry.Details = $"Usuario: {entry.User} | Cliente IP: {entry.ClientIp}" +
+                                    (entry.ElapsedMs.HasValue ? $" | Latencia: {entry.ElapsedMs}ms" : "");
+                }
+
+                return entry;
+            }
+        }
 
         // Caso 1: [EXCEPTION] IP | METHOD PATH | ELAPSEDms | Exception: message
         if (remainder.StartsWith("[EXCEPTION]"))
@@ -480,20 +616,55 @@ public class SystemFilesController : ControllerBase
             return entry;
         }
 
-        // Caso 3: [INFO] / [WARNING] / [ERROR] mensaje simple
+        // Caso 3: [INFO] / [WARNING] / [ERROR] / [AUDIT] en app.log (ej. [INFO] [PID:1234] Mensaje | {"context":...})
         if (remainder.StartsWith("[") && remainder.Contains("]"))
         {
             var endBracket = remainder.IndexOf(']');
             var tag = remainder.Substring(1, endBracket - 1).ToUpperInvariant();
-            if (tag == "ERROR" || tag == "WARNING" || tag == "INFO")
+            if (tag is "ERROR" or "WARNING" or "INFO" or "AUDIT" or "DEBUG" or "FATAL")
             {
-                entry.Level = tag;
-                entry.Message = SanitizePath(remainder.Substring(endBracket + 1).Trim());
+                entry.Level = tag == "FATAL" ? "ERROR" : (tag == "DEBUG" ? "INFO" : tag);
+                var body = remainder.Substring(endBracket + 1).Trim();
+
+                string? pidInfo = null;
+                if (body.StartsWith("[PID:"))
+                {
+                    var pidEnd = body.IndexOf(']');
+                    if (pidEnd > 0)
+                    {
+                        pidInfo = body.Substring(1, pidEnd - 1);
+                        body = body.Substring(pidEnd + 1).Trim();
+                    }
+                }
+
+                var pipeIdx = body.IndexOf(" | {", StringComparison.Ordinal);
+                if (pipeIdx > 0)
+                {
+                    entry.Message = SanitizePath(body[..pipeIdx].Trim());
+                    var jsonCtx = SanitizePath(body[(pipeIdx + 3)..].Trim());
+                    entry.Details = pidInfo != null ? $"[{pidInfo}] Contexto JSON: {jsonCtx}" : $"Contexto JSON: {jsonCtx}";
+                }
+                else
+                {
+                    entry.Message = SanitizePath(body);
+                    if (pidInfo != null) entry.Details = $"Proceso del Servidor: [{pidInfo}]";
+                }
+
+                // Intentar inferir el actor desde el mensaje si menciona Docente/Estudiante/Admin/Usuario
+                if (entry.Message.StartsWith("Docente", StringComparison.OrdinalIgnoreCase)) entry.User = "Docente";
+                else if (entry.Message.StartsWith("Estudiante", StringComparison.OrdinalIgnoreCase)) entry.User = "Estudiante";
+                else if (entry.Message.StartsWith("Admin", StringComparison.OrdinalIgnoreCase)) entry.User = "Administrador";
+                else if (entry.Message.Contains("AUDITORÍA LEY", StringComparison.OrdinalIgnoreCase))
+                {
+                    entry.Level = "AUDIT";
+                    entry.User = "Auditoría Legal";
+                }
+
                 return entry;
             }
         }
 
-        // Caso 4: Formato AccessLog: {ip} | {method} {path} | {status} | {elapsedMs}ms | User:{userId} | {userAgent}
+        // Caso 4: Formato AccessLog heredado: {ip} | {method} {path} | {status} | {elapsedMs}ms | User:{userId} | {userAgent}
         var accessTokens = remainder.Split('|');
         if (accessTokens.Length >= 4)
         {
@@ -535,6 +706,15 @@ public class SystemFilesController : ControllerBase
         // Si no cumple patrón específico, dejar como mensaje general
         entry.Message = SanitizePath(remainder);
         return entry;
+    }
+
+    private static string StripBrackets(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        var v = value.Trim();
+        if (v.StartsWith("[") && v.EndsWith("]") && v.Length >= 2)
+            return v[1..^1].Trim();
+        return v;
     }
 
     private static void ParseMethodPath(string text, ParsedLogEntryDto entry)

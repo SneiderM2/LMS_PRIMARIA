@@ -35,6 +35,11 @@ export class FileDownloadService {
   }
 
   public save(fileUrl: string, fileName: string): void {
+    if (/^https?:\/\//i.test(fileUrl)) {
+      window.open(fileUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     this.fetchBlob(fileUrl).pipe(
       tap((blob) => {
         const objectUrl = URL.createObjectURL(blob);
@@ -50,5 +55,9 @@ export class FileDownloadService {
     ).subscribe({
       error: (err) => console.error('No fue posible descargar el archivo:', err)
     });
+  }
+
+  public downloadFile(fileUrl: string, fileName: string = 'archivo'): void {
+    this.save(fileUrl, fileName);
   }
 }

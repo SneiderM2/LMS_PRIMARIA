@@ -48,9 +48,12 @@ export class SystemInspectorComponent implements OnInit, OnDestroy {
   public errorMessage = signal<string>('');
   public successMessage = signal<string>('');
   public filterQuery = signal<string>('');
+  public autoRefreshEnabled = signal<boolean>(false);
+  public lastRefreshedAt = signal<string>('');
 
   private readonly destroy$ = new Subject<void>();
   private statusTimerId: ReturnType<typeof setTimeout> | null = null;
+  private autoRefreshTimerId: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private systemFilesService: SystemFilesService,
@@ -58,6 +61,7 @@ export class SystemInspectorComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    this.updateLastRefreshedTimestamp();
     this.loadGlobalAudit();
     this.loadLogsList();
   }
@@ -67,8 +71,65 @@ export class SystemInspectorComponent implements OnInit, OnDestroy {
       clearTimeout(this.statusTimerId);
       this.statusTimerId = null;
     }
+    this.stopAutoRefresh();
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  public toggleAutoRefresh(): void {
+    if (this.autoRefreshEnabled()) {
+      this.stopAutoRefresh();
+    } else {
+      this.autoRefreshEnabled.set(true);
+      this.refreshCurrent();
+      this.autoRefreshTimerId = setInterval(() => {
+        this.refreshCurrent();
+      }, 8000);
+    }
+  }
+
+  private stopAutoRefresh(): void {
+    this.autoRefreshEnabled.set(false);
+    if (this.autoRefreshTimerId) {
+      clearInterval(this.autoRefreshTimerId);
+      this.autoRefreshTimerId = null;
+    }
+  }
+
+  private updateLastRefreshedTimestamp(): void {
+    const now = new Date();
+    this.lastRefreshedAt.set(now.toLocaleTimeString('es-CO', { hour12: false }));
+  }
+
+  public get auditPageStats(): { info: number; audit: number; warning: number; error: number } {
+    const items = this.auditLogs();
+    return {
+      info: items.filter(i => i.level === 'INFO').length,
+      audit: items.filter(i => i.level === 'AUDIT').length,
+      warning: items.filter(i => i.level === 'WARNING').length,
+      error: items.filter(i => i.level === 'ERROR').length
+    };
+  }
+
+  public get parsedLogStats(): { total: number; info: number; audit: number; warning: number; error: number } {
+    const items = this.parsedLogs();
+    return {
+      total: items.length,
+      info: items.filter(i => i.level === 'INFO').length,
+      audit: items.filter(i => i.level === 'AUDIT').length,
+      warning: items.filter(i => i.level === 'WARNING').length,
+      error: items.filter(i => i.level === 'ERROR').length
+    };
+  }
+
+  public filterAuditBySeverityChip(level: string): void {
+    this.auditSeverity.set(level);
+    this.applyAuditFilters();
+  }
+
+  public filterParsedBySeverityChip(level: string): void {
+    this.selectedSeverity.set(level);
+    this.loadParsedLogs();
   }
 
   // Verifica si el usuario actual tiene permisos de administración
@@ -244,6 +305,8 @@ export class SystemInspectorComponent implements OnInit, OnDestroy {
   }
 
   public refreshCurrent(): void {
+    this.updateLastRefreshedTimestamp();
+    this.loadLogsList();
     if (this.activeTab() === 'audit') {
       this.loadGlobalAudit();
     } else {
@@ -323,7 +386,10 @@ export class SystemInspectorComponent implements OnInit, OnDestroy {
     if (l.includes('WARN') || l.includes('WARNING')) {
       return 'line-warning';
     }
-    if (l.includes('INFO') || l.includes('HTTP 200')) {
+    if (l.includes('AUDIT') || l.includes('LEY 1581') || l.includes('ENTREGA') || l.includes('CALIFICA')) {
+      return 'line-audit';
+    }
+    if (l.includes('INFO') || l.includes('HTTP 200') || l.includes('HTTP 201')) {
       return 'line-info';
     }
     return 'line-default';

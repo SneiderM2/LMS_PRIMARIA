@@ -26,6 +26,7 @@ export interface TeacherActivity {
   isActive: boolean;
   submissionsCount: number;
   pendingGradingCount: number;
+  enrolledStudentsCount?: number;
   resourceUrl?: string;
   resourceType?: string;
 }

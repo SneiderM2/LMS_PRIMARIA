@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { StudentService, StudentMetrics, StudentCoursesCatalog } from '../../core/services/student.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -12,7 +13,7 @@ import { LanguageSelectorComponent } from '../../shared/components/language-sele
 @Component({
   selector: 'app-student-dashboard',
   standalone: true,
-  imports: [CommonModule, FileDropZoneComponent, TranslatePipe, LanguageSelectorComponent],
+  imports: [CommonModule, FormsModule, FileDropZoneComponent, TranslatePipe, LanguageSelectorComponent],
   templateUrl: './student-dashboard.component.html',
   styleUrls: ['./student-dashboard.component.css']
 })
@@ -21,6 +22,8 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
   public filteredContents: Content[] = [];
   public isLoading = true;
   public selectedSubject: string = 'Todas';
+  public missionStatusFilter: 'ALL' | 'PENDIENTES' | 'ENTREGADAS' | 'CALIFICADAS' = 'ALL';
+  public searchQuery: string = '';
 
   // Pestañas del estudiante
   public activeTab: 'activities' | 'courses' = 'activities';
@@ -42,12 +45,14 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
   public notificationMessage = '';
   public notificationType: 'success' | 'info' | 'warning' = 'info';
 
-  // Control del modal de entrega Drag & Drop
+  // Control del modal de entrega Drag & Drop y detalle de tarea
   public showDropZone = false;
   public activeAssignmentId: string | null = null;
   public activeAssignmentTitle: string = '';
+  public activeAssignment: Content | null = null;
+  public selectedTaskDetail: Content | null = null;
 
-  public readonly subjects = [
+  public subjects = [
     { name: 'Todas', icon: '🌈', color: '#38bdf8' },
     { name: 'Matemáticas', icon: '📐', color: '#facc15' },
     { name: 'Ciencias Naturales', icon: '🔬', color: '#4ade80' },
@@ -96,6 +101,7 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (items) => {
           this.contents = items;
+          this.syncDynamicSubjects(items);
           this.applySubjectFilter();
           this.isLoading = false;
         },
@@ -103,6 +109,73 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
           this.isLoading = false;
         }
       });
+  }
+
+  private syncDynamicSubjects(items: Content[]): void {
+    const baseSubjects = [
+      { name: 'Todas', icon: '🌈', color: '#38bdf8' },
+      { name: 'Matemáticas', icon: '📐', color: '#facc15' },
+      { name: 'Ciencias Naturales', icon: '🔬', color: '#4ade80' },
+      { name: 'Lengua y Literatura', icon: '📖', color: '#fb923c' },
+      { name: 'Artes y Creatividad', icon: '🎨', color: '#a855f7' }
+    ];
+    const knownNames = new Set(baseSubjects.map(s => s.name.toLowerCase()));
+    const extraColors = ['#ec4899', '#14b8a6', '#6366f1', '#f97316'];
+    let colorIdx = 0;
+
+    for (const item of items) {
+      if (item.subject && !knownNames.has(item.subject.toLowerCase())) {
+        knownNames.add(item.subject.toLowerCase());
+        baseSubjects.push({
+          name: item.subject,
+          icon: '📘',
+          color: extraColors[colorIdx++ % extraColors.length]
+        });
+      }
+    }
+    this.subjects = baseSubjects;
+  }
+
+  public onKpiClick(metric: 'courses' | 'gpa' | 'pending' | 'progress'): void {
+    if (metric === 'courses') {
+      this.switchTab('courses');
+      return;
+    }
+    this.activeTab = 'activities';
+    this.selectedSubject = 'Todas';
+    if (metric === 'pending') {
+      this.missionStatusFilter = 'PENDIENTES';
+    } else if (metric === 'gpa') {
+      this.missionStatusFilter = 'CALIFICADAS';
+    } else {
+      this.missionStatusFilter = 'ALL';
+    }
+    this.applySubjectFilter();
+  }
+
+  public setMissionStatusFilter(status: 'ALL' | 'PENDIENTES' | 'ENTREGADAS' | 'CALIFICADAS'): void {
+    this.missionStatusFilter = status;
+    this.applySubjectFilter();
+  }
+
+  public onSearchChange(): void {
+    this.applySubjectFilter();
+  }
+
+  public get totalMissionsCount(): number {
+    return this.contents.length;
+  }
+
+  public get pendingMissionsCount(): number {
+    return this.contents.filter(c => c.type === 'Assignment' && !c.hasSubmitted).length;
+  }
+
+  public get submittedMissionsCount(): number {
+    return this.contents.filter(c => c.type === 'Assignment' && c.hasSubmitted).length;
+  }
+
+  public get gradedMissionsCount(): number {
+    return this.contents.filter(c => c.type === 'Assignment' && c.mySubmission?.grade !== null && c.mySubmission?.grade !== undefined).length;
   }
 
   public loadMetrics(): void {
@@ -181,15 +254,37 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
     this.applySubjectFilter();
   }
 
-  private applySubjectFilter(): void {
-    if (this.selectedSubject === 'Todas') {
-      this.filteredContents = this.contents;
-    } else {
-      this.filteredContents = this.contents.filter(c => c.subject.toLowerCase() === this.selectedSubject.toLowerCase());
+  public applySubjectFilter(): void {
+    let list = [...this.contents];
+
+    if (this.selectedSubject !== 'Todas') {
+      list = list.filter(c => c.subject.toLowerCase() === this.selectedSubject.toLowerCase());
     }
+
+    if (this.missionStatusFilter === 'PENDIENTES') {
+      list = list.filter(c => c.type === 'Assignment' && !c.hasSubmitted);
+    } else if (this.missionStatusFilter === 'ENTREGADAS') {
+      list = list.filter(c => c.type === 'Assignment' && c.hasSubmitted);
+    } else if (this.missionStatusFilter === 'CALIFICADAS') {
+      list = list.filter(c => c.type === 'Assignment' && c.mySubmission?.grade !== null && c.mySubmission?.grade !== undefined);
+    }
+
+    const q = this.searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter(c =>
+        c.title.toLowerCase().includes(q) ||
+        (c.description && c.description.toLowerCase().includes(q)) ||
+        c.subject.toLowerCase().includes(q) ||
+        (c.createdByUserName && c.createdByUserName.toLowerCase().includes(q))
+      );
+    }
+
+    this.filteredContents = list;
   }
 
   public openSubmissionModal(content: Content): void {
+    this.selectedTaskDetail = null;
+    this.activeAssignment = content;
     this.activeAssignmentId = content.id;
     this.activeAssignmentTitle = content.title;
     this.showDropZone = true;
@@ -197,19 +292,41 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
 
   public closeSubmissionModal(): void {
     this.showDropZone = false;
+    this.activeAssignment = null;
     this.activeAssignmentId = null;
+  }
+
+  public openTaskDetailModal(content: Content): void {
+    this.selectedTaskDetail = content;
+  }
+
+  public closeTaskDetailModal(): void {
+    this.selectedTaskDetail = null;
   }
 
   public onAssignmentSubmitted(): void {
     this.closeSubmissionModal();
+    this.showToast('¡Tu tarea fue enviada con éxito a tu profe! 🎉⭐', 'success');
     this.loadDashboard();
     this.loadMetrics();
   }
 
-  public openMedia(url?: string): void {
+  public openMedia(url?: string, filename?: string): void {
     if (url) {
-      this.fileDownload.openInNewTab(url);
+      this.fileDownload.downloadFile(url, filename || 'recurso');
     }
+  }
+
+  public isOverdue(dueDate?: string | Date): boolean {
+    if (!dueDate) return false;
+    return new Date(dueDate).getTime() < Date.now();
+  }
+
+  public formatFileSize(bytes?: number): string {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
   }
 
   public logout(): void {

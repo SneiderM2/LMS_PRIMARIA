@@ -149,6 +149,11 @@ public class AdminController : ControllerBase
             })
             .ToListAsync();
 
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            "Directorio de Usuarios",
+            $"Consulta de directorio ({users.Count} cuentas, rol='{role ?? "ALL"}', búsqueda='{search ?? "N/A"}')");
+
         await FileLogger.LogAsync("AUDIT",
             $"[Ley 1581 / Ley 1098] Consulta administrativa de directorio de usuarios y datos de menores ({users.Count} registros, rol='{role ?? "ALL"}', búsqueda='{search ?? ""}') por {User.Identity?.Name ?? "Admin"}.");
 
@@ -250,7 +255,11 @@ public class AdminController : ControllerBase
 
         _logger.LogInformation("[AUDIT] El Administrador {Admin} creó el usuario {Username} con rol {Role}",
             User.Identity?.Name ?? "Admin", usuario.Username, targetRoleName);
-        await FileLogger.LogAsync("AUDIT", $"El Administrador {User.Identity?.Name ?? "Admin"} creó el usuario {usuario.Username} con rol {targetRoleName}");
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            $"Alta de Usuario ({targetRoleName})",
+            $"Cuenta '{usuario.Username}' ({usuario.FullName}) creada con rol {targetRoleName}" + (gradeResult != null ? $" en Grado {gradeResult}" : ""));
+        await FileLogger.LogAsync("AUDIT", $"El Administrador {User.Identity?.Name ?? "Admin"} creó el usuario {usuario.Username} ({usuario.FullName}) con rol {targetRoleName}");
 
         return CreatedAtAction(nameof(GetUsers), new { id = usuario.Id }, result);
     }
@@ -362,6 +371,10 @@ public class AdminController : ControllerBase
         var statusText = usuario.Activo ? "habilitada" : "suspendida";
         _logger.LogInformation("[AUDIT] El Administrador {Admin} cambió el estado de la cuenta {Username} a {StatusText}",
             User.Identity?.Name ?? "Admin", usuario.Username, statusText);
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            $"Estado de Cuenta ({statusText.ToUpperInvariant()})",
+            $"Usuario '{usuario.Username}' ({usuario.FullName}) {statusText} por {User.Identity?.Name ?? "Admin"}");
         await FileLogger.LogAsync("AUDIT", $"El Administrador {User.Identity?.Name ?? "Admin"} cambió el estado de la cuenta {usuario.Username} a {statusText}");
 
         return Ok(new
@@ -471,6 +484,10 @@ public class AdminController : ControllerBase
 
         _logger.LogInformation("[AUDIT] El Administrador {Admin} creó exitosamente la materia/curso '{NombreCurso}' (ID: {CursoId})",
             User.Identity?.Name ?? "Admin", curso.Nombre, curso.Id);
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            "Creación de Curso Institucional",
+            $"Curso '{curso.Nombre}' ({grado.Nombre}-{curso.Grupo}) asignado a {result.DocenteNombre} (ID: {curso.Id})");
         await FileLogger.LogAsync("AUDIT", $"El Administrador {User.Identity?.Name ?? "Admin"} creó la materia/curso '{curso.Nombre}' (ID: {curso.Id})");
 
         return CreatedAtAction(nameof(GetAdminCourses), new { id = curso.Id }, result);
@@ -507,6 +524,10 @@ public class AdminController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.LogInformation("[AUDIT] El Administrador {Admin} editó/actualizó la materia/curso '{NombreCurso}' (ID: {CursoId})",
             User.Identity?.Name ?? "Admin", curso.Nombre, id);
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            "Edición de Curso Institucional",
+            $"Curso ID {id} actualizado ('{curso.Nombre}', Grupo {curso.Grupo})");
         await FileLogger.LogAsync("AUDIT", $"El Administrador {User.Identity?.Name ?? "Admin"} actualizó la materia/curso '{curso.Nombre}' (ID: {id})");
 
         return Ok(new { message = "Curso actualizado correctamente." });
@@ -528,6 +549,10 @@ public class AdminController : ControllerBase
         var statusText = curso.Activo ? "activado" : "desactivado";
         _logger.LogInformation("[AUDIT] El Administrador {Admin} alternó el estado del curso '{NombreCurso}' (ID: {CursoId}) a {StatusText}",
             User.Identity?.Name ?? "Admin", curso.Nombre, curso.Id, statusText);
+        RequestLoggingMiddleware.SetAuditContext(
+            HttpContext,
+            $"Estado de Curso ({statusText.ToUpperInvariant()})",
+            $"Curso '{curso.Nombre}' (ID {curso.Id}) {statusText} por {User.Identity?.Name ?? "Admin"}");
         await FileLogger.LogAsync("AUDIT", $"El Administrador {User.Identity?.Name ?? "Admin"} alternó el estado del curso '{curso.Nombre}' (ID: {curso.Id}) a {statusText}");
 
         return Ok(new
@@ -898,21 +923,15 @@ public class AdminController : ControllerBase
     {
         try
         {
-            await FileLogger.WriteAuditAsync(new AuditLogEntry
-            {
-                Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                Level = level,
-                Method = HttpContext.Request.Method,
-                Path = HttpContext.Request.Path.ToString(),
-                StatusCode = HttpContext.Response.StatusCode,
-                ElapsedMs = 0,
-                Ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0",
-                UserId = User.Identity?.Name,
-                UserEmail = User.Identity?.Name?.Contains('@') == true ? User.Identity.Name : null,
-                UserRole = User.FindFirstValue(ClaimTypes.Role),
-                Action = action,
-                Details = details
-            });
+            RequestLoggingMiddleware.SetAuditContext(
+                HttpContext,
+                action,
+                details,
+                User.Identity?.Name,
+                User.Identity?.Name?.Contains('@') == true ? User.Identity.Name : null,
+                User.FindFirstValue(ClaimTypes.Role));
+
+            await FileLogger.LogAsync(level, $"[Admin] {action} | Actor: {User.Identity?.Name ?? "Admin"} | {details}");
         }
         catch (Exception ex)
         {
