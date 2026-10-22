@@ -239,6 +239,7 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
     }
 
     /* Adaptación a Modo Oscuro de la app */
+    :host-context(body.dark-theme) .lang-pill-btn,
     :host-context(body.dark-mode) .lang-pill-btn {
       background: rgba(30, 41, 59, 0.88);
       border-color: rgba(56, 189, 248, 0.35);
@@ -246,41 +247,49 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
     }
 
+    :host-context(body.dark-theme) .lang-pill-btn:hover,
     :host-context(body.dark-mode) .lang-pill-btn:hover {
       background: rgba(30, 41, 59, 0.98);
       border-color: #38bdf8;
       box-shadow: 0 6px 18px rgba(56, 189, 248, 0.25);
     }
 
+    :host-context(body.dark-theme) .lang-dropdown-menu,
     :host-context(body.dark-mode) .lang-dropdown-menu {
       background: rgba(15, 23, 42, 0.96);
       border-color: rgba(51, 65, 85, 0.9);
       box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.5);
     }
 
+    :host-context(body.dark-theme) .dropdown-header,
     :host-context(body.dark-mode) .dropdown-header {
       color: #94a3b8;
       border-bottom-color: rgba(51, 65, 85, 0.8);
     }
 
+    :host-context(body.dark-theme) .lang-option-item,
     :host-context(body.dark-mode) .lang-option-item {
       color: #e2e8f0;
     }
 
+    :host-context(body.dark-theme) .lang-option-item:hover,
     :host-context(body.dark-mode) .lang-option-item:hover {
       background: rgba(30, 41, 59, 0.9);
       color: #38bdf8;
     }
 
+    :host-context(body.dark-theme) .lang-option-item.selected,
     :host-context(body.dark-mode) .lang-option-item.selected {
       background: rgba(56, 189, 248, 0.18);
       color: #38bdf8;
     }
 
+    :host-context(body.dark-theme) .option-sub,
     :host-context(body.dark-mode) .option-sub {
       color: #94a3b8;
     }
 
+    :host-context(body.dark-theme) .option-check,
     :host-context(body.dark-mode) .option-check {
       color: #38bdf8;
     }

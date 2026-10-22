@@ -173,19 +173,27 @@
 }
 
 /* Modo oscuro */
+:host-context(body.dark-theme) .calendar-card,
 :host-context(body.dark-mode) .calendar-card,
+body.dark-theme .calendar-card,
 body.dark-mode .calendar-card {
   background: #1e293b;
   border-color: #334155;
 }
 
+:host-context(body.dark-theme) .calendar-heading,
 :host-context(body.dark-mode) .calendar-heading,
+body.dark-theme .calendar-heading,
 body.dark-mode .calendar-heading {
   color: #f8fafc;
 }
 
+:host-context(body.dark-theme) .cal-btn-nav,
+:host-context(body.dark-theme) .cal-btn-today,
 :host-context(body.dark-mode) .cal-btn-nav,
 :host-context(body.dark-mode) .cal-btn-today,
+body.dark-theme .cal-btn-nav,
+body.dark-theme .cal-btn-today,
 body.dark-mode .cal-btn-nav,
 body.dark-mode .cal-btn-today {
   background: #0f172a;
@@ -193,24 +201,32 @@ body.dark-mode .cal-btn-today {
   color: #cbd5e1;
 }
 
+:host-context(body.dark-theme) .day-cell,
 :host-context(body.dark-mode) .day-cell,
+body.dark-theme .day-cell,
 body.dark-mode .day-cell {
   background: #0f172a;
   border-color: #1e293b;
 }
 
+:host-context(body.dark-theme) .day-cell:hover,
 :host-context(body.dark-mode) .day-cell:hover,
+body.dark-theme .day-cell:hover,
 body.dark-mode .day-cell:hover {
   background: #1e293b;
   border-color: #0284c7;
 }
 
+:host-context(body.dark-theme) .day-number,
 :host-context(body.dark-mode) .day-number,
+body.dark-theme .day-number,
 body.dark-mode .day-number {
   color: #cbd5e1;
 }
 
+:host-context(body.dark-theme) .day-today,
 :host-context(body.dark-mode) .day-today,
+body.dark-theme .day-today,
 body.dark-mode .day-today {
   background: rgba(2, 132, 199, 0.2);
   border-color: #38bdf8;

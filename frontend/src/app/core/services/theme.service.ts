@@ -42,13 +42,13 @@ export class ThemeService {
       const body = document.body;
 
       if (theme === 'dark') {
-        root.classList.add('dark-theme');
-        body.classList.add('dark-theme');
+        root.classList.add('dark-theme', 'dark-mode');
+        body.classList.add('dark-theme', 'dark-mode');
         root.setAttribute('data-theme', 'dark');
         body.setAttribute('data-theme', 'dark');
       } else {
-        root.classList.remove('dark-theme');
-        body.classList.remove('dark-theme');
+        root.classList.remove('dark-theme', 'dark-mode');
+        body.classList.remove('dark-theme', 'dark-mode');
         root.setAttribute('data-theme', 'light');
         body.setAttribute('data-theme', 'light');
       }

@@ -68,12 +68,6 @@
     </div>
   </nav>
 
-  <!-- Notificación Toast Flotante -->
-  <div *ngIf="toastMessage" class="admin-toast animate-fade-in" [ngClass]="'toast-' + toastType" role="status" aria-live="polite">
-    <span class="toast-icon" aria-hidden="true">{{ toastType === 'success' ? '✅' : toastType === 'info' ? 'ℹ️' : '⚠️' }}</span>
-    <span class="toast-text">{{ toastMessage }}</span>
-  </div>
-
   <main id="main-content" class="admin-container">
 
     <!-- ========================================================= -->

@@ -101,7 +101,9 @@
 }
 
 /* Modo Oscuro */
+:host-context(body.dark-theme) .toast-card,
 :host-context(body.dark-mode) .toast-card,
+body.dark-theme .toast-card,
 body.dark-mode .toast-card {
   background: #1e293b;
   color: #f8fafc;
@@ -111,17 +113,23 @@ body.dark-mode .toast-card {
   box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.4);
 }
 
+:host-context(body.dark-theme) .toast-title,
 :host-context(body.dark-mode) .toast-title,
+body.dark-theme .toast-title,
 body.dark-mode .toast-title {
   color: #f8fafc;
 }
 
+:host-context(body.dark-theme) .toast-msg,
 :host-context(body.dark-mode) .toast-msg,
+body.dark-theme .toast-msg,
 body.dark-mode .toast-msg {
   color: #cbd5e1;
 }
 
+:host-context(body.dark-theme) .toast-close:hover,
 :host-context(body.dark-mode) .toast-close:hover,
+body.dark-theme .toast-close:hover,
 body.dark-mode .toast-close:hover {
   color: #f8fafc;
   background-color: #334155;

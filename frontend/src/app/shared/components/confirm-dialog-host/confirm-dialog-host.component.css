@@ -150,37 +150,49 @@
 }
 
 /* Modo oscuro */
+:host-context(body.dark-theme) .dialog-modal,
 :host-context(body.dark-mode) .dialog-modal,
+body.dark-theme .dialog-modal,
 body.dark-mode .dialog-modal {
   background: #1e293b;
   color: #f8fafc;
   border-color: #334155;
 }
 
+:host-context(body.dark-theme) .dialog-title,
 :host-context(body.dark-mode) .dialog-title,
+body.dark-theme .dialog-title,
 body.dark-mode .dialog-title {
   color: #f8fafc;
 }
 
+:host-context(body.dark-theme) .dialog-message,
 :host-context(body.dark-mode) .dialog-message,
+body.dark-theme .dialog-message,
 body.dark-mode .dialog-message {
   color: #94a3b8;
 }
 
+:host-context(body.dark-theme) .dialog-input,
 :host-context(body.dark-mode) .dialog-input,
+body.dark-theme .dialog-input,
 body.dark-mode .dialog-input {
   background: #0f172a;
   border-color: #334155;
   color: #f8fafc;
 }
 
+:host-context(body.dark-theme) .dialog-btn-cancel,
 :host-context(body.dark-mode) .dialog-btn-cancel,
+body.dark-theme .dialog-btn-cancel,
 body.dark-mode .dialog-btn-cancel {
   background: #334155;
   color: #cbd5e1;
 }
 
+:host-context(body.dark-theme) .dialog-btn-cancel:hover,
 :host-context(body.dark-mode) .dialog-btn-cancel:hover,
+body.dark-theme .dialog-btn-cancel:hover,
 body.dark-mode .dialog-btn-cancel:hover {
   background: #475569;
   color: #f8fafc;

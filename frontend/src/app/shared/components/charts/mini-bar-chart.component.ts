@@ -100,9 +100,11 @@ export interface BarChartItem {
       fill: #64748b;
       font-family: inherit;
     }
+    :host-context(body.dark-theme) .bar-value-text,
     :host-context(body.dark-mode) .bar-value-text {
       fill: #cbd5e1;
     }
+    :host-context(body.dark-theme) .bar-category-text,
     :host-context(body.dark-mode) .bar-category-text {
       fill: #94a3b8;
     }

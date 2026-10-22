@@ -2,8 +2,8 @@
   min-height: 100vh;
   background-color: var(--bg-main);
   background-image: 
-    radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.08) 0%, transparent 25%),
-    radial-gradient(circle at 85% 85%, rgba(251, 146, 60, 0.08) 0%, transparent 25%);
+    radial-gradient(circle at 15% 15%, rgba(2, 132, 199, 0.035) 0%, transparent 25%),
+    radial-gradient(circle at 85% 85%, rgba(234, 88, 12, 0.03) 0%, transparent 25%);
   padding-bottom: 3.5rem;
 }
 
@@ -672,7 +672,7 @@
 .submission-item-card {
   padding: 1.35rem;
   margin-bottom: 1.25rem;
-  border-left: 4px solid #38bdf8;
+  border-left: 4px solid var(--primary);
 }
 
 .submission-item-header {
@@ -726,8 +726,8 @@
 }
 
 .feedback-quote-box {
-  background: rgba(56, 189, 248, 0.08);
-  border-left: 3px solid #38bdf8;
+  background: rgba(2, 132, 199, 0.08);
+  border-left: 3px solid var(--primary);
   padding: 0.6rem 0.9rem;
   border-radius: 0 8px 8px 0;
   margin-top: 0.75rem;
@@ -914,8 +914,8 @@
 }
 
 .student-submission-comment {
-  background: #f0f9ff;
-  border-left: 3px solid #0284c7;
+  background: var(--bg-surface-alt);
+  border-left: 3px solid var(--primary);
   border-radius: 8px;
   padding: 0.55rem 0.85rem;
   margin: 0.5rem 0;
@@ -990,7 +990,7 @@
 .btn-template-chip:hover,
 .btn-template-chip.active {
   background: #e0f2fe;
-  border-color: #38bdf8;
+  border-color: var(--primary);
   color: #0369a1;
 }
 

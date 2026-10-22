@@ -54,12 +54,6 @@
     </div>
   </nav>
 
-  <!-- Notificación Toast -->
-  <div *ngIf="notificationMessage" class="student-toast animate-fade-in" [ngClass]="'toast-' + notificationType" role="status" aria-live="polite">
-    <span class="toast-icon" aria-hidden="true">{{ notificationType === 'success' ? '🎉' : notificationType === 'info' ? 'ℹ️' : '⚠️' }}</span>
-    <span class="toast-text">{{ notificationMessage }}</span>
-  </div>
-
   <main id="main-content" class="student-container">
     
     <!-- Hero Banner de Bienvenida -->

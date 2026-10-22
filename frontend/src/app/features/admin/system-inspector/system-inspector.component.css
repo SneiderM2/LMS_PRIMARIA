@@ -1,10 +1,10 @@
 .system-inspector {
   margin-top: 1.5rem;
-  background: #ffffff;
+  background: var(--bg-surface, #ffffff);
   border-radius: 16px;
   padding: 1.5rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
-  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.03);
+  border: 1px solid var(--border-color, #cbd5e1);
 }
 
 /* Cabecera */
@@ -857,33 +857,39 @@
 }
 
 /* Adaptación Dark Mode para Auditoría */
+:host-context(body.dark-theme) .system-inspector,
 :host-context(body.dark-mode) .system-inspector {
   background: #0f172a;
   border-color: #334155;
 }
 
+:host-context(body.dark-theme) .header-titles h2,
 :host-context(body.dark-mode) .header-titles h2 {
   color: #f8fafc;
 }
 
+:host-context(body.dark-theme) .badge-audit,
 :host-context(body.dark-mode) .badge-audit {
   background: rgba(99, 102, 241, 0.2);
   color: #a5b4fc;
   border-color: rgba(99, 102, 241, 0.4);
 }
 
+:host-context(body.dark-theme) .cell-ip code,
 :host-context(body.dark-mode) .cell-ip code {
   background: #1e293b;
   color: #94a3b8;
   border-color: #334155;
 }
 
+:host-context(body.dark-theme) .audit-pagination-bar,
 :host-context(body.dark-mode) .audit-pagination-bar {
   background: #1e293b;
   border-color: #334155;
   color: #cbd5e1;
 }
 
+:host-context(body.dark-theme) .page-indicator,
 :host-context(body.dark-mode) .page-indicator {
   color: #f1f5f9;
 }
@@ -983,18 +989,21 @@
   background: rgba(139, 92, 246, 0.12);
 }
 
+:host-context(body.dark-theme) .inline-log-detail-preview,
 :host-context(body.dark-mode) .inline-log-detail-preview {
   background: rgba(30, 41, 59, 0.75);
   color: #cbd5e1;
   border-left-color: #818cf8;
 }
 
+:host-context(body.dark-theme) .log-kpi-chip,
 :host-context(body.dark-mode) .log-kpi-chip {
   background: #1e293b;
   border-color: #334155;
   color: #cbd5e1;
 }
 
+:host-context(body.dark-theme) .log-kpi-chip .kpi-count,
 :host-context(body.dark-mode) .log-kpi-chip .kpi-count {
   background: #0f172a;
   color: #f8fafc;

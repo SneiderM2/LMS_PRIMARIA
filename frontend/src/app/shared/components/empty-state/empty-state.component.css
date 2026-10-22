@@ -50,24 +50,32 @@
 }
 
 /* Modo oscuro */
+:host-context(body.dark-theme) .empty-state-card,
 :host-context(body.dark-mode) .empty-state-card,
+body.dark-theme .empty-state-card,
 body.dark-mode .empty-state-card {
   background: rgba(30, 41, 59, 0.6);
   border-color: #334155;
 }
 
+:host-context(body.dark-theme) .empty-icon-bubble,
 :host-context(body.dark-mode) .empty-icon-bubble,
+body.dark-theme .empty-icon-bubble,
 body.dark-mode .empty-icon-bubble {
   background: #0f172a;
   border-color: #0284c7;
 }
 
+:host-context(body.dark-theme) .empty-title,
 :host-context(body.dark-mode) .empty-title,
+body.dark-theme .empty-title,
 body.dark-mode .empty-title {
   color: #f8fafc;
 }
 
+:host-context(body.dark-theme) .empty-message,
 :host-context(body.dark-mode) .empty-message,
+body.dark-theme .empty-message,
 body.dark-mode .empty-message {
   color: #94a3b8;
 }

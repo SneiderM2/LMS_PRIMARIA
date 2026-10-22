@@ -124,10 +124,18 @@
 }
 
 /* Modo oscuro */
+:host-context(body.dark-theme) .skeleton-card,
+:host-context(body.dark-theme) .skeleton-kpi-card,
+:host-context(body.dark-theme) .skeleton-table,
+:host-context(body.dark-theme) .skeleton-list-item,
 :host-context(body.dark-mode) .skeleton-card,
 :host-context(body.dark-mode) .skeleton-kpi-card,
 :host-context(body.dark-mode) .skeleton-table,
 :host-context(body.dark-mode) .skeleton-list-item,
+body.dark-theme .skeleton-card,
+body.dark-theme .skeleton-kpi-card,
+body.dark-theme .skeleton-table,
+body.dark-theme .skeleton-list-item,
 body.dark-mode .skeleton-card,
 body.dark-mode .skeleton-kpi-card,
 body.dark-mode .skeleton-table,
@@ -136,12 +144,16 @@ body.dark-mode .skeleton-list-item {
   border-color: #334155;
 }
 
+:host-context(body.dark-theme) .skeleton-table-header,
 :host-context(body.dark-mode) .skeleton-table-header,
+body.dark-theme .skeleton-table-header,
 body.dark-mode .skeleton-table-header {
   background: #0f172a;
 }
 
+:host-context(body.dark-theme) .skeleton-block,
 :host-context(body.dark-mode) .skeleton-block,
+body.dark-theme .skeleton-block,
 body.dark-mode .skeleton-block {
   background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
   background-size: 200% 100%;

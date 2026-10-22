@@ -305,11 +305,6 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
   }
 
   private showToast(msg: string, type: 'success' | 'info' | 'warning' = 'info'): void {
-    if (this.toastTimeoutId) {
-      clearTimeout(this.toastTimeoutId);
-    }
-    this.notificationMessage = msg;
-    this.notificationType = type;
     if (type === 'success') {
       this.toastService.success(msg);
     } else if (type === 'warning') {
@@ -317,10 +312,6 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
     } else {
       this.toastService.info(msg);
     }
-    this.toastTimeoutId = setTimeout(() => {
-      this.notificationMessage = '';
-      this.toastTimeoutId = null;
-    }, 4500);
   }
 
   public selectSubject(subjectName: string): void {

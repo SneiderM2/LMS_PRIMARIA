@@ -942,14 +942,13 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
   }
 
   public showToast(message: string, type: 'success' | 'info' | 'error'): void {
-    if (this.toastTimeoutId) {
-      clearTimeout(this.toastTimeoutId);
+    if (type === 'error') {
+      this.toastService.error(message);
+    } else if (type === 'info') {
+      this.toastService.info(message);
+    } else {
+      this.toastService.success(message);
     }
-    this.enrollNotification = { message, type };
-    this.toastTimeoutId = setTimeout(() => {
-      this.enrollNotification = null;
-      this.toastTimeoutId = null;
-    }, 4500);
   }
 
   public exportCurrentTabReport(format: 'csv' | 'pdf'): void {

@@ -139,13 +139,19 @@ interface ComputedArc {
       font-weight: 700;
       color: #0f172a;
     }
+    :host-context(body.dark-theme) .donut-center-val,
     :host-context(body.dark-mode) .donut-center-val,
+    body.dark-theme .donut-center-val,
     body.dark-mode .donut-center-val,
+    :host-context(body.dark-theme) .legend-val,
     :host-context(body.dark-mode) .legend-val,
+    body.dark-theme .legend-val,
     body.dark-mode .legend-val {
       color: #f8fafc;
     }
+    :host-context(body.dark-theme) .legend-item,
     :host-context(body.dark-mode) .legend-item,
+    body.dark-theme .legend-item,
     body.dark-mode .legend-item {
       color: #cbd5e1;
     }

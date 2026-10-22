@@ -68,12 +68,6 @@
     </div>
   </nav>
 
-  <!-- Toast flotante de notificación -->
-  <div *ngIf="enrollNotification" class="toast-notification animate-fade-in" [ngClass]="'toast-' + enrollNotification.type" role="status" aria-live="polite">
-    <span class="toast-icon" aria-hidden="true">{{ enrollNotification.type === 'success' ? '✅' : enrollNotification.type === 'info' ? 'ℹ️' : '⚠️' }}</span>
-    <span>{{ enrollNotification.message }}</span>
-  </div>
-
   <main id="main-content" class="main-container">
 
     <!-- ========================================================================= -->
