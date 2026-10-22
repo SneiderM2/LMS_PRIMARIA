@@ -10,30 +10,26 @@ namespace LMS.API.Controllers;
 [AllowAnonymous]
 public class HealthController : ControllerBase
 {
-    private readonly LMSDbContext _context;
-    private readonly IFileStorageService _storage;
-
-    public HealthController(LMSDbContext context, IFileStorageService storage)
-    {
-        _context = context;
-        _storage = storage;
-    }
-
     /// <summary>
     /// Verificación de salud completa (Base de datos y Almacenamiento).
     /// GET: /api/health
     /// </summary>
     [HttpGet]
     [ResponseCache(NoStore = true)]
-    public async Task<IActionResult> CheckHealth(CancellationToken cancellationToken)
+    public async Task<IActionResult> CheckHealth(
+        [FromServices] LMSDbContext context,
+        [FromServices] IFileStorageService storage,
+        [FromServices] ILogger<HealthController> logger,
+        CancellationToken cancellationToken)
     {
         var dbOk = false;
         try
         {
-            dbOk = await _context.Database.CanConnectAsync(cancellationToken);
+            dbOk = await context.Database.CanConnectAsync(cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogError(ex, "Fallo en la verificación de salud de la base de datos.");
             dbOk = false;
         }
 
@@ -41,7 +37,7 @@ public class HealthController : ControllerBase
         {
             status = dbOk ? "Healthy" : "Degraded",
             database = dbOk ? "Healthy" : "Unhealthy",
-            storage = _storage.ProviderName,
+            storage = storage.ProviderName,
             timestamp = DateTime.UtcNow
         };
 
@@ -79,7 +75,8 @@ public class HealthController : ControllerBase
     {
         return Ok(new
         {
-            status = "Pong",
+            status = "healthy",
+            message = "LMS Primary School API is active and ready.",
             timestamp = DateTime.UtcNow
         });
     }

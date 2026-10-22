@@ -34,7 +34,7 @@ public class SecurityHeadersMiddleware
             "midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), " +
             "screen-wake-lock=(), sync-xhr=(), usb=(), xr-spatial-tracking=()";
         headers["Cross-Origin-Opener-Policy"] = "same-origin";
-        headers["Cross-Origin-Resource-Policy"] = "same-site";
+        headers["Cross-Origin-Resource-Policy"] = "cross-origin";
         headers["X-Permitted-Cross-Domain-Policies"] = "none";
         headers["X-Download-Options"] = "noopen";
 

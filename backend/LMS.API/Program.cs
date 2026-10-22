@@ -373,9 +373,7 @@ app.Lifetime.ApplicationStarted.Register(() =>
 // ---------------------------------------------------------------------------
 app.UseResponseCompression();
 app.UseForwardedHeaders();
-app.UseGlobalExceptionHandler();
 app.UseSecurityHeaders();
-app.UseRequestLogging();
 
 if (app.Environment.IsDevelopment())
 {
@@ -396,65 +394,16 @@ app.UseHttpsRedirection();
 
 app.UseRouting();
 app.UseCors("FrontendPolicy");
+app.UseGlobalExceptionHandler();
+app.UseRequestLogging();
 app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseSingleSessionValidation();
 app.UseAuthorization();
 
-// ---------------------------------------------------------------------------
-// 14. Endpoints de salud (sin filtrar detalles internos)
-// ---------------------------------------------------------------------------
-app.MapGet("/api/ping", () => Results.Ok(new
-{
-    status = "healthy",
-    message = "LMS Primary School API is active and ready.",
-    timestamp = DateTime.UtcNow
-})).AllowAnonymous();
-
-app.MapGet("/api/health/live", () => Results.Ok(new
-{
-    status = "alive",
-    timestamp = DateTime.UtcNow
-})).AllowAnonymous();
-
-app.MapGet("/api/health", async (LMSDbContext context, ILogger<Program> logger) =>
-{
-    try
-    {
-        string? dbError = null;
-        var canConnect = false;
-        try
-        {
-            var conn = context.Database.GetDbConnection();
-            await conn.OpenAsync();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT 1;";
-            await cmd.ExecuteScalarAsync();
-            await conn.CloseAsync();
-            canConnect = true;
-        }
-        catch (Exception ex)
-        {
-            dbError = ex.Message + (ex.InnerException != null ? " | " + ex.InnerException.Message : "");
-            logger.LogError(ex, "Fallo conectando a la base de datos.");
-        }
-
-        return Results.Ok(new
-        {
-            status = canConnect ? "healthy" : "degraded",
-            database = canConnect ? "connected" : "error",
-            error = dbError,
-            timestamp = DateTime.UtcNow
-        });
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Fallo en la verificación de salud de la base de datos.");
-        return Results.Json(new { status = "error", error = ex.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
-    }
-}).AllowAnonymous();
-
+// Los endpoints /api/health, /api/health/live y /api/ping están registrados
+// en HealthController para evitar conflictos de rutas ambiguas (AmbiguousMatchException).
 app.MapControllers();
 
 app.Run();

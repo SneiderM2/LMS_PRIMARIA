@@ -16,12 +16,14 @@ public class SingleSessionMiddleware
         _logger = logger;
     }
 
-    public async Task InvokeAsync(HttpContext context, LMSDbContext dbContext)
+    public async Task InvokeAsync(HttpContext context)
     {
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
 
-        // Omitir la validación estricta en endpoints de autenticación inicial y backup
-        if (path.Contains("/api/auth/login") || 
+        // Omitir la validación estricta en endpoints de salud, autenticación inicial y backup
+        if (path.StartsWith("/api/health") ||
+            path.StartsWith("/api/ping") ||
+            path.Contains("/api/auth/login") || 
             path.Contains("/api/auth/google-login") || 
             path.Contains("/api/auth/register") || 
             path.Contains("/api/auth/seed-users") ||
@@ -38,6 +40,7 @@ public class SingleSessionMiddleware
 
             if (!string.IsNullOrEmpty(username))
             {
+                var dbContext = context.RequestServices.GetRequiredService<LMSDbContext>();
                 var currentDbSessionToken = await dbContext.Usuarios
                     .AsNoTracking()
                     .Where(u => u.Username.ToLower() == username.ToLower())
