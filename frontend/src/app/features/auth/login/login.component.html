@@ -68,9 +68,12 @@
           <label for="password">
             <span class="label-icon">🔒</span> {{ 'login.passwordLabel' | translate }}
           </label>
-          <div class="input-box">
-            <input id="password" type="password" name="password" [(ngModel)]="password" [placeholder]="'login.passwordPlaceholder' | translate" required
-              autocomplete="current-password" />
+          <div class="input-box input-with-eye">
+            <input id="password" [type]="showLoginPassword ? 'text' : 'password'" name="password" [(ngModel)]="password" [placeholder]="'login.passwordPlaceholder' | translate" required
+              autocomplete="current-password" maxlength="128" />
+            <button type="button" class="btn-eye" (click)="showLoginPassword = !showLoginPassword" [attr.aria-label]="showLoginPassword ? 'Ocultar contraseña' : 'Ver contraseña'">
+              {{ showLoginPassword ? '🙈' : '👁️' }}
+            </button>
           </div>
         </div>
 
@@ -231,24 +234,41 @@
         <div class="form-row-2">
           <div class="form-group">
             <label for="regPassword">
-              <span class="label-icon" aria-hidden="true">🔒</span> {{ 'login.regPasswordLabel' | translate }}
+              <span class="label-icon" aria-hidden="true">🔒</span> {{ 'login.regPasswordLabel' | translate }} (4 a 10 caract.)
             </label>
-            <div class="input-box">
-              <input id="regPassword" type="password" name="regPassword" [(ngModel)]="regPassword"
-                [placeholder]="'login.regPasswordPlaceholder' | translate" minlength="8" maxlength="128" required
-                aria-describedby="regPasswordHint" />
+            <div class="input-box input-with-eye">
+              <input id="regPassword" [type]="showRegPassword ? 'text' : 'password'" name="regPassword" [(ngModel)]="regPassword"
+                [placeholder]="'login.regPasswordPlaceholder' | translate" minlength="4" maxlength="10" required
+                aria-describedby="regPasswordMeter" />
+              <button type="button" class="btn-eye" (click)="showRegPassword = !showRegPassword" [attr.aria-label]="showRegPassword ? 'Ocultar contraseña' : 'Ver contraseña'">
+                {{ showRegPassword ? '🙈' : '👁️' }}
+              </button>
             </div>
-            <small id="regPasswordHint" class="field-hint">Mínimo 8 caracteres, incluyendo mayúscula, minúscula, número y carácter especial.</small>
+            <app-password-policy-meter
+              id="regPasswordMeter"
+              [password]="regPassword"
+              [username]="regId"
+              [fullName]="regFullName">
+            </app-password-policy-meter>
           </div>
 
           <div class="form-group">
             <label for="regConfirmPassword">
               <span class="label-icon" aria-hidden="true">🔐</span> {{ 'login.regConfirmPasswordLabel' | translate }}
             </label>
-            <div class="input-box">
-              <input id="regConfirmPassword" type="password" name="regConfirmPassword" [(ngModel)]="regConfirmPassword"
-                [placeholder]="'login.regConfirmPasswordPlaceholder' | translate" maxlength="128" required />
+            <div class="input-box input-with-eye">
+              <input id="regConfirmPassword" [type]="showRegConfirmPassword ? 'text' : 'password'" name="regConfirmPassword" [(ngModel)]="regConfirmPassword"
+                [placeholder]="'login.regConfirmPasswordPlaceholder' | translate" minlength="4" maxlength="10" required />
+              <button type="button" class="btn-eye" (click)="showRegConfirmPassword = !showRegConfirmPassword" [attr.aria-label]="showRegConfirmPassword ? 'Ocultar contraseña' : 'Ver contraseña'">
+                {{ showRegConfirmPassword ? '🙈' : '👁️' }}
+              </button>
             </div>
+            <small *ngIf="regConfirmPassword && regPassword !== regConfirmPassword" class="mismatch-text">
+              ❌ Las contraseñas no coinciden.
+            </small>
+            <small *ngIf="regConfirmPassword && regPassword === regConfirmPassword && regPassword" class="match-text">
+              ✓ Las contraseñas coinciden.
+            </small>
           </div>
         </div>
 

@@ -16,6 +16,9 @@ import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { LanguageSelectorComponent } from '../../shared/components/language-selector/language-selector.component';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { PasswordPolicyMeterComponent } from '../../shared/components/password-policy-meter/password-policy-meter.component';
+import { ChangePasswordModalComponent } from '../../shared/components/change-password-modal/change-password-modal.component';
+import { PasswordPolicyService } from '../../core/services/password-policy.service';
 
 @Component({
   selector: 'app-teacher-dashboard',
@@ -26,7 +29,9 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
     TranslatePipe,
     LanguageSelectorComponent,
     SkeletonComponent,
-    EmptyStateComponent
+    EmptyStateComponent,
+    PasswordPolicyMeterComponent,
+    ChangePasswordModalComponent
   ],
   templateUrl: './teacher-dashboard.component.html',
   styleUrls: ['./teacher-dashboard.component.css']
@@ -150,6 +155,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
   // Notificaciones
   public enrollingMap: { [key: number]: boolean } = {};
   public enrollNotification: { message: string; type: 'success' | 'info' | 'error' } | null = null;
+  public showChangePasswordModal = false;
   private readonly destroy$ = new Subject<void>();
   private toastTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -160,8 +166,22 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
     private fileDownload: FileDownloadService,
     private toastService: ToastService,
     private confirmDialogService: ConfirmDialogService,
-    private excelExportService: ExcelExportService
+    private excelExportService: ExcelExportService,
+    private passwordPolicyService: PasswordPolicyService
   ) {}
+
+  public generatePasswordForNewStudent(): void {
+    this.newStudent.password = this.passwordPolicyService.generateSecurePassword(8);
+  }
+
+  public copyPassword(pwd: string): void {
+    if (!pwd) return;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(pwd).then(() => {
+        this.toastService.success('Contraseña copiada al portapapeles', 'Copiado');
+      });
+    }
+  }
 
   ngOnInit(): void {
     this.loadAcademicMetrics();
@@ -899,14 +919,9 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
 
     const password = this.newStudent.password.trim();
     if (password.length > 0) {
-      const hasMinLength = password.length >= 8;
-      const hasUpper = /[A-ZÁÉÍÓÚÑ]/.test(password);
-      const hasLower = /[a-záéíóúñ]/.test(password);
-      const hasDigit = /\d/.test(password);
-      const hasSpecial = /[^A-Za-z0-9\s]/.test(password);
-
-      if (!hasMinLength || !hasUpper || !hasLower || !hasDigit || !hasSpecial) {
-        this.createStudentError = 'La contraseña personalizada debe tener mínimo 8 caracteres e incluir mayúscula, minúscula, número y carácter especial.';
+      const validation = this.passwordPolicyService.validate(password, this.newStudent.username, this.newStudent.fullName);
+      if (!validation.isValid) {
+        this.createStudentError = validation.errors[0] || 'La contraseña personalizada debe tener entre 4 y 10 caracteres e incluir mayúscula, minúscula, número y símbolo (@, #, !, etc.).';
         return;
       }
     }

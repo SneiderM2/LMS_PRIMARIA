@@ -8,20 +8,18 @@ namespace LMS.API.Services;
 /// </summary>
 public static class PasswordPolicy
 {
-    public const int MinLength = 8;
-    public const int MaxLength = 128;
+    public const int MinLength = 4;
+    public const int MaxLength = 10;
 
     private const string SpecialCharacters = "!@#$%^&*()_+-=[]{};':\"\\|,.<>/?~`";
 
-    // Lista corta de contraseñas comprometidas de uso frecuente en Colombia y en el proyecto.
+    // Lista corta de contraseñas comprometidas de uso frecuente (4 a 10 caracteres).
     private static readonly HashSet<string> BlockedPasswords = new(StringComparer.OrdinalIgnoreCase)
     {
-        "123456", "123456789", "12345678", "1234567890", "password", "password123",
-        "admin123", "docente123", "estudiante123", "qwerty123", "abc123456",
-        "colombia2026", "lmsprimaria", "lms2026", "colegio123", "escuela123",
-        "admin123456", "Password123", "Password123!", "Password1234", "12345678910", "123456789a",
-        "1q2w3e4r5t6y", "iloveyou", "princesa", "bogota2026", "medellin2026",
-        "Admin123!", "Docente123!", "Estudiante123!", "Colombia2026!"
+        "1234", "12345", "123456", "12345678", "123456789", "1234567890",
+        "admin", "admin123", "docente", "docente123", "alumno", "alumno123",
+        "qwerty", "password", "clave123", "colegio1", "escuela1",
+        "Admin123!", "Docente1!", "Alumno123!", "Col2026!"
     };
 
     /// <summary>
@@ -32,7 +30,7 @@ public static class PasswordPolicy
 
     /// <summary>
     /// Valida una contraseña en texto plano. Devuelve el motivo legible del rechazo.
-    /// Exige mínimo 8 caracteres, al menos una mayúscula, una minúscula, un número y un carácter especial.
+    /// Exige entre 4 y 10 caracteres, al menos una mayúscula, una minúscula, un número y un carácter especial.
     /// </summary>
     public static (bool IsValid, string Message) Validate(string? password, string? username = null, string? fullName = null)
     {
@@ -73,10 +71,10 @@ public static class PasswordPolicy
 
         if (!password.Any(IsSpecialCharacter))
         {
-            return (false, "La contraseña debe incluir al menos un carácter especial (por ejemplo: !@#$%&*+-_?).");
+            return (false, "La contraseña debe incluir al menos un carácter especial (por ejemplo: @, #, !, $, %).");
         }
 
-        if (password.Distinct().Count() < 5)
+        if (password.Distinct().Count() < Math.Min(4, password.Length))
         {
             return (false, "La contraseña es demasiado repetitiva. Usa una combinación más variada.");
         }
@@ -101,14 +99,14 @@ public static class PasswordPolicy
     }
 
     /// <summary>
-    /// Genera una contraseña temporal criptográficamente segura (mayúscula, minúscula,
-    /// dígito y carácter especial, sin caracteres ambiguos) para entregar al acudiente o al usuario.
+    /// Genera una contraseña temporal criptográficamente segura dentro del rango de 4 a 10 caracteres
+    /// (mayúscula, minúscula, dígito y carácter especial, sin caracteres ambiguos) para entregar al acudiente o usuario.
     /// </summary>
-    public static string GenerateTemporaryPassword(int length = 16)
+    public static string GenerateTemporaryPassword(int length = 8)
     {
         const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*+-_?";
         const string specials = "!@#$%&*+-_?";
-        var safeLength = Math.Max(MinLength, length);
+        var safeLength = Math.Clamp(length, MinLength, MaxLength);
         var buffer = new char[safeLength];
 
         for (var i = 0; i < safeLength; i++)
@@ -121,6 +119,13 @@ public static class PasswordPolicy
         buffer[1] = (char)('a' + System.Security.Cryptography.RandomNumberGenerator.GetInt32(26));
         buffer[2] = (char)('2' + System.Security.Cryptography.RandomNumberGenerator.GetInt32(8));
         buffer[3] = specials[System.Security.Cryptography.RandomNumberGenerator.GetInt32(specials.Length)];
+
+        // Mezclar aleatoriamente las posiciones (Fisher-Yates) para que no siempre empiece con el mismo orden
+        for (var i = safeLength - 1; i > 0; i--)
+        {
+            var j = System.Security.Cryptography.RandomNumberGenerator.GetInt32(i + 1);
+            (buffer[i], buffer[j]) = (buffer[j], buffer[i]);
+        }
 
         return new string(buffer);
     }

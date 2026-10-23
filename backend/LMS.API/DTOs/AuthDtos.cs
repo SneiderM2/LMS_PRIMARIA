@@ -77,8 +77,8 @@ public class RegisterRequestDto
     public string FullName { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "La contraseña es requerida")]
-    [MinLength(8, ErrorMessage = "La contraseña debe tener al menos 8 caracteres, incluyendo mayúscula, minúscula, número y carácter especial")]
-    [MaxLength(128)]
+    [MinLength(4, ErrorMessage = "La contraseña debe tener entre 4 y 10 caracteres, incluyendo mayúscula, minúscula, número y símbolo (@, #, !, etc.)")]
+    [MaxLength(10, ErrorMessage = "La contraseña no puede superar 10 caracteres")]
     public string Password { get; set; } = string.Empty;
 
     /// <summary>
@@ -139,8 +139,8 @@ public class ChangePasswordDto
     public string CurrentPassword { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "La nueva contraseña es requerida")]
-    [MinLength(8, ErrorMessage = "La nueva contraseña debe tener al menos 8 caracteres, incluyendo mayúscula, minúscula, número y carácter especial")]
-    [MaxLength(128)]
+    [MinLength(4, ErrorMessage = "La nueva contraseña debe tener entre 4 y 10 caracteres, incluyendo mayúscula, minúscula, número y símbolo (@, #, !, etc.)")]
+    [MaxLength(10, ErrorMessage = "La nueva contraseña no puede superar 10 caracteres")]
     public string NewPassword { get; set; } = string.Empty;
 
     public string? ConfirmNewPassword { get; set; }

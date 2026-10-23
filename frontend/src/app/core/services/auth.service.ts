@@ -92,6 +92,14 @@ export class AuthService {
   }
 
   /**
+   * Cambia la contraseña del usuario autenticado validando política estricta (4 a 10 caracteres).
+   */
+  public changePassword(currentPassword: string, newPassword: string, confirmNewPassword?: string): Observable<any> {
+    const body = { currentPassword, newPassword, confirmNewPassword };
+    return this.http.post<any>(`${this.apiUrl}/auth/change-password`, body);
+  }
+
+  /**
    * Polling ligero / Validación: verifica que la sesión actual siga siendo válida en el servidor.
    */
   public validateSession(skipInterceptorRedirect = false): Observable<{ valid: boolean }> {

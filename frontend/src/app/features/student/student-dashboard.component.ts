@@ -15,6 +15,7 @@ import { NotificationBellComponent } from '../../shared/components/notification-
 import { MonthCalendarComponent, CalendarEvent } from '../../shared/components/calendar/month-calendar.component';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { ChangePasswordModalComponent } from '../../shared/components/change-password-modal/change-password-modal.component';
 
 @Component({
   selector: 'app-student-dashboard',
@@ -28,7 +29,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
     NotificationBellComponent,
     MonthCalendarComponent,
     SkeletonComponent,
-    EmptyStateComponent
+    EmptyStateComponent,
+    ChangePasswordModalComponent
   ],
   templateUrl: './student-dashboard.component.html',
   styleUrls: ['./student-dashboard.component.css']
@@ -67,6 +69,7 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
   public coursesLoading = false;
   public notificationMessage = '';
   public notificationType: 'success' | 'info' | 'warning' = 'info';
+  public showChangePasswordModal = false;
 
   // Control del modal de entrega Drag & Drop y detalle de tarea
   public showDropZone = false;

@@ -6,6 +6,8 @@ import { Subject, takeUntil } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { UserRole } from '../../../core/models/user.model';
 import { SessionTimeoutService } from '../../../core/services/session-timeout.service';
+import { PasswordPolicyService } from '../../../core/services/password-policy.service';
+import { PasswordPolicyMeterComponent } from '../../../shared/components/password-policy-meter/password-policy-meter.component';
 import { environment } from '../../../../environments/environment';
 
 import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
@@ -16,7 +18,7 @@ declare const grecaptcha: any;
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe],
+  imports: [CommonModule, FormsModule, TranslatePipe, PasswordPolicyMeterComponent],
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css']
 })
@@ -32,6 +34,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   // Campos de Iniciar Sesión
   public id = '';
   public password = '';
+  public showLoginPassword = false;
 
   // Sprint 4: Honeypot (trampa invisible para bots)
   public honeypotTrap = '';
@@ -49,6 +52,8 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   public regFullName = '';
   public regPassword = '';
   public regConfirmPassword = '';
+  public showRegPassword = false;
+  public showRegConfirmPassword = false;
   public regRole: UserRole = 'Student';
   public regGrade = '1°';
   public regHoneypot = '';
@@ -78,6 +83,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     private authService: AuthService,
     private sessionTimeoutService: SessionTimeoutService,
+    private passwordPolicyService: PasswordPolicyService,
     private route: ActivatedRoute,
     private ngZone: NgZone
   ) { }
@@ -447,23 +453,9 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private validateNormalizedPassword(pwd: string): string | null {
-    if (pwd.length < 8) {
-      return 'La contraseña debe tener al menos 8 caracteres 🔒';
-    }
-    if (/\s/.test(pwd)) {
-      return 'La contraseña no debe contener espacios en blanco 🔒';
-    }
-    if (!/[A-Z]/.test(pwd)) {
-      return 'La contraseña debe incluir al menos una letra mayúscula (A-Z) 🔒';
-    }
-    if (!/[a-z]/.test(pwd)) {
-      return 'La contraseña debe incluir al menos una letra minúscula (a-z) 🔒';
-    }
-    if (!/[0-9]/.test(pwd)) {
-      return 'La contraseña debe incluir al menos un número (0-9) 🔒';
-    }
-    if (!/[^A-Za-z0-9\s]/.test(pwd)) {
-      return 'La contraseña debe incluir al menos un carácter especial (ej. !@#$%&*+-_?) 🔒';
+    const res = this.passwordPolicyService.validate(pwd, this.regId, this.regFullName);
+    if (!res.isValid) {
+      return res.errors[0] || 'La contraseña debe tener entre 4 y 10 caracteres, incluyendo mayúscula, minúscula, número y símbolo (@, #, !, etc.) 🔒';
     }
     return null;
   }

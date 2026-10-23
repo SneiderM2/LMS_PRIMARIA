@@ -17,6 +17,9 @@
         <span class="user-grade">📚 {{ authService.currentUser()?.gradeLevel || ('teacher.roleTeacher' | translate) }}</span>
       </div>
       <app-language-selector mode="inline"></app-language-selector>
+      <button class="btn btn-secondary btn-sm" (click)="showChangePasswordModal = true" title="Cambiar mi contraseña">
+        🔑 Contraseña
+      </button>
       <button class="btn btn-secondary btn-sm" (click)="logout()" [title]="'nav.logout' | translate">
         🚪 {{ 'nav.logout' | translate }}
       </button>
@@ -1158,10 +1161,26 @@
               </select>
             </div>
             <div class="form-group col">
-              <label>{{ 'teacher.studentPassLabel' | translate }}</label>
-              <input type="password" [(ngModel)]="newStudent.password" name="sPass" class="form-input"
-                minlength="8" maxlength="128" placeholder="Mín. 8 caract. (Aa1!) u opcional"
-                autocomplete="new-password" />
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                <label style="margin: 0;">{{ 'teacher.studentPassLabel' | translate }} (4 a 10 caract.)</label>
+                <button type="button" class="btn btn-sm btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.72rem;" (click)="generatePasswordForNewStudent()">
+                  🎲 Generar
+                </button>
+              </div>
+              <div style="position: relative; display: flex; align-items: center;">
+                <input type="text" [(ngModel)]="newStudent.password" name="sPass" class="form-input"
+                  minlength="4" maxlength="10" placeholder="Ej: Clave1&#64; (4-10)"
+                  autocomplete="new-password" />
+                <button *ngIf="newStudent.password" type="button" class="btn btn-sm btn-secondary" style="position: absolute; right: 6px; padding: 0.25rem 0.5rem; font-size: 0.72rem;" (click)="copyPassword(newStudent.password)" title="Copiar">
+                  📋 Copiar
+                </button>
+              </div>
+              <app-password-policy-meter
+                *ngIf="newStudent.password"
+                [password]="newStudent.password"
+                [username]="newStudent.username"
+                [compact]="true">
+              </app-password-policy-meter>
             </div>
           </div>
           <div class="modal-actions">
@@ -1248,5 +1267,11 @@
 
     </div>
   </div>
+
+  <!-- Modal Cambiar mi contraseña docente -->
+  <app-change-password-modal
+    [isOpen]="showChangePasswordModal"
+    (close)="showChangePasswordModal = false">
+  </app-change-password-modal>
 
 </div>

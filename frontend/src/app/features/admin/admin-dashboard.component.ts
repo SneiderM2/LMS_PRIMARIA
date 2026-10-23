@@ -15,6 +15,9 @@ import { MiniBarChartComponent } from '../../shared/components/charts/mini-bar-c
 import { DonutChartComponent } from '../../shared/components/charts/donut-chart.component';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { PasswordPolicyMeterComponent } from '../../shared/components/password-policy-meter/password-policy-meter.component';
+import { ChangePasswordModalComponent } from '../../shared/components/change-password-modal/change-password-modal.component';
+import { PasswordPolicyService } from '../../core/services/password-policy.service';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -28,7 +31,9 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
     MiniBarChartComponent,
     DonutChartComponent,
     SkeletonComponent,
-    EmptyStateComponent
+    EmptyStateComponent,
+    PasswordPolicyMeterComponent,
+    ChangePasswordModalComponent
   ],
   templateUrl: './admin-dashboard.component.html',
   styleUrls: ['./admin-dashboard.component.css']
@@ -124,6 +129,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   // Toast Flotante
   public toastMessage: string | null = null;
   public toastType: 'success' | 'info' | 'warning' = 'info';
+  public showChangePasswordModal = false;
   private readonly destroy$ = new Subject<void>();
   private toastTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -133,8 +139,26 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     private router: Router,
     private reportService: ReportExportService,
     private toastService: ToastService,
-    private confirmDialogService: ConfirmDialogService
+    private confirmDialogService: ConfirmDialogService,
+    private passwordPolicyService: PasswordPolicyService
   ) { }
+
+  public generatePasswordForNewUser(): void {
+    this.newUser.password = this.passwordPolicyService.generateSecurePassword(8);
+  }
+
+  public generatePasswordForEditUser(): void {
+    this.editUserForm.password = this.passwordPolicyService.generateSecurePassword(8);
+  }
+
+  public copyPassword(pwd: string): void {
+    if (!pwd) return;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(pwd).then(() => {
+        this.toastService.success('Contraseña copiada al portapapeles', 'Copiado');
+      });
+    }
+  }
 
   ngOnInit(): void {
     this.loadMetrics();

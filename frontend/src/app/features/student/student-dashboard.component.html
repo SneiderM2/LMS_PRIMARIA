@@ -18,6 +18,9 @@
         <span class="kid-grade">⭐ {{ authService.currentUser()?.gradeLevel || ('student.gradePrimary' | translate) }}</span>
       </div>
       <app-language-selector mode="inline"></app-language-selector>
+      <button class="btn btn-secondary btn-sm" (click)="showChangePasswordModal = true" title="Cambiar mi contraseña">
+        🔑 Contraseña
+      </button>
       <button class="btn btn-secondary btn-sm btn-logout" (click)="logout()" [title]="'nav.logout' | translate">
         🚪 {{ 'nav.logout' | translate }}
       </button>
@@ -564,5 +567,11 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal Cambiar mi contraseña estudiante -->
+  <app-change-password-modal
+    [isOpen]="showChangePasswordModal"
+    (close)="showChangePasswordModal = false">
+  </app-change-password-modal>
 
 </div>
