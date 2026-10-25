@@ -459,6 +459,31 @@ body.dark-mode .tab-btn.active {
   border-bottom-color: #38bdf8 !important;
 }
 
+body.dark-theme .friendly-table th,
+body.dark-mode .friendly-table th {
+  background: #0f172a !important;
+  color: #94a3b8 !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+body.dark-theme .friendly-table td,
+body.dark-mode .friendly-table td {
+  border-bottom: 1px solid #1e293b !important;
+  color: #e2e8f0 !important;
+}
+
+body.dark-theme .friendly-logs-section,
+body.dark-mode .friendly-logs-section {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+body.dark-theme .friendly-filters-bar,
+body.dark-mode .friendly-filters-bar {
+  background: #0f172a !important;
+  border-bottom-color: #334155 !important;
+}
+
 body.dark-theme ::-webkit-scrollbar-track,
 body.dark-mode ::-webkit-scrollbar-track {
   background: #0f172a;
