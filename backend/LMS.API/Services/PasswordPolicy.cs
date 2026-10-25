@@ -2,18 +2,18 @@ namespace LMS.API.Services;
 
 /// <summary>
 /// Política institucional de contraseñas.
-/// Alineada con OWASP ASVS 4.0 (V2.1), NIST SP 800-63B y las recomendaciones de la
-/// Resolución MinTIC 1519 de 2020 / MSPI: mínimo 8 caracteres, mayúscula, minúscula,
-/// número, carácter especial, bloqueo de contraseñas comunes y de datos predecibles del titular.
+/// Alineada con NIST SP 800-63B y las recomendaciones de la Resolución MinTIC 1519
+/// de 2020 / MSPI: mínimo 8 caracteres, máximo 64, mayúscula, minúscula, número,
+/// carácter especial, bloqueo de contraseñas comunes y de datos predecibles del titular.
 /// </summary>
 public static class PasswordPolicy
 {
-    public const int MinLength = 4;
-    public const int MaxLength = 10;
+    public const int MinLength = 8;
+    public const int MaxLength = 64;
 
     private const string SpecialCharacters = "!@#$%^&*()_+-=[]{};':\"\\|,.<>/?~`";
 
-    // Lista corta de contraseñas comprometidas de uso frecuente (4 a 10 caracteres).
+    // Lista corta de contraseñas comprometidas de uso frecuente.
     private static readonly HashSet<string> BlockedPasswords = new(StringComparer.OrdinalIgnoreCase)
     {
         "1234", "12345", "123456", "12345678", "123456789", "1234567890",
@@ -30,7 +30,7 @@ public static class PasswordPolicy
 
     /// <summary>
     /// Valida una contraseña en texto plano. Devuelve el motivo legible del rechazo.
-    /// Exige entre 4 y 10 caracteres, al menos una mayúscula, una minúscula, un número y un carácter especial.
+    /// Exige entre 8 y 64 caracteres, al menos una mayúscula, una minúscula, un número y un carácter especial.
     /// </summary>
     public static (bool IsValid, string Message) Validate(string? password, string? username = null, string? fullName = null)
     {
@@ -99,10 +99,10 @@ public static class PasswordPolicy
     }
 
     /// <summary>
-    /// Genera una contraseña temporal criptográficamente segura dentro del rango de 4 a 10 caracteres
+    /// Genera una contraseña temporal criptográficamente segura dentro del rango permitido
     /// (mayúscula, minúscula, dígito y carácter especial, sin caracteres ambiguos) para entregar al acudiente o usuario.
     /// </summary>
-    public static string GenerateTemporaryPassword(int length = 8)
+    public static string GenerateTemporaryPassword(int length = 12)
     {
         const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*+-_?";
         const string specials = "!@#$%&*+-_?";

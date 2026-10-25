@@ -7,7 +7,7 @@
   <div class="floating-bg-item bg-star-2" aria-hidden="true">✨</div>
 
   <div class="login-container">
-    <main id="main-content" class="login-card">
+    <main id="main-content" tabindex="-1" class="login-card">
 
       <!-- Encabezado con Mascota Escolar -->
       <div class="login-header">
@@ -18,9 +18,17 @@
         <p class="portal-subtitle">{{ 'login.subtitle' | translate }}</p>
 
         <!-- Indicador de conexión instantánea del servidor -->
-        <div class="server-status-pill" [class.ready]="isServerReady" [class.warming]="isServerWarming && !isServerReady" role="status" aria-live="polite">
+        <div class="server-status-pill" [class.ready]="isServerReady" [class.warming]="isServerWarming && !isServerReady" [class.unavailable]="isServerUnavailable" role="status" aria-live="polite">
           <span class="status-dot" aria-hidden="true"></span>
-          <span class="status-text">{{ isServerReady ? '⚡ Conexión instantánea activa' : '⏳ Sincronizando con el servidor escolar...' }}</span>
+          <span class="status-text">
+            @if (isServerReady) {
+              ⚡ Conexión instantánea activa
+            } @else if (isServerUnavailable) {
+              ⚠️ El servidor tardó en responder; puedes intentar iniciar sesión
+            } @else {
+              ⏳ Sincronizando con el servidor escolar...
+            }
+          </span>
         </div>
       </div>
 
@@ -234,22 +242,16 @@
         <div class="form-row-2">
           <div class="form-group">
             <label for="regPassword">
-              <span class="label-icon" aria-hidden="true">🔒</span> {{ 'login.regPasswordLabel' | translate }} (4 a 10 caract.)
+              <span class="label-icon" aria-hidden="true">🔒</span> {{ 'login.regPasswordLabel' | translate }} (8–64)
             </label>
             <div class="input-box input-with-eye">
               <input id="regPassword" [type]="showRegPassword ? 'text' : 'password'" name="regPassword" [(ngModel)]="regPassword"
-                [placeholder]="'login.regPasswordPlaceholder' | translate" minlength="4" maxlength="10" required
+                [placeholder]="'login.regPasswordPlaceholder' | translate" minlength="8" maxlength="64" required
                 aria-describedby="regPasswordMeter" />
               <button type="button" class="btn-eye" (click)="showRegPassword = !showRegPassword" [attr.aria-label]="showRegPassword ? 'Ocultar contraseña' : 'Ver contraseña'">
                 {{ showRegPassword ? '🙈' : '👁️' }}
               </button>
             </div>
-            <app-password-policy-meter
-              id="regPasswordMeter"
-              [password]="regPassword"
-              [username]="regId"
-              [fullName]="regFullName">
-            </app-password-policy-meter>
           </div>
 
           <div class="form-group">
@@ -258,7 +260,7 @@
             </label>
             <div class="input-box input-with-eye">
               <input id="regConfirmPassword" [type]="showRegConfirmPassword ? 'text' : 'password'" name="regConfirmPassword" [(ngModel)]="regConfirmPassword"
-                [placeholder]="'login.regConfirmPasswordPlaceholder' | translate" minlength="4" maxlength="10" required />
+                [placeholder]="'login.regConfirmPasswordPlaceholder' | translate" minlength="8" maxlength="64" required />
               <button type="button" class="btn-eye" (click)="showRegConfirmPassword = !showRegConfirmPassword" [attr.aria-label]="showRegConfirmPassword ? 'Ocultar contraseña' : 'Ver contraseña'">
                 {{ showRegConfirmPassword ? '🙈' : '👁️' }}
               </button>
@@ -271,6 +273,13 @@
             </small>
           </div>
         </div>
+
+        <app-password-policy-meter
+          id="regPasswordMeter"
+          [password]="regPassword"
+          [username]="regId"
+          [fullName]="regFullName">
+        </app-password-policy-meter>
 
         <!-- Aceptación de política de tratamiento de datos -->
         <div class="policy-check-register">

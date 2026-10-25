@@ -137,7 +137,7 @@ public class AdminController : ControllerBase
             else if (roleUpper == "TEACHER" || roleUpper == "DOCENTE")
                 query = query.Where(u => u.Rol.Nombre == "DOCENTE");
             else if (roleUpper.Contains("ADMIN"))
-                query = query.Where(u => u.Rol.Nombre == "ADMINISTRADOR" || u.Rol.Nombre == ".admin");
+                query = query.Where(AdminRolePredicate);
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -149,7 +149,7 @@ public class AdminController : ControllerBase
         }
 
         var users = await query
-            .OrderBy(u => (u.Rol.Nombre == "ADMINISTRADOR" || u.Rol.Nombre == ".admin" || u.Rol.Nombre.Contains("ADMIN")) ? 1
+            .OrderBy(u => u.Rol.Nombre.ToLower().Contains("admin") ? 1
                         : (u.Rol.Nombre == "DOCENTE" ? 2
                         : (u.Rol.Nombre == "ALUMNO" ? 3 : 4)))
             .ThenBy(u => (u.Rol.Nombre == "ALUMNO" && (u.Alumno == null || u.Alumno.Grado == null || string.IsNullOrEmpty(u.Alumno.Grado.Nombre))) ? 1 : 0)
@@ -218,6 +218,28 @@ public class AdminController : ControllerBase
 
         if (rol == null) return BadRequest(new { message = "No se encontró el rol en el sistema." });
 
+        Grado? grado = null;
+        string? gradeResult = null;
+        if (targetRoleName == "ALUMNO")
+        {
+            var rawGrade = dto.GradeLevel?.Trim() ?? "1°";
+            var gradeKey = rawGrade.Contains('°') ? rawGrade.Substring(0, rawGrade.IndexOf('°') + 1) : rawGrade;
+            var grados = await _context.Grados.ToListAsync();
+            grado = grados.FirstOrDefault(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
+
+            if (grado == null)
+            {
+                return BadRequest(new
+                {
+                    code = "INVALID_GRADE",
+                    message = $"El grado '{rawGrade}' no existe. Selecciona uno de los grados registrados.",
+                    validGrades = grados.Select(g => g.Nombre).OrderBy(g => g).ToArray()
+                });
+            }
+
+            gradeResult = grado.Nombre;
+        }
+
         var password = dto.Password?.Trim();
         var generatedPassword = false;
 
@@ -247,27 +269,22 @@ public class AdminController : ControllerBase
             Apellido = dto.Apellido.Trim(),
             AvatarUrl = avatarUrl,
             Activo = true,
-            FechaCreacion = DateTime.UtcNow
+            FechaCreacion = DateTime.UtcNow,
+            // Las cuentas creadas por administración no tienen consentimiento presunto.
+            // El titular (o su acudiente) debe aceptar la política en el primer ingreso.
+            DataPolicyAccepted = false,
+            DataPolicyAcceptedAt = null,
+            DataPolicyVersion = null
         };
 
         _context.Usuarios.Add(usuario);
         await _context.SaveChangesAsync();
         InvalidateAdminCache();
 
-        string? gradeResult = null;
-        if (targetRoleName == "ALUMNO")
+        if (targetRoleName == "ALUMNO" && grado != null)
         {
-            var rawGrade = dto.GradeLevel?.Trim() ?? "1°";
-            var gradeKey = rawGrade.Contains('°') ? rawGrade.Substring(0, rawGrade.IndexOf('°') + 1) : rawGrade;
-            var grado = await _context.Grados.FirstOrDefaultAsync(g => g.Nombre == gradeKey || g.Nombre == rawGrade)
-                        ?? await _context.Grados.FirstOrDefaultAsync();
-
-            if (grado != null)
-            {
-                _context.Alumnos.Add(new Alumno { UsuarioId = usuario.Id, GradoId = grado.Id });
-                await _context.SaveChangesAsync();
-                gradeResult = grado.Nombre;
-            }
+            _context.Alumnos.Add(new Alumno { UsuarioId = usuario.Id, GradoId = grado.Id });
+            await _context.SaveChangesAsync();
         }
 
         var result = new AdminUserDto
@@ -348,7 +365,8 @@ public class AdminController : ControllerBase
             if (currentlyAdmin && targetRoleName != "ADMINISTRADOR")
             {
                 var activeAdmins = await _context.Usuarios
-                    .CountAsync(u => u.Activo && (u.Rol.Nombre == "ADMINISTRADOR" || u.Rol.Nombre == ".admin"));
+                    .Where(AdminRolePredicate)
+                    .CountAsync(u => u.Activo);
 
                 if (activeAdmins <= 1)
                 {
@@ -356,7 +374,14 @@ public class AdminController : ControllerBase
                 }
             }
 
-            usuario.RolId = targetRole.Id;
+            if (usuario.RolId != targetRole.Id)
+            {
+                usuario.RolId = targetRole.Id;
+
+                // El rol viaja en el JWT; se invalida la sesión para que el cambio
+                // de privilegios surta efecto de inmediato y no espere 8 horas.
+                usuario.SessionToken = null;
+            }
         }
 
         // Actualizar grado de alumno si aplica
@@ -364,11 +389,20 @@ public class AdminController : ControllerBase
         {
             var rawGrade = dto.GradeLevel.Trim();
             var gradeKey = rawGrade.Contains('°') ? rawGrade[..(rawGrade.IndexOf('°') + 1)] : rawGrade;
-            var grado = await _context.Grados.FirstOrDefaultAsync(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
-            if (grado != null)
+            var grados = await _context.Grados.ToListAsync();
+            var grado = grados.FirstOrDefault(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
+
+            if (grado == null)
             {
-                usuario.Alumno.GradoId = grado.Id;
+                return BadRequest(new
+                {
+                    code = "INVALID_GRADE",
+                    message = $"El grado '{rawGrade}' no existe. Selecciona uno de los grados registrados.",
+                    validGrades = grados.Select(g => g.Nombre).OrderBy(g => g).ToArray()
+                });
             }
+
+            usuario.Alumno.GradoId = grado.Id;
         }
 
         await _context.SaveChangesAsync();
@@ -389,16 +423,39 @@ public class AdminController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ToggleUserStatus(int id)
     {
-        var usuario = await _context.Usuarios.FindAsync(id);
+        var usuario = await _context.Usuarios
+            .Include(u => u.Rol)
+            .FirstOrDefaultAsync(u => u.Id == id);
         if (usuario == null) return NotFound(new { message = "Usuario no encontrado." });
 
-        // No permitir que el admin se inactive a sí mismo accidentalmente
-        if (usuario.Username.Equals(User.Identity?.Name, StringComparison.OrdinalIgnoreCase))
+        // No permitir que el admin se inactive a sí mismo accidentalmente.
+        // NameIdentifier contiene el username; User.Identity.Name contiene el nombre completo.
+        var currentUsername = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (usuario.Username.Equals(currentUsername, StringComparison.OrdinalIgnoreCase))
         {
             return BadRequest(new { message = "No puedes suspender tu propia cuenta de administrador en uso." });
         }
 
+        // Tampoco se debe dejar el sistema sin ningún administrador activo.
+        if (usuario.Activo && IsAdminRole(usuario.Rol?.Nombre))
+        {
+            var activeAdmins = await _context.Usuarios
+                .Where(AdminRolePredicate)
+                .CountAsync(u => u.Activo);
+
+            if (activeAdmins <= 1)
+            {
+                return BadRequest(new { message = "No es posible suspender al último administrador activo." });
+            }
+        }
+
         usuario.Activo = !usuario.Activo;
+        if (!usuario.Activo)
+        {
+            // Invalida inmediatamente el JWT del usuario suspendido.
+            usuario.SessionToken = null;
+        }
+
         await _context.SaveChangesAsync();
         InvalidateAdminCache();
 
@@ -463,14 +520,17 @@ public class AdminController : ControllerBase
 
         var rawGrade = dto.Grado?.Trim() ?? "1°";
         var gradeKey = rawGrade.Contains('°') ? rawGrade.Substring(0, rawGrade.IndexOf('°') + 1) : rawGrade;
-        var grado = await _context.Grados.FirstOrDefaultAsync(g => g.Nombre == gradeKey || g.Nombre == rawGrade)
-                    ?? await _context.Grados.FirstOrDefaultAsync();
+        var grados = await _context.Grados.ToListAsync();
+        var grado = grados.FirstOrDefault(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
 
         if (grado == null)
         {
-            grado = new Grado { Nombre = gradeKey, Descripcion = $"{gradeKey} de primaria" };
-            _context.Grados.Add(grado);
-            await _context.SaveChangesAsync();
+            return BadRequest(new
+            {
+                code = "INVALID_GRADE",
+                message = $"El grado '{rawGrade}' no existe. Selecciona uno de los grados registrados.",
+                validGrades = grados.Select(g => g.Nombre).OrderBy(g => g).ToArray()
+            });
         }
 
         Usuario? docente = null;
@@ -552,8 +612,20 @@ public class AdminController : ControllerBase
         {
             var rawGrade = dto.Grado.Trim();
             var gradeKey = rawGrade.Contains('°') ? rawGrade.Substring(0, rawGrade.IndexOf('°') + 1) : rawGrade;
-            var grado = await _context.Grados.FirstOrDefaultAsync(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
-            if (grado != null) curso.GradoId = grado.Id;
+            var grados = await _context.Grados.ToListAsync();
+            var grado = grados.FirstOrDefault(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
+
+            if (grado == null)
+            {
+                return BadRequest(new
+                {
+                    code = "INVALID_GRADE",
+                    message = $"El grado '{rawGrade}' no existe. Selecciona uno de los grados registrados.",
+                    validGrades = grados.Select(g => g.Nombre).OrderBy(g => g).ToArray()
+                });
+            }
+
+            curso.GradoId = grado.Id;
         }
 
         await _context.SaveChangesAsync();
@@ -1112,6 +1184,15 @@ public class AdminController : ControllerBase
            && (roleName.Equals("ADMINISTRADOR", StringComparison.OrdinalIgnoreCase)
                || roleName.Equals(".admin", StringComparison.OrdinalIgnoreCase)
                || roleName.Equals("Admin", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Predicado equivalente a <see cref="IsAdminRole"/> que EF Core traduce a SQL.
+    /// Incluye el rol legado "Admin" y compara sin distinguir mayúsculas.
+    /// </summary>
+    private static readonly System.Linq.Expressions.Expression<Func<Usuario, bool>> AdminRolePredicate =
+        u => u.Rol.Nombre.ToLower() == "administrador"
+             || u.Rol.Nombre.ToLower() == ".admin"
+             || u.Rol.Nombre.ToLower() == "admin";
 
     private async Task AuditAsync(string action, string? details = null, string level = "AUDIT")
     {

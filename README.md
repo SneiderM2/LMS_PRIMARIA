@@ -19,12 +19,12 @@ Sistema de Gestión de Aprendizaje (LMS) diseñado con arquitectura limpia en **
 
 | Capa | Tecnología | Versión |
 | :--- | :--- | :---: |
-| **Backend** | ASP.NET Core Web API | .NET 8 (net8.0) |
+| **Backend** | ASP.NET Core Web API | .NET 8 (net8.0) — EOL 10/11/2026 |
 | **ORM** | Entity Framework Core + Npgsql PostgreSQL | 8.0.11 |
 | **Autenticación** | JWT Bearer + Google OAuth 2.0 | 8.0.11 / 1.76.0 |
 | **Documentación API** | Swagger / OpenAPI (Swashbuckle) | 6.6.2 |
 | **Hashing** | BCrypt.Net-Next | 4.0.3 |
-| **Frontend** | Angular 18 (Standalone Components) | 18.x |
+| **Frontend** | Angular 18 (Standalone Components) | 18.x — EOL |
 | **Base de datos** | PostgreSQL (Supabase Cloud / Pooler IPv4) | 16.x |
 | **Internacionalización** | i18n Multilingüe en tiempo real | ES, EN, ZH, JA, PT |
 | **Hosting Frontend** | GitHub Pages (SPA + PWA) | — |
@@ -56,6 +56,29 @@ los lineamientos de la **SIC**, el **MSPI** de MinTIC, **ISO/IEC 27001**, **ISO/
 > reCAPTCHA (estuvieron versionadas), cambie las contraseñas de las cuentas demo y complete los datos
 > del responsable del tratamiento. Ver [SETUP_SECRETS.md](SETUP_SECRETS.md).
 
+### Estado de seguridad (auditoría 2026-10)
+
+- La API **no arranca** sin `Jwt:SecretKey` (≥48 caracteres) ni sin `Privacy:EvidenceHmacKey`
+  (≥32 caracteres, distinta de la JWT). Ya no existen claves de respaldo en el código.
+- El CAPTCHA es **fail-closed**: si `Recaptcha__SecretKey` no está configurada en producción, el
+  login y el registro se rechazan. El bypass solo existe en Development y debe habilitarse
+  explícitamente con `Recaptcha__AllowDevBypass=true`.
+- La sesión única y la aceptación vigente de la política se validan en el servidor para cada
+  petición autenticada, no solo en el frontend.
+- `Storage:Provider=Local` sigue disponible para desarrollo, pero en producción el disco de Render
+  es efímero. El servicio actual usa el plan Free, que **no admite discos persistentes**. El bucket
+  privado `lms-uploads` ya existe en Supabase (25 MB), pero la API todavía reporta `storage: "Local"`
+  hasta configurar `Storage__Provider=Supabase`, la URL y la Service Role Key en Render, y desplegar.
+  Si se migra a un plan con disco, use `Storage__RootPath` apuntando al disco montado. El fallback
+  silencioso de Supabase a local está deshabilitado (`Storage:AllowLocalFallback=false`).
+- **Deuda de plataforma:** .NET 8 alcanza su fin de soporte el **10/11/2026** y Angular 18 ya está
+  fuera de soporte. La migración mayor no se ejecutó en esta auditoría; debe planificarse antes de
+  la fecha de EOL de .NET. Mientras tanto, `npm audit --omit=dev` reporta vulnerabilidades altas y
+  moderadas de Angular 18 sin corrección dentro de esa versión mayor.
+- La anonimización por inactividad está **deshabilitada y en modo simulación** por defecto. Actívela
+  solo cuando el responsable del tratamiento apruebe la retención declarada
+  (`Privacy:EnableInactivityAnonymization` y `Privacy:InactivityAnonymizationDryRun`).
+
 ---
 
 ## ✨ Funcionalidades Principales
@@ -64,7 +87,7 @@ los lineamientos de la **SIC**, el **MSPI** de MinTIC, **ISO/IEC 27001**, **ISO/
 - Login con usuario/contraseña + JWT Bearer automático
 - **Precalentamiento inteligente (Warmup):** Ping invisible en segundo plano a `/api/ping` que despierta a Render al cargar la pantalla de login
 - **Píldora interactiva de conexión:** Estado reactivo del servidor en tiempo real (`⏳ Sincronizando con el servidor...` / `⚡ Conexión instantánea activa`)
-- **Búsqueda instantánea en BD:** Índice funcional PostgreSQL `idx_usuarios_lower_username` para validación case-insensitive inmediata
+- **Búsqueda instantánea en BD:** Índice funcional único PostgreSQL `uq_usuarios_lower_username` para validación case-insensitive inmediata
 - Registro público con reCAPTCHA v2, honeypot y **autorización del acudiente** para menores de edad
 - Inicio de sesión con **Google OAuth 2.0** (Google Identity Services)
 - Protección de rutas por rol: `Admin`, `Teacher`, `Student` (`RoleGuard`)
@@ -134,10 +157,11 @@ El proyecto **no incluye credenciales**. Crea el archivo local (ignorado por Git
 Copy-Item backend\LMS.API\appsettings.Example.json backend\LMS.API\appsettings.Local.json
 ```
 
-Completa `ConnectionStrings:DefaultConnection`, `Jwt:SecretKey` (mínimo 64 caracteres),
-`Recaptcha:SecretKey`, `Privacy:EvidenceHmacKey`, `Registration:TeacherInviteCode` y
-`Supabase:ProjectRef`. En producción usa variables de entorno (`ConnectionStrings__DefaultConnection`,
-`Jwt__SecretKey`, etc.). Detalle completo en [SETUP_SECRETS.md](SETUP_SECRETS.md).
+Completa `ConnectionStrings:DefaultConnection`, `Jwt:SecretKey` (mínimo 48 caracteres, recomendado 64),
+`Recaptcha:SecretKey`, `Privacy:EvidenceHmacKey` (mínimo 32 caracteres, distinta de la JWT),
+`Registration:TeacherInviteCode` y `Supabase:ProjectRef`. En producción usa variables de entorno
+(`ConnectionStrings__DefaultConnection`, `Jwt__SecretKey`, etc.). `appsettings.Local.json` solo se
+carga en Development. Detalle completo en [SETUP_SECRETS.md](SETUP_SECRETS.md).
 
 ### PASO 2 — Iniciar el Backend (.NET 8)
 
@@ -176,8 +200,12 @@ push a `main` (solo cuando cambian archivos de `frontend/`).
 ### PASO 5 — Pruebas y verificación
 
 ```powershell
-# Pruebas unitarias del backend (26)
+# Pruebas unitarias del backend (55)
 dotnet test backend\LMS.API.Tests\LMS.API.Tests.csproj -c Release
+
+# Pruebas unitarias del frontend (6, ChromeHeadless)
+cd frontend
+npm test
 
 # Con el backend en ejecución: cabeceras, CORS, privacidad y archivos
 powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
@@ -439,7 +467,27 @@ powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
 
 ## 📝 Changelog Completo
 
-### v7.0.0 — 2026-10-19 _(versión actual)_
+### v7.1.0 — 2026-10-25 _(auditoría de seguridad)_
+
+**Correcciones críticas**
+
+- 🔐 **Sin claves de respaldo:** la API no arranca sin `Jwt:SecretKey` (≥48 caracteres) ni sin
+  `Privacy:EvidenceHmacKey` (≥32, dedicada). La evidencia de consentimiento ya no reutiliza la JWT.
+- 🧯 **CAPTCHA fail-closed:** sin `Recaptcha:SecretKey` en producción se rechaza el acceso; el
+  bypass solo existe en Development con habilitación explícita.
+- 👤 **Sesión y política en el servidor:** se rechazan tokens revocados, cuentas inactivas o
+  anonimizadas y usuarios sin la versión vigente de la política.
+- 🗑️ **Supresión completa:** al eliminar una cuenta se borran evidencia de consentimiento, último
+  acceso y contadores de intentos.
+- 📦 **Almacenamiento sin fallback silencioso:** un fallo de Supabase ya no guarda el archivo en un
+  disco efímero; `Storage:AllowLocalFallback=false` por defecto.
+- 🐳 **Docker no-root:** el proceso corre como `lmsapp` y solo escribe en `logs` y `App_Data`.
+- 🧪 **Pruebas:** 55 backend + 6 frontend; CI ejecuta pruebas y auditorías.
+- 🧹 **Integridad:** índice único `uq_usuarios_lower_username` y validación estricta de grados.
+- ♿ **Accesibilidad:** foco al contenido principal, `aria-live` y `prefers-reduced-motion`.
+- 🛡️ **CSP del frontend:** política por `<meta>` compatible con GitHub Pages.
+
+### v7.0.0 — 2026-10-19
 
 **Seguridad**
 
@@ -487,7 +535,7 @@ powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
 
 **Calidad y operación**
 
-- 🧪 **CI:** compilación de backend/frontend, 26 pruebas unitarias, auditoría de dependencias,
+- 🧪 **CI:** compilación de backend/frontend, 61 pruebas unitarias, auditoría de dependencias,
   verificación de secretos, CodeQL y Dependabot.
 - 🐳 **Docker endurecido:** usuario sin privilegios, `.dockerignore` y exclusión de secretos del publish.
 - 🧹 **Repositorio limpio:** se dejan de versionar 40.000 archivos de `node_modules`.
@@ -500,7 +548,7 @@ powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
 - 🚀 **Arranque asíncrono no bloqueante en Render:** `DbInitializer.SeedAsync()` desacoplado del inicio de Kestrel mediante `app.Lifetime.ApplicationStarted.Register()`. Deploys en Render reducidos de 8+ minutos a ~1 minuto sin bloqueos en health checks.
 - ⚡ **Aceleración de Login & Precalentamiento (Warmup):** `LoginComponent` envía un ping invisible a `/api/ping` al abrir la pantalla, despertando a Render en background antes de enviar credenciales.
 - 🟢 **Píldora interactiva de conexión en vivo:** Indicador visual dinámico en login (`⏳ Sincronizando con el servidor...` / `⚡ Conexión instantánea activa`) con estados reactivos.
-- 🔍 **Índice Funcional en PostgreSQL:** Creación de `idx_usuarios_lower_username` para búsquedas case-insensitive sin Sequential Scan.
+- 🔍 **Índice Funcional en PostgreSQL:** Creación de `uq_usuarios_lower_username` para búsquedas case-insensitive sin Sequential Scan y sin duplicados.
 - 🗄️ **Fast-Path en DbInitializer & Connection Pooling:** Reducción de 4500ms a ~130ms (-97%) en comprobaciones de esquema, y pool configurado con `MinPool=2`, `MaxPool=15`, `Keepalive=30s`, `TcpKeepalive=true` en Session Mode (Puerto 5432).
 - 🌐 **Soporte Multilingüe Completo (i18n):** Traducción profunda en 5 idiomas (ES, EN, ZH, JA, PT) con DOM Walker y `MutationObserver` reactivo para elementos dinámicos.
 - 📊 **Auditoría con Cobertura Total:** Más de 50 categorías de eventos mapeadas y registradas en el sistema de logs (`access.log`, `app.log`, `error.log`).

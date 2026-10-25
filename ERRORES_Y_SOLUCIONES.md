@@ -772,7 +772,7 @@ Se implementó una estrategia integral de optimización y precalentamiento:
 2. **Endpoint ultraligero `/api/ping`:** Diseñado en `Program.cs` para responder inmediatamente en memoria (~2 ms) sin tocar la base de datos.
 3. **Indicador visual de sincronización:** Se integró en `login.component.html` una píldora reactiva con estados (`⏳ Sincronizando con el servidor...` / `⚡ Conexión instantánea activa`) y animaciones CSS de pulso.
 4. **Fast-path en inicializador:** `DbInitializer.cs` ahora verifica la columna `session_token` en una única consulta; si ya existe, omite el resto del escaneo, reduciendo el arranque de 4.5s a ~130ms (mejora del 97%).
-5. **Índice funcional en PostgreSQL:** Se creó el índice `CREATE INDEX IF NOT EXISTS idx_usuarios_lower_username ON usuarios (LOWER(username));`.
+5. **Índice funcional en PostgreSQL:** Se creó el índice único `CREATE UNIQUE INDEX IF NOT EXISTS uq_usuarios_lower_username ON usuarios (LOWER(username));`.
 6. **Connection Pooling afinado:** Parámetros optimizados en la cadena de conexión (`Port=5432` Session Mode, `Minimum Pool Size=2`, `Maximum Pool Size=15`, `Keepalive=30`, `Tcp Keepalive=true`).
 7. **Timeout en reCAPTCHA:** Limitado a 4 segundos en `GoogleRecaptchaService` para evitar bloqueos por dependencias externas.
 

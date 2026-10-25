@@ -44,7 +44,19 @@ public sealed class PrivacyOptions
     /// <summary>Meses de inactividad tras los cuales se anonimiza una cuenta.</summary>
     public int InactivityAnonymizationMonths { get; set; } = 36;
 
-    /// <summary>Clave para firmar (HMAC) la evidencia de consentimiento. Si está vacía se usa la clave JWT.</summary>
+    /// <summary>
+    /// Habilita la anonimización automática por inactividad. Debe activarse solo
+    /// cuando el responsable del tratamiento haya aprobado la retención declarada.
+    /// </summary>
+    public bool EnableInactivityAnonymization { get; set; } = false;
+
+    /// <summary>
+    /// Modo simulación: registra las cuentas candidatas sin modificar datos.
+    /// Se recomienda mantenerlo en true durante la primera ejecución en producción.
+    /// </summary>
+    public bool InactivityAnonymizationDryRun { get; set; } = true;
+
+    /// <summary>Clave dedicada para firmar (HMAC) la evidencia de consentimiento.</summary>
     public string EvidenceHmacKey { get; set; } = string.Empty;
 
     public string SuperintendenceUrl { get; set; } = "https://www.sic.gov.co";
@@ -63,6 +75,12 @@ public sealed class StorageOptions
     public long MaxFileSizeBytes { get; set; } = 25 * 1024 * 1024;
 
     public int MaxFilesPerSubmission { get; set; } = 5;
+
+    /// <summary>
+    /// Permite que Supabase Storage caiga silenciosamente al disco local si falla.
+    /// En producción debe permanecer en false para no perder archivos en un disco efímero.
+    /// </summary>
+    public bool AllowLocalFallback { get; set; } = false;
 
     public SupabaseStorageOptions Supabase { get; set; } = new();
 }

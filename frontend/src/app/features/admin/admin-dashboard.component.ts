@@ -144,11 +144,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   ) { }
 
   public generatePasswordForNewUser(): void {
-    this.newUser.password = this.passwordPolicyService.generateSecurePassword(8);
+    this.newUser.password = this.passwordPolicyService.generateSecurePassword(12);
   }
 
   public generatePasswordForEditUser(): void {
-    this.editUserForm.password = this.passwordPolicyService.generateSecurePassword(8);
+    this.editUserForm.password = this.passwordPolicyService.generateSecurePassword(12);
   }
 
   public copyPassword(pwd: string): void {

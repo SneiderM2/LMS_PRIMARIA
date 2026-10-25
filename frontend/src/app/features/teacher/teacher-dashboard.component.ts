@@ -171,7 +171,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
   ) {}
 
   public generatePasswordForNewStudent(): void {
-    this.newStudent.password = this.passwordPolicyService.generateSecurePassword(8);
+    this.newStudent.password = this.passwordPolicyService.generateSecurePassword(12);
   }
 
   public copyPassword(pwd: string): void {
@@ -921,7 +921,7 @@ export class TeacherDashboardComponent implements OnInit, OnDestroy {
     if (password.length > 0) {
       const validation = this.passwordPolicyService.validate(password, this.newStudent.username, this.newStudent.fullName);
       if (!validation.isValid) {
-        this.createStudentError = validation.errors[0] || 'La contraseña personalizada debe tener entre 4 y 10 caracteres e incluir mayúscula, minúscula, número y símbolo (@, #, !, etc.).';
+        this.createStudentError = validation.errors[0] || 'La contraseña personalizada debe tener entre 8 y 64 caracteres e incluir mayúscula, minúscula, número y símbolo (@, #, !, etc.).';
         return;
       }
     }

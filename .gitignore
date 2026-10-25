@@ -42,6 +42,9 @@ coverage/
 TestResults/
 *.trx
 
+# Artefactos de Playwright MCP
+.playwright-mcp/
+
 # Compilados de frontend en la raíz (GitHub Pages)
 /chunk-*.js
 /main-*.js

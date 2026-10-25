@@ -72,15 +72,27 @@ public class GoogleRecaptchaServiceTests
     }
 
     [Fact]
-    public async Task Allows_token_gracefully_in_production_when_secret_key_missing_from_server()
+    public async Task Rejects_token_in_production_when_secret_key_missing_from_server()
     {
         var service = CreateService(Environments.Production, new()
         {
             ["Recaptcha:SecretKey"] = ""
         });
 
-        // Cliente envió token válido pero servidor no configuró Recaptcha__SecretKey
+        // Fail-closed: sin secreto el servidor no puede validar y no debe permitir el acceso.
         var result = await service.VerifyTokenAsync("client-submitted-recaptcha-token", "203.0.113.1");
-        Assert.True(result);
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task Rejects_token_in_development_when_bypass_is_not_explicitly_enabled()
+    {
+        var service = CreateService(Environments.Development, new()
+        {
+            ["Recaptcha:SecretKey"] = ""
+        });
+
+        var result = await service.VerifyTokenAsync("some-token", "127.0.0.1");
+        Assert.False(result);
     }
 }

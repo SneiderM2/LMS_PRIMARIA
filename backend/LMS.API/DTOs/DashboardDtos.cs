@@ -129,7 +129,7 @@ public class CreateAdminUserDto
     public string Username { get; set; } = string.Empty;
 
     /// <summary>Opcional. Si se omite, el servidor genera una contraseña temporal fuerte.</summary>
-    [MaxLength(128)]
+    [MaxLength(64)]
     public string Password { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "El nombre es obligatorio.")]
@@ -158,7 +158,7 @@ public class UpdateAdminUserDto
     public string? GradeLevel { get; set; }
 
     /// <summary>Opcional. Si se envía, debe cumplir la política de contraseñas.</summary>
-    [MaxLength(128)]
+    [MaxLength(64)]
     public string? Password { get; set; }
 }
 

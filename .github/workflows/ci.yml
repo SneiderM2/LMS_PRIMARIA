@@ -36,8 +36,14 @@ jobs:
         run: dotnet test backend/LMS.API.Tests/LMS.API.Tests.csproj -c Release --nologo
 
       - name: Revisar paquetes vulnerables
-        continue-on-error: true
-        run: dotnet list backend/LMS.API/LMS.API.csproj package --vulnerable --include-transitive
+        run: |
+          set -e
+          output=$(dotnet list backend/LMS.API/LMS.API.csproj package --vulnerable --include-transitive)
+          echo "$output"
+          if echo "$output" | grep -qiE "(has the following|tiene los siguientes) .*vulnerab"; then
+            echo "::error::Se detectaron paquetes NuGet vulnerables. Actualiza o justifica antes de fusionar."
+            exit 1
+          fi
 
   frontend:
     name: Frontend (Angular 18)
@@ -61,9 +67,23 @@ jobs:
       - name: Compilar para producción
         run: npm run build
 
-      - name: Auditar dependencias de producción
-        continue-on-error: true
-        run: npm audit --omit=dev --audit-level=high
+      - name: Pruebas unitarias
+        run: npm test
+
+      - name: Auditar dependencias de producción (críticas)
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: Reportar vulnerabilidades altas conocidas
+        run: npm audit --omit=dev --audit-level=high || true
+
+  docker:
+    name: Imagen Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir imagen de producción
+        run: docker build -t lms-api:ci .
 
   secrets:
     name: Verificar ausencia de secretos

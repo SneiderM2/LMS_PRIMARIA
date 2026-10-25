@@ -33,6 +33,14 @@ public class GoogleRecaptchaService : ICaptchaService
     private static string? FirstNonEmpty(params string?[] values)
         => values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
 
+    /// <summary>
+    /// El bypass solo existe en Development y debe habilitarse explícitamente.
+    /// En Production, Staging o cualquier otro entorno nunca se permite.
+    /// </summary>
+    private bool IsDevBypassEnabled()
+        => _environment.IsDevelopment()
+           && _configuration.GetValue<bool>("Recaptcha:AllowDevBypass");
+
     public async Task<bool> VerifyTokenAsync(string? token, string? remoteIp)
     {
         if (string.IsNullOrWhiteSpace(token))
@@ -41,8 +49,8 @@ public class GoogleRecaptchaService : ICaptchaService
             return false;
         }
 
-        // 1. Bypass en entorno de desarrollo o token de prueba interno
-        if (_environment.IsDevelopment())
+        // 1. Bypass controlado exclusivamente en desarrollo.
+        if (IsDevBypassEnabled())
         {
             if (token == DevBypassToken || token == AltDevBypassToken)
             {
@@ -50,20 +58,16 @@ public class GoogleRecaptchaService : ICaptchaService
                 return true;
             }
 
-            if (_configuration.GetValue<bool>("Recaptcha:AllowDevBypass", true))
-            {
-                var devSecret = FirstNonEmpty(
-                    _configuration["Recaptcha:SecretKey"],
-                    _configuration["Recaptcha__SecretKey"],
-                    Environment.GetEnvironmentVariable("Recaptcha__SecretKey"),
-                    Environment.GetEnvironmentVariable("RECAPTCHA_SECRET_KEY"));
+            var devSecret = FirstNonEmpty(
+                _configuration["Recaptcha:SecretKey"],
+                _configuration["Recaptcha__SecretKey"],
+                Environment.GetEnvironmentVariable("Recaptcha__SecretKey"),
+                Environment.GetEnvironmentVariable("RECAPTCHA_SECRET_KEY"));
 
-                // Si no hay clave configurada en desarrollo, permitir para no bloquear el trabajo local
-                if (string.IsNullOrWhiteSpace(devSecret))
-                {
-                    _logger.LogWarning("Bypass de reCAPTCHA automático en desarrollo (sin clave secreta configurada).");
-                    return true;
-                }
+            if (string.IsNullOrWhiteSpace(devSecret))
+            {
+                _logger.LogWarning("Bypass de reCAPTCHA explícito en desarrollo (sin clave secreta configurada).");
+                return true;
             }
         }
 
@@ -76,12 +80,9 @@ public class GoogleRecaptchaService : ICaptchaService
 
         if (string.IsNullOrWhiteSpace(secretKey))
         {
-            // Modo tolerante cuando el servidor no tiene configurada la clave en Render,
-            // pero el cliente envió un token no vacío (evita caída general del sistema escolar).
-            _logger.LogWarning("Recaptcha:SecretKey no está configurada en el servidor. " +
-                               "Para validación completa en producción defina Recaptcha__SecretKey. " +
-                               "Permitiendo acceso porque el cliente proporcionó token.");
-            return true;
+            // Fail-closed: nunca se permite el acceso si el servidor no puede validar el token.
+            _logger.LogError("Recaptcha:SecretKey no está configurada. Se rechaza la autenticación para evitar un bypass.");
+            return false;
         }
 
         try
@@ -97,7 +98,7 @@ public class GoogleRecaptchaService : ICaptchaService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Endpoint de reCAPTCHA devolvió HTTP {Status}.", response.StatusCode);
-                return _environment.IsDevelopment();
+                return IsDevBypassEnabled();
             }
 
             var json = await response.Content.ReadAsStringAsync();
@@ -112,11 +113,16 @@ public class GoogleRecaptchaService : ICaptchaService
                 return false;
             }
 
-            // Validación opcional de dominio esperado (protege si la site key se reutiliza).
+            // Validación del dominio esperado (protege si la site key se reutiliza en otro sitio).
             var expectedHostname = _configuration["Recaptcha:ExpectedHostname"];
-            if (!string.IsNullOrWhiteSpace(expectedHostname)
-                && doc.RootElement.TryGetProperty("hostname", out var hostnameProp))
+            if (!string.IsNullOrWhiteSpace(expectedHostname))
             {
+                if (!doc.RootElement.TryGetProperty("hostname", out var hostnameProp))
+                {
+                    _logger.LogWarning("reCAPTCHA no devolvió hostname; se rechaza porque ExpectedHostname está configurado.");
+                    return false;
+                }
+
                 var hostname = hostnameProp.GetString();
                 var isTestDomain = _environment.IsDevelopment()
                     || string.Equals(hostname, "testkey.google.com", StringComparison.OrdinalIgnoreCase)
@@ -134,7 +140,7 @@ public class GoogleRecaptchaService : ICaptchaService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Excepción durante la verificación del token de reCAPTCHA.");
-            return _environment.IsDevelopment();
+            return IsDevBypassEnabled();
         }
     }
 }

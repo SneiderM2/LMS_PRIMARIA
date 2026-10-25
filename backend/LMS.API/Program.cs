@@ -23,7 +23,10 @@ var builder = WebApplication.CreateBuilder(args);
 //    appsettings.Local.json NO se versiona (secretos de desarrollo).
 //    En producción se usan variables de entorno, que tienen prioridad.
 // ---------------------------------------------------------------------------
-builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+}
 builder.Configuration.AddEnvironmentVariables();
 
 static string? FirstNonEmpty(params string?[] values)
@@ -57,6 +60,36 @@ builder.Services.Configure<PrivacyOptions>(builder.Configuration.GetSection(Priv
 builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName));
 builder.Services.Configure<RegistrationOptions>(builder.Configuration.GetSection(RegistrationOptions.SectionName));
 
+// La evidencia de consentimiento debe firmarse con una clave dedicada, no con la clave JWT.
+var evidenceHmacKey = FirstNonEmpty(
+    Environment.GetEnvironmentVariable("EVIDENCE_HMAC_KEY"),
+    Environment.GetEnvironmentVariable("Privacy__EvidenceHmacKey"),
+    builder.Configuration["Privacy:EvidenceHmacKey"]);
+
+if (string.IsNullOrWhiteSpace(evidenceHmacKey) || evidenceHmacKey.Length < 32)
+{
+    throw new InvalidOperationException(
+        "Privacy:EvidenceHmacKey es obligatorio y debe tener al menos 32 caracteres. " +
+        "Use una clave distinta de Jwt:SecretKey para firmar las evidencias de consentimiento.");
+}
+
+builder.Configuration["Privacy:EvidenceHmacKey"] = evidenceHmacKey;
+
+if (!builder.Environment.IsDevelopment())
+{
+    var controllerNit = builder.Configuration["Privacy:ControllerNit"];
+    var contactPhone = builder.Configuration["Privacy:ContactPhone"];
+    var dpoName = builder.Configuration["Privacy:DpoName"];
+
+    if (string.IsNullOrWhiteSpace(controllerNit) || controllerNit.Contains("Por definir", StringComparison.OrdinalIgnoreCase)
+        || string.IsNullOrWhiteSpace(contactPhone) || contactPhone.Contains("Por definir", StringComparison.OrdinalIgnoreCase)
+        || string.IsNullOrWhiteSpace(dpoName))
+    {
+        Console.WriteLine("[ADVERTENCIA] La política de privacidad tiene datos institucionales incompletos. " +
+                          "Configure Privacy:ControllerNit, ContactPhone y DpoName antes de una auditoría legal.");
+    }
+}
+
 builder.Services.Configure<FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = 30 * 1024 * 1024;
@@ -88,6 +121,7 @@ builder.Services.AddResponseCompression(options =>
 builder.Services.AddSingleton<AuditLogQueue>();
 builder.Services.AddHostedService<AuditLogDbBackgroundService>();
 builder.Services.AddHostedService<AuditLogRetentionBackgroundService>();
+builder.Services.AddHostedService<InactivityAnonymizationBackgroundService>();
 
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ISemaforoService, SemaforoService>();
@@ -103,10 +137,38 @@ var storageProvider = builder.Configuration.GetValue<string>("Storage:Provider")
 
 if (storageProvider.Equals("Supabase", StringComparison.OrdinalIgnoreCase))
 {
+    var supabaseUrl = FirstNonEmpty(
+        builder.Configuration["Storage:Supabase:Url"],
+        Environment.GetEnvironmentVariable("SUPABASE_URL"));
+    var supabaseKey = FirstNonEmpty(
+        builder.Configuration["Storage:Supabase:ServiceRoleKey"],
+        Environment.GetEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY"));
+    var supabaseBucket = FirstNonEmpty(
+        builder.Configuration["Storage:Supabase:Bucket"],
+        Environment.GetEnvironmentVariable("SUPABASE_STORAGE_BUCKET")) ?? "lms-uploads";
+
+    if (string.IsNullOrWhiteSpace(supabaseUrl) || string.IsNullOrWhiteSpace(supabaseKey))
+    {
+        throw new InvalidOperationException(
+            "Storage:Provider=Supabase requiere Storage:Supabase:Url y Storage:Supabase:ServiceRoleKey " +
+            "(o SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).");
+    }
+
+    builder.Configuration["Storage:Supabase:Url"] = supabaseUrl;
+    builder.Configuration["Storage:Supabase:ServiceRoleKey"] = supabaseKey;
+    builder.Configuration["Storage:Supabase:Bucket"] = supabaseBucket;
+
     builder.Services.AddScoped<IFileStorageService, SupabaseStorageService>();
 }
 else
 {
+    if (!builder.Environment.IsDevelopment())
+    {
+        Console.WriteLine("[ADVERTENCIA] Storage:Provider=Local en producción. " +
+                          "El disco de Render es efímero salvo que se monte un disco persistente; " +
+                          "configure Supabase Storage o un disco persistente antes de recibir archivos reales.");
+    }
+
     builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 }
 
@@ -126,9 +188,20 @@ var jwtSecretKey = FirstNonEmpty(
 
 if (string.IsNullOrWhiteSpace(jwtSecretKey) || jwtSecretKey.Length < 48)
 {
-    jwtSecretKey = "LmsPrimarySchool_Production_Fallback_Secret_Key_2026_Secure_Token_Key_987654321";
-    builder.Configuration["Jwt:SecretKey"] = jwtSecretKey;
+    throw new InvalidOperationException(
+        "Jwt:SecretKey es obligatorio y debe tener al menos 48 caracteres. " +
+        "Configure Jwt__SecretKey o JWT_SECRET en el entorno; no se permite una clave de respaldo.");
 }
+
+if (string.Equals(jwtSecretKey, evidenceHmacKey, StringComparison.Ordinal))
+{
+    throw new InvalidOperationException(
+        "Privacy:EvidenceHmacKey debe ser distinta de Jwt:SecretKey. " +
+        "Use una clave dedicada para firmar las evidencias de consentimiento.");
+}
+
+// Asegura que TokenService y cualquier otro consumidor usen la misma clave resuelta.
+builder.Configuration["Jwt:SecretKey"] = jwtSecretKey;
 
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "LMS.API";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "LMS.Client";
@@ -332,6 +405,7 @@ try { Directory.CreateDirectory(logsPath); }
 catch { logsPath = Path.Combine(Path.GetTempPath(), "lms-logs"); Directory.CreateDirectory(logsPath); }
 FileLogger.SetLogDirectory(logsPath);
 FileLogger.DbQueue = app.Services.GetRequiredService<AuditLogQueue>();
+FileLogger.ConsoleSink = message => app.Logger.LogInformation("[AUDIT] {AuditLine}", message);
 
 // ---------------------------------------------------------------------------
 // 12. Inicialización de BD después de que Kestrel empieza a escuchar
@@ -416,7 +490,7 @@ static string ClientKey(HttpContext context)
 
 static string NormalizeConnectionString(string raw, IConfiguration configuration)
 {
-    var trustCertificate = configuration.GetValue<bool?>("Database:TrustServerCertificate") ?? true;
+    var trustCertificate = configuration.GetValue<bool?>("Database:TrustServerCertificate") ?? false;
 
     if (raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)
         || raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
@@ -444,17 +518,13 @@ static string NormalizeConnectionString(string raw, IConfiguration configuration
             }
         }
 
-        if (string.IsNullOrWhiteSpace(projectRef))
-        {
-            projectRef = "rjvsbjjmlmvcihfgbiaz";
-        }
-
         var poolerHost = FirstNonEmpty(
             Environment.GetEnvironmentVariable("SUPABASE_POOLER_HOST"),
             Environment.GetEnvironmentVariable("Supabase__PoolerHost"),
-            configuration["Supabase:PoolerHost"]) ?? "aws-0-us-east-1.pooler.supabase.com";
+            configuration["Supabase:PoolerHost"]);
 
-        if (host.EndsWith(".supabase.co", StringComparison.OrdinalIgnoreCase))
+        if (host.EndsWith(".supabase.co", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(poolerHost))
         {
             host = poolerHost;
             port = 5432;
@@ -475,7 +545,7 @@ static string NormalizeConnectionString(string raw, IConfiguration configuration
         }
 
         return $"Host={host};Port={port};Database={database};Username={user};Password={password};" +
-               $"SSL Mode=Require;Trust Server Certificate=true;" +
+               $"SSL Mode=Require;Trust Server Certificate={trustCertificate.ToString().ToLowerInvariant()};" +
                "Pooling=true;Minimum Pool Size=2;Maximum Pool Size=15;Connection Idle Lifetime=300;" +
                "Keepalive=30;Tcp Keepalive=true;";
     }

@@ -6,6 +6,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { UserRole } from '../../../core/models/user.model';
 import { SessionTimeoutService } from '../../../core/services/session-timeout.service';
+import { ServerStatusService } from '../../../core/services/server-status.service';
 import { PasswordPolicyService } from '../../../core/services/password-policy.service';
 import { PasswordPolicyMeterComponent } from '../../../shared/components/password-policy-meter/password-policy-meter.component';
 import { environment } from '../../../../environments/environment';
@@ -73,6 +74,9 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   // Precalentamiento del backend en segundo plano (elimina los 20 segundos de cold start)
   public isServerWarming = true;
   public isServerReady = false;
+  public isServerUnavailable = false;
+  private warmupAttempts = 0;
+  private warmupRetryTimerId: ReturnType<typeof setTimeout> | null = null;
 
   // Modal de sesión activa en otro dispositivo
   public showActiveSessionModal = false;
@@ -84,6 +88,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
     private authService: AuthService,
     private sessionTimeoutService: SessionTimeoutService,
     private passwordPolicyService: PasswordPolicyService,
+    private serverStatus: ServerStatusService,
     private route: ActivatedRoute,
     private ngZone: NgZone
   ) { }
@@ -111,9 +116,14 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.googleIntervalId) clearInterval(this.googleIntervalId);
     if (this.googleTimeoutId) clearTimeout(this.googleTimeoutId);
     if (this.tabSwitchTimerId) clearTimeout(this.tabSwitchTimerId);
+    if (this.warmupRetryTimerId) clearTimeout(this.warmupRetryTimerId);
   }
 
   private warmupBackend(): void {
+    this.isServerWarming = true;
+    this.isServerReady = false;
+    this.isServerUnavailable = false;
+
     this.authService.warmup()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -121,11 +131,26 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
           this.ngZone.run(() => {
             this.isServerReady = true;
             this.isServerWarming = false;
+            this.isServerUnavailable = false;
           });
         },
         error: () => {
           this.ngZone.run(() => {
-            this.isServerWarming = false;
+            this.warmupAttempts++;
+            // El cold start de Render puede tardar; reintentamos con espera
+            // creciente antes de mostrar un estado de error honesto.
+            if (this.warmupAttempts < 5) {
+              this.warmupRetryTimerId = setTimeout(
+                () => this.warmupBackend(),
+                3000 * this.warmupAttempts
+              );
+            } else {
+              this.isServerWarming = false;
+              this.isServerUnavailable = true;
+              // Evita que el banner global siga anunciando un arranque que ya
+              // agotó sus reintentos; el pill muestra el estado real.
+              this.serverStatus.setWakingUp(false);
+            }
           });
         }
       });
@@ -455,7 +480,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   private validateNormalizedPassword(pwd: string): string | null {
     const res = this.passwordPolicyService.validate(pwd, this.regId, this.regFullName);
     if (!res.isValid) {
-      return res.errors[0] || 'La contraseña debe tener entre 4 y 10 caracteres, incluyendo mayúscula, minúscula, número y símbolo (@, #, !, etc.) 🔒';
+      return res.errors[0] || 'La contraseña debe tener entre 8 y 64 caracteres, incluyendo mayúscula, minúscula, número y símbolo (@, #, !, etc.) 🔒';
     }
     return null;
   }

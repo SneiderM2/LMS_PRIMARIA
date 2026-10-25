@@ -34,10 +34,13 @@ masiva de datos personales.
 
 | Componente | Versión soportada |
 | :--- | :--- |
-| Backend | .NET 8 (LTS), última versión desplegada |
-| Frontend | Angular 18 |
+| Backend | .NET 8 (LTS) — **fin de soporte 10/11/2026** |
+| Frontend | Angular 18 — **fuera de soporte; migración mayor pendiente** |
 | Base de datos | PostgreSQL 16 (Supabase) |
 | Navegadores | Dos últimas versiones de Chrome, Edge, Firefox y Safari |
+
+> La migración a .NET 10 y a una versión soportada de Angular no se ejecutó en la auditoría
+> 2026-10. Es una deuda de plataforma con fecha límite y debe planificarse antes del EOL de .NET 8.
 
 ---
 
@@ -47,11 +50,16 @@ masiva de datos personales.
 
 - JWT firmado con HMAC-SHA256; clave de al menos 48 caracteres obligatoria, sin valores por defecto.
 - Expiración configurable (8 h por defecto) y validación estricta de emisor, audiencia, firma y vigencia.
-- Revocación por **sesión única**: cada inicio de sesión invalida el token anterior.
+- Revocación por **sesión única**: cada inicio de sesión invalida el token anterior. El servidor
+  rechaza tokens revocados, nulos, de cuentas inactivas o anonimizadas.
 - Bloqueo temporal de 15 minutos tras 5 intentos fallidos; mensajes de error uniformes.
-- Contraseñas con BCrypt (factor 12) y política mínima de 12 caracteres, sin contraseñas comunes.
+- Contraseñas con BCrypt (factor 12) y política de **8 a 64 caracteres** con mayúscula, minúscula,
+  número, símbolo y bloqueo de contraseñas comunes o datos predecibles del titular.
 - CAPTCHA obligatorio en login y registro (reCAPTCHA), con *fail-closed* si no está configurado.
+  El bypass solo existe en Development y requiere habilitación explícita.
 - Google OAuth solo con validación criptográfica del ID token y cuenta institucional preexistente.
+- La aceptación de la versión vigente de la política se exige en el servidor para los endpoints
+  distintos de los de consentimiento, consulta de datos y cierre de sesión.
 
 ### Autorización
 
@@ -62,9 +70,13 @@ masiva de datos personales.
 
 ### Protección de datos y privacidad
 
-- Consentimiento informado con evidencia firmada (HMAC-SHA256): versión, fecha, IP, agente de usuario y acudiente enmascarado.
+- Consentimiento informado con evidencia firmada (HMAC-SHA256) usando una clave dedicada
+  (`Privacy:EvidenceHmacKey`, ≥32 caracteres, distinta de la JWT): versión, fecha, IP, agente de
+  usuario y acudiente enmascarado.
 - Autorización del acudiente obligatoria para menores (Ley 1581 de 2012, art. 7).
-- Endpoints de acceso/portabilidad, rectificación y supresión (`/api/privacy/*`).
+- Endpoints de acceso/portabilidad, rectificación y supresión (`/api/privacy/*`). La supresión
+  elimina también la evidencia de consentimiento, el último acceso y los contadores de intentos.
+- Retención por inactividad configurable, deshabilitada y en modo simulación por defecto.
 - Minimización de datos: exportaciones sin contraseñas ni tokens; logs con redacción de parámetros sensibles.
 - Archivos fuera de `wwwroot`, con validación de firma binaria y nombre saneado.
 
@@ -80,11 +92,13 @@ masiva de datos personales.
 
 ### Infraestructura
 
-- Secretos por variables de entorno; `appsettings.Local.json` ignorado por Git y por Docker.
-- Contenedor ejecutado como usuario sin privilegios, con `Server` header deshabilitado.
-- TLS obligatorio en la base de datos (`SSL Mode=Require`, `Trust Server Certificate=false`).
+- Secretos por variables de entorno; `appsettings.Local.json` ignorado por Git y por Docker y
+  cargado únicamente en Development.
+- Contenedor ejecutado como usuario sin privilegios (`lmsapp`), con `Server` header deshabilitado.
+- TLS obligatorio en la base de datos (`SSL Mode=Require`); `Trust Server Certificate` es `false`
+  por defecto y solo puede habilitarse explícitamente por configuración.
 - Respaldos con advertencia de datos personales y procedimiento de restauración controlado.
-- Registro de auditoría con retención configurable.
+- Registro de auditoría con retención configurable y salida a stdout para Render.
 
 ---
 
@@ -92,12 +106,19 @@ masiva de datos personales.
 
 | Riesgo | Estado | Mitigación / siguiente paso |
 | :--- | :--- | :--- |
-| Token JWT almacenado en `localStorage` | Aceptado con mitigaciones | CSP no controlable en GitHub Pages; evaluar cookies `HttpOnly` + `SameSite` con un proxy del mismo sitio. |
-| GitHub Pages no permite cabeceras HTTP | Aceptado | No alojar datos sensibles en el frontend; evaluar migrar a Cloudflare Pages/Netlify. |
+| Token JWT almacenado en `localStorage` | Aceptado con mitigaciones | El frontend aplica CSP por `<meta>` y evita `innerHTML`; evaluar cookies `HttpOnly` + `SameSite` con un proxy del mismo sitio. |
+| GitHub Pages no permite cabeceras HTTP | Aceptado | Se añadió CSP por `<meta>` solo en el build de producción (`src/index.production.html`); `frame-ancestors` y `sandbox` solo pueden aplicarse desde un hosting con cabeceras. |
 | Secreto JWT y contraseña de BD estuvieron en el historial de Git | **Acción obligatoria** | Rotar credenciales y clave JWT; ver `SETUP_SECRETS.md`. |
 | Cuentas `admin`, `docente`, `estudiante` con contraseñas iniciales débiles | **Acción obligatoria** | Rotar contraseñas o desactivar cuentas; el sistema ya no las crea ni reactiva. |
+| .NET 8 sin soporte desde 10/11/2026 y Angular 18 fuera de soporte | **Riesgo alto** | Planificar migración mayor a .NET 10 y Angular soportado; no se ejecutó por falta de autorización. |
+| Vulnerabilidades altas/moderadas de Angular 18 | Aceptado temporalmente | `dompurify` crítico corregido por override; el resto exige actualización mayor. Revisar `npm audit --omit=dev`. |
+| `Storage:Provider=Local` en producción | **Acción obligatoria** | Verificado el 25/10/2026: Render está en plan Free, sin disco, y `/api/health` devuelve `storage: Local`. El bucket privado `lms-uploads` ya existe en Supabase (25 MB, sin acceso público); falta configurar `Storage__Provider=Supabase` y la Service Role Key en Render y desplegar. El fallback silencioso está deshabilitado. |
+| `audit_logs` ausente en producción | **Resuelto en producción; corrección pendiente de desplegar** | La tabla se creó manualmente el 25/10/2026 con RLS activo e índices, y una petición real quedó registrada. `DbInitializer` también se corrigió para crearla en bases ya migradas y habilitar RLS en entornos nuevos; esa corrección se desplegará con el próximo release. |
+| Supabase Free sin backups automáticos | **Acción obligatoria** | El panel muestra «No backups». Definir un respaldo lógico programado y cifrado, o pasar a un plan con backups/PITR, antes de usar datos reales. |
+| Anonimización por inactividad deshabilitada | Configurable | Activar solo con aprobación del responsable del tratamiento; iniciar en modo simulación. |
+| Política de privacidad con datos institucionales incompletos | **Acción obligatoria** | Completar NIT, dirección, teléfono, DPO y texto aprobado antes de una auditoría legal. |
 | Migraciones de esquema en tiempo de ejecución | Deuda técnica | Migrar a EF Core Migrations y aprobar cambios por revisión. |
-| Pruebas automatizadas limitadas | En progreso | 26 pruebas unitarias (xUnit); pendiente integración/E2E y OWASP ZAP. |
+| Pruebas automatizadas limitadas | En progreso | 55 pruebas backend (xUnit) y 6 frontend (Karma/Jasmine); pendiente integración/E2E y OWASP ZAP. |
 
 ---
 
@@ -107,7 +128,7 @@ masiva de datos personales.
 2. No registrar datos personales en `console.log`, `Debug.WriteLine` ni mensajes de error.
 3. Usar `[Authorize]` y validar pertenencia de recursos en cada endpoint nuevo.
 4. Validar entradas con DataAnnotations y límites de tamaño.
-5. Ejecutar `dotnet build` y `npm run build` antes de abrir un pull request.
+5. Ejecutar `dotnet build`, `dotnet test`, `npm run build` y `npm test` antes de abrir un pull request.
 6. Revisar dependencias con `dotnet list package --vulnerable` y `npm audit`.
 
 ---

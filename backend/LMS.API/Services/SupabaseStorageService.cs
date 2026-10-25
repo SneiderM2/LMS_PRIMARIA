@@ -12,8 +12,14 @@ using Microsoft.Extensions.Options;
 namespace LMS.API.Services;
 
 /// <summary>
-/// Almacenamiento seguro en la nube (Supabase Storage) con fallback local automático.
-/// Protege los adjuntos escolares de la pérdida en contenedores con disco efímero.
+/// Almacenamiento seguro en la nube (Supabase Storage).
+/// Los archivos escolares nunca se sirven públicamente: se descargan mediante
+/// una ruta de API autenticada con verificación de metadatos.
+///
+/// El fallback a disco local está deshabilitado por defecto. Cuando se habilita
+/// (solo para desarrollo o con un disco persistente montado), se usa de forma
+/// explícita y queda registrado; en producción un fallo de Supabase se reporta
+/// como error para no perder adjuntos en un disco efímero.
 /// </summary>
 public sealed class SupabaseStorageService : IFileStorageService
 {
@@ -64,6 +70,25 @@ public sealed class SupabaseStorageService : IFileStorageService
 
     private bool IsConfigured => !string.IsNullOrWhiteSpace(_baseUrl) && !string.IsNullOrWhiteSpace(_serviceKey);
 
+    private bool CanUseLocalFallback => _options.AllowLocalFallback;
+
+    private async Task<StoredFile> FallbackOrFailAsync(
+        IFormFile file,
+        string scope,
+        int ownerUserId,
+        string ownerRole,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        if (!CanUseLocalFallback)
+        {
+            return Fail(errorMessage);
+        }
+
+        _logger.LogWarning("Supabase Storage no disponible. Se usa el fallback local explícito: {Reason}", errorMessage);
+        return await _localFallback.SaveFileAsync(file, scope, ownerUserId, ownerRole, cancellationToken);
+    }
+
     private async Task EnsureBucketExistsAsync(CancellationToken cancellationToken)
     {
         if (_bucketChecked || !IsConfigured) return;
@@ -93,10 +118,12 @@ public sealed class SupabaseStorageService : IFileStorageService
         string ownerRole,
         CancellationToken cancellationToken = default)
     {
-        // Si no está configurada la nube, delegar al almacenamiento local
+        // Si no está configurada la nube, no se debe fingir que el archivo quedó seguro.
         if (!IsConfigured)
         {
-            return await _localFallback.SaveFileAsync(file, scope, ownerUserId, ownerRole, cancellationToken);
+            return await FallbackOrFailAsync(file, scope, ownerUserId, ownerRole,
+                "El almacenamiento en la nube no está configurado. Contacta al administrador.",
+                cancellationToken);
         }
 
         if (file == null || file.Length == 0)
@@ -172,8 +199,10 @@ public sealed class SupabaseStorageService : IFileStorageService
                 var uploadRes = await _httpClient.SendAsync(uploadReq, cancellationToken);
                 if (!uploadRes.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("Fallo al subir a almacenamiento en la nube ({StatusCode}). Usando fallback local.", uploadRes.StatusCode);
-                    return await _localFallback.SaveFileAsync(file, scope, ownerUserId, ownerRole, cancellationToken);
+                    _logger.LogError("Fallo al subir a Supabase Storage ({StatusCode}).", uploadRes.StatusCode);
+                    return await FallbackOrFailAsync(file, scope, ownerUserId, ownerRole,
+                        "No fue posible guardar el archivo en el almacenamiento institucional. Intenta de nuevo.",
+                        cancellationToken);
                 }
             }
 
@@ -198,7 +227,18 @@ public sealed class SupabaseStorageService : IFileStorageService
                 metaReq.Headers.Add("x-upsert", "true");
                 metaReq.Content = new StringContent(metaJson, Encoding.UTF8, "application/json");
 
-                await _httpClient.SendAsync(metaReq, cancellationToken);
+                var metaRes = await _httpClient.SendAsync(metaReq, cancellationToken);
+                if (!metaRes.IsSuccessStatusCode)
+                {
+                    _logger.LogError("No fue posible guardar los metadatos del archivo ({StatusCode}). Se revierte la subida.", metaRes.StatusCode);
+
+                    // Sin metadatos no se puede autorizar la descarga: se elimina el objeto huérfano.
+                    await DeleteCloudObjectQuietlyAsync(storageKey, cancellationToken);
+
+                    return await FallbackOrFailAsync(file, scope, ownerUserId, ownerRole,
+                        "No fue posible registrar los metadatos del archivo. Intenta de nuevo.",
+                        cancellationToken);
+                }
             }
 
             return new StoredFile
@@ -214,8 +254,25 @@ public sealed class SupabaseStorageService : IFileStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Excepción durante la subida a la nube. Guardando en almacenamiento local.");
-            return await _localFallback.SaveFileAsync(file, scope, ownerUserId, ownerRole, cancellationToken);
+            _logger.LogError(ex, "Excepción durante la subida a Supabase Storage.");
+            return await FallbackOrFailAsync(file, scope, ownerUserId, ownerRole,
+                "No fue posible guardar el archivo en el almacenamiento institucional. Intenta de nuevo.",
+                cancellationToken);
+        }
+    }
+
+    private async Task DeleteCloudObjectQuietlyAsync(string storageKey, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Delete, $"{_baseUrl}/storage/v1/object/{_bucket}/{storageKey}");
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _serviceKey);
+            req.Headers.Add("apikey", _serviceKey);
+            await _httpClient.SendAsync(req, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No fue posible revertir el objeto huérfano en Supabase Storage.");
         }
     }
 
@@ -223,7 +280,7 @@ public sealed class SupabaseStorageService : IFileStorageService
     {
         var key = NormalizeKey(storageKey);
 
-        if (IsConfigured)
+        if (IsConfigured && StorageKeyPattern.IsMatch(key))
         {
             try
             {
@@ -252,7 +309,7 @@ public sealed class SupabaseStorageService : IFileStorageService
         var key = NormalizeKey(storageKey);
 
         // Primero verificar si existe en la nube
-        if (IsConfigured)
+        if (IsConfigured && StorageKeyPattern.IsMatch(key))
         {
             try
             {
@@ -281,28 +338,32 @@ public sealed class SupabaseStorageService : IFileStorageService
         if (string.IsNullOrWhiteSpace(urlOrStorageKey)) return false;
 
         var key = NormalizeKey(urlOrStorageKey);
+        var cloudDeleted = false;
 
-        if (IsConfigured)
+        if (IsConfigured && StorageKeyPattern.IsMatch(key))
         {
             try
             {
                 using var req = new HttpRequestMessage(HttpMethod.Delete, $"{_baseUrl}/storage/v1/object/{_bucket}/{key}");
                 req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _serviceKey);
                 req.Headers.Add("apikey", _serviceKey);
-                await _httpClient.SendAsync(req, cancellationToken);
+                var res = await _httpClient.SendAsync(req, cancellationToken);
+                cloudDeleted = res.IsSuccessStatusCode;
 
                 using var reqMeta = new HttpRequestMessage(HttpMethod.Delete, $"{_baseUrl}/storage/v1/object/{_bucket}/{key}.meta.json");
                 reqMeta.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _serviceKey);
                 reqMeta.Headers.Add("apikey", _serviceKey);
                 await _httpClient.SendAsync(reqMeta, cancellationToken);
             }
-            catch
+            catch (Exception ex)
             {
-                // Limpieza silenciosa
+                _logger.LogWarning(ex, "No fue posible eliminar el objeto de Supabase Storage.");
             }
         }
 
-        return await _localFallback.DeleteAsync(urlOrStorageKey, cancellationToken);
+        // También limpia copias locales legadas o creadas por un fallback explícito.
+        var localDeleted = await _localFallback.DeleteAsync(urlOrStorageKey, cancellationToken);
+        return cloudDeleted || localDeleted;
     }
 
     public string? ResolvePhysicalPath(string storageKey) => _localFallback.ResolvePhysicalPath(storageKey);

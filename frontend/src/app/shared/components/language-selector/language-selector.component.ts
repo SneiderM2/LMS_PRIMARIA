@@ -1,11 +1,12 @@
 import { Component, Input, inject, signal, HostListener, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LanguageService, SupportedLanguage } from '../../../core/services/language.service';
+import { LanguageFlagComponent } from '../language-flag/language-flag.component';
 
 @Component({
   selector: 'app-language-selector',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LanguageFlagComponent],
   template: `
     <div 
       class="language-selector-container notranslate skiptranslate" 
@@ -21,7 +22,7 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
         [attr.aria-expanded]="isOpen()"
         [attr.aria-label]="'Seleccionar idioma. Idioma actual: ' + langService.currentOption().label"
         title="Cambiar idioma / Switch language">
-        <span class="flag-icon">{{ langService.currentOption().flag }}</span>
+        <app-language-flag class="flag-icon" [code]="langService.currentLang()"></app-language-flag>
         <span class="lang-code">{{ langService.currentOption().code.toUpperCase() }}</span>
         <span class="chevron-arrow" [class.rotated]="isOpen()">▾</span>
       </button>
@@ -42,10 +43,12 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
               (click)="onSelectLanguage(item.code)"
               role="option"
               [attr.aria-selected]="item.code === langService.currentLang()">
-              <span class="option-flag">{{ item.flag }}</span>
+              <app-language-flag class="option-flag" [code]="item.code"></app-language-flag>
               <div class="option-names">
                 <span class="option-native">{{ item.nativeName }}</span>
-                <span class="option-sub">({{ item.label }})</span>
+                @if (item.nativeName !== item.label) {
+                  <span class="option-sub">({{ item.label }})</span>
+                }
               </div>
               @if (item.code === langService.currentLang()) {
                 <span class="option-check">✓</span>
@@ -114,8 +117,8 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
     }
 
     .flag-icon {
-      font-size: 1.15rem;
-      line-height: 1;
+      width: 1.4rem;
+      height: 1.05rem;
     }
 
     .lang-code {
@@ -196,8 +199,8 @@ import { LanguageService, SupportedLanguage } from '../../../core/services/langu
     }
 
     .option-flag {
-      font-size: 1.25rem;
-      line-height: 1;
+      width: 1.55rem;
+      height: 1.15rem;
     }
 
     .option-names {

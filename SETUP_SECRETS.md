@@ -12,14 +12,18 @@ ASP.NET Core lee las variables con doble guion bajo (`__`) para navegar la confi
 | Variable | Obligatoria | Ejemplo / valor |
 | :--- | :---: | :--- |
 | `ConnectionStrings__DefaultConnection` o `DATABASE_URL` | Sí | `Host=...;Port=5432;Database=postgres;Username=postgres.<ref>;Password=<secreto>;SSL Mode=Require;Trust Server Certificate=false;` |
-| `Jwt__SecretKey` | Sí | Cadena aleatoria de **64+ caracteres** (Base64). Sin valor por defecto. |
+| `Jwt__SecretKey` | Sí | Cadena aleatoria de **48+ caracteres** (recomendado 64, Base64). La API no arranca sin ella. |
 | `Jwt__Issuer` | No | `LMS.API` |
 | `Jwt__Audience` | No | `LMS.Client` |
 | `Jwt__ExpirationMinutes` | No | `480` (8 horas); máximo 1440 |
-| `Recaptcha__SecretKey` | Sí (si se usa CAPTCHA) | Clave secreta de reCAPTCHA v2 |
+| `Recaptcha__SecretKey` | Sí en producción | Clave secreta de reCAPTCHA v2. Sin ella el login/registro se rechazan (*fail-closed*). |
 | `Recaptcha__ExpectedHostname` | Recomendada | `sneiderm2.github.io` |
+| `Recaptcha__AllowDevBypass` | No | `false`; solo se acepta en Development. |
 | `Authentication__Google__ClientId` | Solo si se usa Google | `xxxx.apps.googleusercontent.com` |
-| `Privacy__EvidenceHmacKey` | Recomendada | Clave aleatoria distinta de la JWT para firmar consentimientos |
+| `Privacy__EvidenceHmacKey` | Sí | Clave aleatoria de **32+ caracteres**, distinta de la JWT, para firmar consentimientos. |
+| `Privacy__EnableInactivityAnonymization` | No | `false` por defecto. Activar solo con aprobación del responsable del tratamiento. |
+| `Privacy__InactivityAnonymizationDryRun` | No | `true` por defecto; simula sin modificar datos. |
+| `Privacy__InactivityAnonymizationMonths` | No | `36` meses por defecto. |
 | `Registration__TeacherInviteCode` | Recomendada | Código entregado a docentes; vacío deshabilita su auto-registro |
 | `Supabase__ProjectRef` | Si la URL no incluye el usuario completo | `abcdefghijklmnop` |
 | `Cors__AllowedOrigins__0` | Sí | `https://sneiderm2.github.io` |
@@ -28,7 +32,9 @@ ASP.NET Core lee las variables con doble guion bajo (`__`) para navegar la confi
 | `Storage__Supabase__Url` o `SUPABASE_URL` | Si Provider=Supabase | URL del proyecto Supabase (ej. `https://<ref>.supabase.co`) |
 | `Storage__Supabase__ServiceRoleKey` o `SUPABASE_SERVICE_ROLE_KEY` | Si Provider=Supabase | Service Role Key (privada, para escribir en el bucket privado) |
 | `Storage__Supabase__Bucket` o `SUPABASE_STORAGE_BUCKET` | No | Nombre del bucket (`lms-uploads` por defecto) |
-| `Storage__RootPath` | No | Ruta privada para fallback local; por defecto `App_Data/uploads` |
+| `Storage__AllowLocalFallback` | No | `false` por defecto. No habilitar en producción con disco efímero. |
+| `Storage__RootPath` | No | Ruta privada para almacenamiento local; por defecto `App_Data/uploads` |
+| `Database__TrustServerCertificate` | No | `false` por defecto. No habilitar salvo diagnóstico controlado. |
 | `Seed__Enabled` | No | `false` (nunca `true` en producción salvo instalación inicial) |
 | `Features__EnableDatabaseRestore` | No | `false` |
 | `Features__AllowRestoreInProduction` | No | `false` |
@@ -62,8 +68,9 @@ ASP.NET Core lee las variables con doble guion bajo (`__`) para navegar la confi
    dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena>"
    ```
 
-> `appsettings.Local.json` se carga en cualquier entorno si existe, pero las variables de
-> entorno tienen prioridad. En Docker el archivo no se copia.
+> `appsettings.Local.json` se carga **solo** cuando `ASPNETCORE_ENVIRONMENT=Development`.
+> En cualquier otro entorno use variables de entorno o un proveedor de secretos. En Docker el
+> archivo no se copia.
 
 ### Generar una clave JWT segura
 
@@ -82,12 +89,36 @@ $rng.GetBytes($bytes); $rng.Dispose()
 2. No uses `DATABASE_URL` con la contraseña en texto plano en el repositorio; usa el panel de Render.
 3. Verifica que `Cors__AllowedOrigins__0` sea exactamente `https://sneiderm2.github.io` (sin `/` final).
 4. Configura `Recaptcha__ExpectedHostname=sneiderm2.github.io`.
-5. Despliega con el `Dockerfile`; el contenedor corre como usuario `appuser`.
-6. Comprueba:
+5. Despliega con el `Dockerfile`; el contenedor corre como usuario sin privilegios `lmsapp`.
+6. Define `Storage__Provider=Supabase` con URL, Service Role Key y bucket. El plan Free de Render
+   **no admite discos persistentes**; usa `Local` solo en desarrollo o con un disco montado en un
+   plan superior. No uses `Local` con disco efímero para archivos reales.
+7. Comprueba:
    - `GET /api/ping` → 200.
-   - `GET /api/health` → 200 y `database: connected`.
+   - `GET /api/health` → 200, `database: "Healthy"` y `storage` acorde al proveedor configurado.
    - `GET /swagger` → 404 en producción (Swagger deshabilitado).
    - Cabeceras `Strict-Transport-Security` y `X-Content-Type-Options` presentes.
+
+### 3.1 Estado verificado de producción (25/10/2026)
+
+| Elemento | Estado observado | Implicación |
+| :--- | :--- | :--- |
+| Render `LMS_PRIMARIA` | Plan **Free**, región Virginia, auto-deploy en cada commit a `main`; última versión `ba00a00`. | La instancia se suspende por inactividad; los 503 iniciales son *cold start*. |
+| Disco de Render | No hay disco. El plan Free no admite discos persistentes. | `Storage:Provider=Local` es efímero y no sirve para archivos reales. |
+| `/api/health` de producción | `database: "Healthy"`, `storage: "Local"`. | La API funciona, pero el almacenamiento de archivos no es persistente. |
+| Variables de entorno en Render | Solo `ConnectionStrings__DefaultConnection`. | El código endurecido exige además JWT, HMAC de evidencias, reCAPTCHA y almacenamiento; el despliegue fallará hasta configurarlas. |
+| Supabase | Proyecto activo y saludable; 27 MB de BD, 0/1 GB de Storage, sin backups automáticos visibles. Bucket `lms-uploads` creado el 25/10/2026: privado (`public=false`), límite de 25 MB (`26214400` bytes). | El bucket ya está listo; falta configurar la Service Role Key en Render y programar respaldos. |
+| Tabla `audit_logs` | Creada el 25/10/2026 con RLS activo, 13 columnas y 3 índices (`audit_logs_pkey`, `idx_audit_logs_timestamp`, `idx_audit_logs_level`). Una petición real a `/api/privacy/policy` quedó registrada. | La auditoría ya persiste en producción. La corrección de `DbInitializer` (creación idempotente + RLS) se desplegará en el próximo release para entornos nuevos. |
+| Frontend publicado | Sirve la versión anterior (`4 a 10` caracteres) desde GitHub Pages. | Los cambios de esta rama aún no están desplegados. |
+
+**Decisión de almacenamiento:** mientras Render sea Free, usar **Supabase Storage** con el bucket
+privado `lms-uploads` ya creado. Falta definir en Render `Storage__Provider=Supabase`,
+`Storage__Supabase__Url=https://rjvsbjjmlmvcihfgbiaz.supabase.co`,
+`Storage__Supabase__Bucket=lms-uploads` y `Storage__Supabase__ServiceRoleKey` (copiada desde
+**Project Settings → API Keys → Secret keys**; nunca en el repositorio ni en el chat), y desplegar
+el código que usa `SupabaseStorageService`. Si se sube de plan y se monta un disco, se puede volver
+a `Local` apuntando `Storage__RootPath` al disco. No habilitar `Storage:AllowLocalFallback` en
+producción.
 
 ---
 
@@ -126,7 +157,12 @@ Procedimiento:
 
 - [ ] No hay secretos en `git grep` ni en `git log -p`.
 - [ ] `appsettings.Local.json` está ignorado y fuera del contexto Docker.
-- [ ] `Jwt__SecretKey` tiene 64+ caracteres y es única por entorno.
+- [ ] `Jwt__SecretKey` tiene 48+ caracteres (recomendado 64) y es única por entorno.
+- [ ] `Privacy__EvidenceHmacKey` tiene 32+ caracteres y es distinta de la JWT.
+- [ ] `Recaptcha__SecretKey` está configurada; no se depende de bypass en producción.
+- [ ] `Storage__Provider` apunta a almacenamiento persistente y `AllowLocalFallback=false`.
+- [ ] `Privacy__EnableInactivityAnonymization` y `InactivityAnonymizationDryRun` fueron revisados.
+- [ ] `Database__TrustServerCertificate=false` y el certificado TLS es válido.
 - [ ] CORS no contiene `*` ni `SetIsOriginAllowed(_ => true)`.
 - [ ] Swagger no está expuesto en producción.
 - [ ] `Seed__Enabled=false` y las cuentas demo están rotadas o desactivadas.

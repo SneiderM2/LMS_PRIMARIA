@@ -28,10 +28,10 @@ export interface PasswordPolicyValidationResult {
   providedIn: 'root'
 })
 export class PasswordPolicyService {
-  public readonly minLength = 4;
-  public readonly maxLength = 10;
+  public readonly minLength = 8;
+  public readonly maxLength = 64;
 
-  // Lista negra de contraseñas cortas comunes
+  // Lista negra de contraseñas comunes
   private readonly blockedPasswords = new Set([
     '1234', '12345', '123456', '12345678', '123456789', '1234567890',
     'admin', 'admin123', 'docente', 'docente123', 'alumno', 'alumno123',
@@ -40,7 +40,7 @@ export class PasswordPolicyService {
   ]);
 
   /**
-   * Evalúa la contraseña en tiempo real contra los criterios institucionales (4 a 10 caracteres).
+   * Evalúa la contraseña en tiempo real contra los criterios institucionales (8 a 64 caracteres).
    */
   public validate(password: string | null | undefined, username?: string, fullName?: string): PasswordPolicyValidationResult {
     const pwd = password || '';
@@ -101,6 +101,10 @@ export class PasswordPolicyService {
       score = 0;
     } else if (isBlocked) {
       score = Math.min(score, 25);
+    } else if (!hasLength) {
+      // La longitud es un requisito eliminatorio: no debe mostrarse "Buena"
+      // solo porque las demás reglas se cumplen.
+      score = Math.min(score, 34);
     }
 
     let strengthLabel: 'Muy débil' | 'Débil' | 'Aceptable' | 'Buena' | 'Fuerte' = 'Muy débil';
@@ -155,9 +159,9 @@ export class PasswordPolicyService {
   }
 
   /**
-   * Genera una contraseña segura dentro del rango de 4 a 10 caracteres (por defecto 8).
+   * Genera una contraseña segura dentro del rango de 8 a 64 caracteres (por defecto 12).
    */
-  public generateSecurePassword(length = 8): string {
+  public generateSecurePassword(length = 12): string {
     const targetLength = Math.max(this.minLength, Math.min(this.maxLength, length));
     const uppers = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
     const lowers = 'abcdefghijkmnopqrstuvwxyz';

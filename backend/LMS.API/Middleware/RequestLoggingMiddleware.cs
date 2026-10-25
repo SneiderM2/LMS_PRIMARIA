@@ -866,6 +866,9 @@ public static class FileLogger
     /// <summary>Cola opcional para persistencia en base de datos.</summary>
     public static Services.AuditLogQueue? DbQueue { get; set; }
 
+    /// <summary>Salida adicional para que Render capture la auditoría en stdout.</summary>
+    public static Action<string>? ConsoleSink { get; set; }
+
     /// <summary>Tamaño máximo por archivo antes de rotar (5 MB).</summary>
     private const long MaxFileSize = 5 * 1024 * 1024;
 
@@ -918,6 +921,7 @@ public static class FileLogger
         {
             DbQueue?.Enqueue(entry);
             var json = JsonSerializer.Serialize(entry);
+            ConsoleSink?.Invoke(json);
             await WriteAsync("app-audit", json);
         }
         catch

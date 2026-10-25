@@ -92,7 +92,7 @@ export class AuthService {
   }
 
   /**
-   * Cambia la contraseña del usuario autenticado validando política estricta (4 a 10 caracteres).
+   * Cambia la contraseña del usuario autenticado validando política estricta (8 a 64 caracteres).
    */
   public changePassword(currentPassword: string, newPassword: string, confirmNewPassword?: string): Observable<any> {
     const body = { currentPassword, newPassword, confirmNewPassword };

@@ -6,15 +6,14 @@ export interface LanguageOption {
   code: SupportedLanguage;
   label: string;
   nativeName: string;
-  flag: string;
 }
 
 export const SUPPORTED_LANGUAGES: LanguageOption[] = [
-  { code: 'es', label: 'Español', nativeName: 'Español', flag: '🇪🇸' },
-  { code: 'en', label: 'English', nativeName: 'English', flag: '🇺🇸' },
-  { code: 'zh', label: 'Chino', nativeName: '中文', flag: '🇨🇳' },
-  { code: 'ja', label: 'Japonés', nativeName: '日本語', flag: '🇯🇵' },
-  { code: 'pt', label: 'Portugués', nativeName: 'Português', flag: '🇧🇷' }
+  { code: 'es', label: 'Español', nativeName: 'Español' },
+  { code: 'en', label: 'English', nativeName: 'English' },
+  { code: 'zh', label: 'Chino', nativeName: '中文' },
+  { code: 'ja', label: 'Japonés', nativeName: '日本語' },
+  { code: 'pt', label: 'Portugués', nativeName: 'Português' }
 ];
 
 // Diccionario exhaustivo de claves jerárquicas (Dot-Notation)
@@ -68,7 +67,7 @@ const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     "login.grade4": "4° Primaria (Cuarto Grado)",
     "login.grade5": "5° Primaria (Quinto Grado)",
     "login.regPasswordLabel": "Contraseña",
-    "login.regPasswordPlaceholder": "Mínimo 4 caracteres",
+    "login.regPasswordPlaceholder": "Mínimo 8 caracteres",
     "login.regConfirmPasswordLabel": "Repetir",
     "login.regConfirmPasswordPlaceholder": "Confirma tu clave",
     "login.btnRegister": "🎉 ¡Crear mi Cuenta y Entrar!",
@@ -540,7 +539,7 @@ const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     "login.grade4": "4th Grade (Fourth Grade)",
     "login.grade5": "5th Grade (Fifth Grade)",
     "login.regPasswordLabel": "Password",
-    "login.regPasswordPlaceholder": "Minimum 4 characters",
+    "login.regPasswordPlaceholder": "Minimum 8 characters",
     "login.regConfirmPasswordLabel": "Confirm",
     "login.regConfirmPasswordPlaceholder": "Confirm your password",
     "login.btnRegister": "🎉 Create my Account & Enter!",
@@ -1012,7 +1011,7 @@ const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     "login.grade4": "四年级",
     "login.grade5": "五年级",
     "login.regPasswordLabel": "密码",
-    "login.regPasswordPlaceholder": "至少4位字符",
+    "login.regPasswordPlaceholder": "至少8位字符",
     "login.regConfirmPasswordLabel": "确认密码",
     "login.regConfirmPasswordPlaceholder": "再次输入密码",
     "login.btnRegister": "🎉 创建账号并进入！",
@@ -1484,7 +1483,7 @@ const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     "login.grade4": "小学4年生",
     "login.grade5": "小学5年生",
     "login.regPasswordLabel": "パスワード",
-    "login.regPasswordPlaceholder": "4文字以上",
+    "login.regPasswordPlaceholder": "8文字以上",
     "login.regConfirmPasswordLabel": "パスワード再入力",
     "login.regConfirmPasswordPlaceholder": "パスワードを確認",
     "login.btnRegister": "🎉 アカウントを作成して入室！",
@@ -1956,7 +1955,7 @@ const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     "login.grade4": "4º Ano (Quarto Ano)",
     "login.grade5": "5º Ano (Quinto Ano)",
     "login.regPasswordLabel": "Senha",
-    "login.regPasswordPlaceholder": "Mínimo de 4 caracteres",
+    "login.regPasswordPlaceholder": "Mínimo de 8 caracteres",
     "login.regConfirmPasswordLabel": "Repetir",
     "login.regConfirmPasswordPlaceholder": "Confirme sua senha",
     "login.btnRegister": "🎉 Criar minha Conta e Entrar!",

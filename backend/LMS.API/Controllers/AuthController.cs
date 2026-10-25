@@ -170,6 +170,29 @@ public class AuthController : ControllerBase
                 await _context.SaveChangesAsync();
             }
 
+            // Validar el grado antes de crear la cuenta para no dejar registros parciales.
+            Grado? grado = null;
+            string? gradoNombre = null;
+            if (targetRoleName == "ALUMNO")
+            {
+                var rawGrade = request.Grade?.Trim() ?? "1°";
+                var gradeKey = rawGrade.Contains('°') ? rawGrade[..(rawGrade.IndexOf('°') + 1)] : rawGrade;
+                var grados = await _context.Grados.ToListAsync();
+                grado = grados.FirstOrDefault(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
+
+                if (grado == null)
+                {
+                    return BadRequest(new
+                    {
+                        code = "INVALID_GRADE",
+                        message = $"El grado '{rawGrade}' no existe. Selecciona uno de los grados registrados.",
+                        validGrades = grados.Select(g => g.Nombre).OrderBy(g => g).ToArray()
+                    });
+                }
+
+                gradoNombre = grado.Nombre;
+            }
+
             var fullNameParts = request.FullName.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
             var firstName = fullNameParts.Length > 0 ? fullNameParts[0] : cleanUsername;
             var lastName = fullNameParts.Length > 1 ? fullNameParts[1] : string.Empty;
@@ -204,25 +227,8 @@ public class AuthController : ControllerBase
                 request.GuardianFullName,
                 request.GuardianDocument);
 
-            string? gradoNombre = null;
-            if (targetRoleName == "ALUMNO")
+            if (targetRoleName == "ALUMNO" && grado != null)
             {
-                var rawGrade = request.Grade?.Trim() ?? "1°";
-                var gradeKey = rawGrade.Contains('°') ? rawGrade[..(rawGrade.IndexOf('°') + 1)] : rawGrade;
-
-                var grado = await _context.Grados.FirstOrDefaultAsync(g => g.Nombre == gradeKey || g.Nombre == rawGrade)
-                            ?? await _context.Grados.FirstOrDefaultAsync(g => g.Nombre.StartsWith("1"))
-                            ?? await _context.Grados.FirstOrDefaultAsync();
-
-                if (grado == null)
-                {
-                    grado = new Grado { Nombre = gradeKey, Descripcion = $"{gradeKey} de primaria" };
-                    _context.Grados.Add(grado);
-                    await _context.SaveChangesAsync();
-                }
-
-                gradoNombre = grado.Nombre;
-
                 _context.Alumnos.Add(new Alumno
                 {
                     UsuarioId = nuevoUsuario.Id,

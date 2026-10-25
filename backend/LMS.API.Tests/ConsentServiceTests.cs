@@ -1,7 +1,6 @@
 using LMS.API.Configuration;
 using LMS.API.Entities;
 using LMS.API.Services;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -17,14 +16,7 @@ public class ConsentServiceTests
             EvidenceHmacKey = new string('k', 64)
         });
 
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Jwt:SecretKey"] = new string('j', 64)
-            })
-            .Build();
-
-        return new ConsentService(options, configuration);
+        return new ConsentService(options);
     }
 
     private static Usuario CreateUser() => new()

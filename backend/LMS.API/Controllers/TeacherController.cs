@@ -165,15 +165,17 @@ public class TeacherController : ControllerBase
 
         var rawGrade = dto.Grade.Trim();
         var gradeKey = rawGrade.Contains('°') ? rawGrade.Substring(0, rawGrade.IndexOf('°') + 1) : rawGrade;
-        var grado = await _context.Grados.FirstOrDefaultAsync(g => g.Nombre == gradeKey || g.Nombre == rawGrade)
-                    ?? await _context.Grados.FirstOrDefaultAsync(g => g.Nombre.StartsWith("1"))
-                    ?? await _context.Grados.FirstOrDefaultAsync();
+        var grados = await _context.Grados.ToListAsync();
+        var grado = grados.FirstOrDefault(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
 
         if (grado == null)
         {
-            grado = new Grado { Nombre = gradeKey, Descripcion = $"{gradeKey} de primaria" };
-            _context.Grados.Add(grado);
-            await _context.SaveChangesAsync();
+            return BadRequest(new
+            {
+                code = "INVALID_GRADE",
+                message = $"El grado '{rawGrade}' no existe. Selecciona uno de los grados registrados.",
+                validGrades = grados.Select(g => g.Nombre).OrderBy(g => g).ToArray()
+            });
         }
 
         var password = dto.Password?.Trim();
@@ -441,14 +443,17 @@ public class TeacherController : ControllerBase
 
         var rawGrade = dto.Grado.Trim();
         var gradeKey = rawGrade.Contains('°') ? rawGrade.Substring(0, rawGrade.IndexOf('°') + 1) : rawGrade;
-        var grado = await _context.Grados.FirstOrDefaultAsync(g => g.Nombre == gradeKey || g.Nombre == rawGrade)
-                    ?? await _context.Grados.FirstOrDefaultAsync();
+        var grados = await _context.Grados.ToListAsync();
+        var grado = grados.FirstOrDefault(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
 
         if (grado == null)
         {
-            grado = new Grado { Nombre = gradeKey, Descripcion = $"{gradeKey} de primaria" };
-            _context.Grados.Add(grado);
-            await _context.SaveChangesAsync();
+            return BadRequest(new
+            {
+                code = "INVALID_GRADE",
+                message = $"El grado '{rawGrade}' no existe. Selecciona uno de los grados registrados.",
+                validGrades = grados.Select(g => g.Nombre).OrderBy(g => g).ToArray()
+            });
         }
 
         var curso = new Curso
@@ -613,14 +618,17 @@ public class TeacherController : ControllerBase
         // Buscar un curso que coincida con la materia/grado o crear uno automático
         var rawGrade = dto.GradeLevel.Trim();
         var gradeKey = rawGrade.Contains('°') ? rawGrade.Substring(0, rawGrade.IndexOf('°') + 1) : rawGrade;
-        var grado = await _context.Grados.FirstOrDefaultAsync(g => g.Nombre == gradeKey || g.Nombre == rawGrade)
-                    ?? await _context.Grados.FirstOrDefaultAsync();
+        var grados = await _context.Grados.ToListAsync();
+        var grado = grados.FirstOrDefault(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
 
         if (grado == null)
         {
-            grado = new Grado { Nombre = gradeKey, Descripcion = $"{gradeKey} de primaria" };
-            _context.Grados.Add(grado);
-            await _context.SaveChangesAsync();
+            return BadRequest(new
+            {
+                code = "INVALID_GRADE",
+                message = $"El grado '{rawGrade}' no existe. Selecciona uno de los grados registrados.",
+                validGrades = grados.Select(g => g.Nombre).OrderBy(g => g).ToArray()
+            });
         }
 
         Curso? curso = null;

@@ -16,9 +16,13 @@ export class PasswordPolicyMeterComponent implements OnChanges {
   @Input() showChecklist = true;
   @Input() compact = false;
 
+  public readonly minLength: number;
+  public readonly maxLength: number;
   public result: PasswordPolicyValidationResult;
 
   constructor(private policyService: PasswordPolicyService) {
+    this.minLength = policyService.minLength;
+    this.maxLength = policyService.maxLength;
     this.result = this.policyService.validate('');
   }
 

@@ -73,7 +73,7 @@
 .portal-subtitle {
   font-size: 1.05rem;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--primary-hover);
   margin-top: 0.2rem;
   transition: color 0.3s;
 }
@@ -355,6 +355,16 @@
   color: var(--primary);
 }
 
+/* Contraste AA sobre fondo oscuro */
+:host-context(body.dark-theme) .portal-title,
+:host-context(body.dark-mode) .portal-title,
+:host-context(body.dark-theme) .portal-subtitle,
+:host-context(body.dark-mode) .portal-subtitle,
+:host-context(body.dark-theme) .register-prompt a,
+:host-context(body.dark-mode) .register-prompt a {
+  color: #38bdf8;
+}
+
 .login-footer {
   text-align: center;
   margin-top: 1.5rem;
@@ -465,7 +475,7 @@
 
 .captcha-fallback-notice .fallback-text strong {
   display: block;
-  color: var(--text-primary, #1e293b);
+  color: var(--text-main, #1e293b);
   margin-bottom: 0.25rem;
   font-weight: 700;
 }
@@ -646,7 +656,7 @@
   font-weight: 600;
   margin-top: 0.65rem;
   background: rgba(245, 158, 11, 0.1);
-  color: #d97706;
+  color: #92400e;
   border: 1px solid rgba(245, 158, 11, 0.25);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -671,6 +681,33 @@
   background: #22c55e;
   animation: none;
   box-shadow: 0 0 6px #22c55e;
+}
+
+.server-status-pill.unavailable {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.server-status-pill.unavailable .status-dot {
+  background: #ef4444;
+  animation: none;
+}
+
+/* Contraste AA del indicador sobre fondo oscuro */
+:host-context(body.dark-theme) .server-status-pill,
+:host-context(body.dark-mode) .server-status-pill {
+  color: #fbbf24;
+}
+
+:host-context(body.dark-theme) .server-status-pill.ready,
+:host-context(body.dark-mode) .server-status-pill.ready {
+  color: #4ade80;
+}
+
+:host-context(body.dark-theme) .server-status-pill.unavailable,
+:host-context(body.dark-mode) .server-status-pill.unavailable {
+  color: #fca5a5;
 }
 
 @keyframes pulse-dot {
@@ -701,6 +738,22 @@
   margin-bottom: 0.5rem;
 }
 
+:host-context(body.dark-theme) .guardian-register-box,
+:host-context(body.dark-mode) .guardian-register-box {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+:host-context(body.dark-theme) .guardian-register-box .section-label,
+:host-context(body.dark-mode) .guardian-register-box .section-label {
+  color: #fbbf24;
+}
+
+:host-context(body.dark-theme) .guardian-register-box .policy-check-inline,
+:host-context(body.dark-mode) .guardian-register-box .policy-check-inline {
+  color: #e2e8f0;
+}
+
 .policy-check-register {
   margin: 0.5rem 0 1rem;
   font-size: 0.84rem;
@@ -726,4 +779,30 @@
   color: #1d4ed8;
   font-weight: 700;
   text-decoration: underline;
+}
+
+/* Ajustes de registro en pantallas pequeñas */
+@media (max-width: 600px) {
+  .login-wrapper {
+    padding-bottom: 7rem;
+  }
+
+  .login-card {
+    padding: 2rem 1.25rem;
+  }
+
+  .form-row-2 {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .form-row-2 .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .server-status-pill {
+    font-size: 0.72rem;
+    line-height: 1.35;
+    padding: 0.35rem 0.7rem;
+  }
 }

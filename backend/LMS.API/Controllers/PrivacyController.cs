@@ -183,11 +183,12 @@ public class PrivacyController : ControllerBase
         }
 
         var matriculas = new List<object>();
-        if (user.Alumno != null)
+        var alumnoId = user.Alumno?.UsuarioId;
+        if (alumnoId.HasValue)
         {
             var rows = await _context.Inscripciones
                 .AsNoTracking()
-                .Where(i => i.AlumnoId == user.Id)
+                .Where(i => i.AlumnoId == alumnoId.Value)
                 .OrderBy(i => i.FechaRegistro)
                 .Select(i => new
                 {
@@ -203,27 +204,33 @@ public class PrivacyController : ControllerBase
             matriculas.AddRange(rows);
         }
 
-        var entregas = await _context.Entregas
-            .AsNoTracking()
-            .Where(e => e.AlumnoId == user.Id)
-            .OrderByDescending(e => e.FechaEntrega)
-            .Select(e => new
-            {
-                tarea = e.Tarea.Titulo,
-                curso = e.Tarea.Curso.Nombre,
-                e.FechaEntrega,
-                e.Estado,
-                e.Calificacion,
-                e.Retroalimentacion,
-                archivos = e.Archivos.Select(a => new
+        var entregas = new List<object>();
+        if (alumnoId.HasValue)
+        {
+            var rows = await _context.Entregas
+                .AsNoTracking()
+                .Where(e => e.AlumnoId == alumnoId.Value)
+                .OrderByDescending(e => e.FechaEntrega)
+                .Select(e => new
                 {
-                    a.NombreOriginal,
-                    a.TipoMime,
-                    a.TamanoBytes,
-                    a.FechaSubida
-                }).ToList()
-            })
-            .ToListAsync();
+                    tarea = e.Tarea.Titulo,
+                    curso = e.Tarea.Curso.Nombre,
+                    e.FechaEntrega,
+                    e.Estado,
+                    e.Calificacion,
+                    e.Retroalimentacion,
+                    archivos = e.Archivos.Select(a => new
+                    {
+                        a.NombreOriginal,
+                        a.TipoMime,
+                        a.TamanoBytes,
+                        a.FechaSubida
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            entregas.AddRange(rows);
+        }
 
         var payload = new
         {
@@ -339,10 +346,21 @@ public class PrivacyController : ControllerBase
             return BadRequest(new { message = "La contraseña no es correcta." });
         }
 
-        var archivos = await _context.ArchivosEntrega
-            .Include(a => a.Entrega)
-            .Where(a => a.Entrega.AlumnoId == user.Id)
-            .ToListAsync();
+        var archivos = new List<ArchivoEntrega>();
+        var entregas = new List<Entrega>();
+        var alumnoId = user.Alumno?.UsuarioId;
+
+        if (alumnoId.HasValue)
+        {
+            archivos = await _context.ArchivosEntrega
+                .Include(a => a.Entrega)
+                .Where(a => a.Entrega.AlumnoId == alumnoId.Value)
+                .ToListAsync();
+
+            entregas = await _context.Entregas
+                .Where(e => e.AlumnoId == alumnoId.Value)
+                .ToListAsync();
+        }
 
         foreach (var archivo in archivos)
         {
@@ -352,7 +370,6 @@ public class PrivacyController : ControllerBase
         _context.ArchivosEntrega.RemoveRange(archivos);
 
         // La historia académica se conserva, pero se elimina el contenido libre del titular.
-        var entregas = await _context.Entregas.Where(e => e.AlumnoId == user.Id).ToListAsync();
         foreach (var entrega in entregas)
         {
             entrega.ContenidoTexto = null;
@@ -365,6 +382,16 @@ public class PrivacyController : ControllerBase
         user.Activo = false;
         user.SessionToken = null;
         user.LockoutEnd = null;
+        user.LastLoginAt = null;
+
+        // La evidencia de consentimiento contiene nombre del acudiente, IP, user-agent
+        // y hash del usuario. Al ejercer el derecho de supresión no debe conservarse.
+        user.DataPolicyAccepted = false;
+        user.DataPolicyAcceptedAt = null;
+        user.DataPolicyVersion = null;
+        user.DataPolicyEvidence = null;
+        user.AccessFailedCount = 0;
+
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N"), workFactor: 12);
         user.DeletedAt = DateTime.UtcNow;
         user.AnonymizedAt = DateTime.UtcNow;
@@ -372,7 +399,7 @@ public class PrivacyController : ControllerBase
         await _context.SaveChangesAsync();
 
         await AuditAsync(user, "Privacidad: Supresión y anonimización de cuenta",
-            $"Archivos eliminados: {archivos.Count}. Motivo declarado: {Truncate(dto.Reason, 200) ?? "no indicado"}.");
+            $"Archivos eliminados: {archivos.Count}. Evidencia de consentimiento eliminada.");
 
         return Ok(new
         {
@@ -411,16 +438,6 @@ public class PrivacyController : ControllerBase
            && (roleName.Equals("ADMINISTRADOR", StringComparison.OrdinalIgnoreCase)
                || roleName.Equals(".admin", StringComparison.OrdinalIgnoreCase)
                || roleName.Equals("Admin", StringComparison.OrdinalIgnoreCase));
-
-    private static string? Truncate(string? value, int max)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        return value.Length <= max ? value : value[..max];
-    }
 
     private async Task AuditAsync(Usuario user, string action, string? details)
     {

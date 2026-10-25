@@ -62,7 +62,7 @@ administradores solo se crean desde el panel administrativo autenticado.
 ### 4.1 Gestión de identidades y accesos (ISO 27001 A.5/A.8)
 
 - Roles canónicos y políticas de autorización.
-- Contraseñas con BCrypt (coste 12), mínimo 12 caracteres, bloqueo de contraseñas comunes.
+- Contraseñas con BCrypt (coste 12), política de 8 a 64 caracteres y bloqueo de contraseñas comunes.
 - Bloqueo temporal de 15 minutos tras 5 fallos y limitación de tasa por IP.
 - JWT firmado con HMAC-SHA256, expiración de 8 horas, `jti`, `iat` y `nbf`.
 - Revocación por sesión única (token de sesión en base de datos).

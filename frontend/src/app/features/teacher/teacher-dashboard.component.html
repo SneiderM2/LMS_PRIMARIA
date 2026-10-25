@@ -71,7 +71,7 @@
     </div>
   </nav>
 
-  <main id="main-content" class="main-container">
+  <main id="main-content" tabindex="-1" class="main-container">
 
     <!-- ========================================================================= -->
     <!-- PESTAÑA 1: GESTIÓN DE ACTIVIDADES, TAREAS Y CALIFICACIONES (CRUD)          -->
@@ -1162,14 +1162,14 @@
             </div>
             <div class="form-group col">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                <label style="margin: 0;">{{ 'teacher.studentPassLabel' | translate }} (4 a 10 caract.)</label>
+                <label style="margin: 0;">{{ 'teacher.studentPassLabel' | translate }} (8 a 64 caract.)</label>
                 <button type="button" class="btn btn-sm btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.72rem;" (click)="generatePasswordForNewStudent()">
                   🎲 Generar
                 </button>
               </div>
               <div style="position: relative; display: flex; align-items: center;">
                 <input type="text" [(ngModel)]="newStudent.password" name="sPass" class="form-input"
-                  minlength="4" maxlength="10" placeholder="Ej: Clave1&#64; (4-10)"
+                  minlength="8" maxlength="64" placeholder="Ej: Clave1&#64;Segura (8-64)"
                   autocomplete="new-password" />
                 <button *ngIf="newStudent.password" type="button" class="btn btn-sm btn-secondary" style="position: absolute; right: 6px; padding: 0.25rem 0.5rem; font-size: 0.72rem;" (click)="copyPassword(newStudent.password)" title="Copiar">
                   📋 Copiar

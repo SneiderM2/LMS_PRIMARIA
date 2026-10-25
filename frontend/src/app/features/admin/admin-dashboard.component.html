@@ -71,7 +71,7 @@
     </div>
   </nav>
 
-  <main id="main-content" class="admin-container">
+  <main id="main-content" tabindex="-1" class="admin-container">
 
     <!-- ========================================================= -->
     <!-- SECCIÓN 1: GESTIÓN DE USUARIOS Y MÉTRICAS GLOBALES        -->
@@ -670,15 +670,15 @@
 
           <div class="form-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-              <label style="margin: 0;">{{ 'admin.formPassword' | translate }} (4 a 10 caract.)</label>
+              <label style="margin: 0;">{{ 'admin.formPassword' | translate }} (8 a 64 caract.)</label>
               <button type="button" class="btn btn-sm btn-secondary" style="padding: 0.2rem 0.55rem; font-size: 0.75rem;" (click)="generatePasswordForNewUser()">
-                🎲 Generar clave (8 caract.)
+                🎲 Generar clave (12 caract.)
               </button>
             </div>
             <div style="position: relative; display: flex; align-items: center;">
               <input type="text" [(ngModel)]="newUser.password" name="password" class="form-input"
-                minlength="4" maxlength="10" autocomplete="new-password"
-                placeholder="Ej: Clave1&#64; (4 a 10 caract.)" />
+                minlength="8" maxlength="64" autocomplete="new-password"
+                placeholder="Ej: Clave1&#64;Segura (8 a 64 caract.)" />
               <button *ngIf="newUser.password" type="button" class="btn btn-sm btn-secondary" style="position: absolute; right: 6px; padding: 0.25rem 0.55rem; font-size: 0.75rem;" (click)="copyPassword(newUser.password)" title="Copiar al portapapeles">
                 📋 Copiar
               </button>
@@ -690,7 +690,7 @@
               [compact]="true">
             </app-password-policy-meter>
             <small *ngIf="!newUser.password" style="display:block; margin-top:0.3rem; font-size:0.76rem; color:#64748b;">
-              Entre 4 y 10 caracteres con mayúscula, minúscula, número y símbolo (&#64;, #, !, etc.). Si se deja vacío, el sistema genera una temporal automáticamente.
+              Entre 8 y 64 caracteres con mayúscula, minúscula, número y símbolo (&#64;, #, !, etc.). Si se deja vacío, el sistema genera una temporal automáticamente.
             </small>
           </div>
 
@@ -741,14 +741,14 @@
 
           <div class="form-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-              <label style="margin: 0;">{{ 'admin.formResetPassword' | translate }} (4 a 10 caract.)</label>
+              <label style="margin: 0;">{{ 'admin.formResetPassword' | translate }} (8 a 64 caract.)</label>
               <button type="button" class="btn btn-sm btn-secondary" style="padding: 0.2rem 0.55rem; font-size: 0.75rem;" (click)="generatePasswordForEditUser()">
-                🎲 Generar clave (8 caract.)
+                🎲 Generar clave (12 caract.)
               </button>
             </div>
             <div style="position: relative; display: flex; align-items: center;">
               <input type="text" [(ngModel)]="editUserForm.password" name="ePass" class="form-input"
-                minlength="4" maxlength="10" autocomplete="new-password"
+                minlength="8" maxlength="64" autocomplete="new-password"
                 placeholder="Dejar en blanco para no cambiarla" />
               <button *ngIf="editUserForm.password" type="button" class="btn btn-sm btn-secondary" style="position: absolute; right: 6px; padding: 0.25rem 0.55rem; font-size: 0.75rem;" (click)="copyPassword(editUserForm.password)" title="Copiar al portapapeles">
                 📋 Copiar

@@ -230,6 +230,7 @@ public class DbInitializer
                 if (alreadyMigrated != null && alreadyMigrated != DBNull.Value)
                 {
                     await EnsureLoginIndexAsync(conn);
+                    await EnsureAuditLogsTableAsync(conn);
                     return;
                 }
             }
@@ -341,7 +342,7 @@ public class DbInitializer
         }
     }
 
-    private static async Task EnsureAuditLogsTableAsync(System.Data.Common.DbConnection conn)
+    private async Task EnsureAuditLogsTableAsync(System.Data.Common.DbConnection conn)
     {
         try
         {
@@ -365,24 +366,62 @@ public class DbInitializer
             CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);
             CREATE INDEX IF NOT EXISTS idx_audit_logs_level ON audit_logs (level);";
             await auditCmd.ExecuteNonQueryAsync();
+
+            // La tabla no debe quedar expuesta por la Data API a roles anónimos.
+            // El propietario de la tabla (usuario de la API) sigue pudiendo escribir.
+            try
+            {
+                using var rlsCmd = conn.CreateCommand();
+                rlsCmd.CommandText = "ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;";
+                await rlsCmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "No fue posible habilitar RLS en audit_logs. Revise el propietario de la tabla.");
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            // La tabla de auditoría se creará o se usará fallback en memoria/archivo
+            // La auditoría es un control de seguridad: un fallo no debe pasar inadvertido.
+            _logger.LogError(ex, "No se pudo crear la tabla audit_logs. Revise permisos y esquema en PostgreSQL.");
         }
     }
 
-    private static async Task EnsureLoginIndexAsync(System.Data.Common.DbConnection conn)
+    private async Task EnsureLoginIndexAsync(System.Data.Common.DbConnection conn)
     {
         try
         {
+            // Detecta duplicados antes de imponer la unicidad para no romper el arranque.
+            using (var dupCmd = conn.CreateCommand())
+            {
+                dupCmd.CommandText = @"SELECT COUNT(*) FROM (
+                                          SELECT LOWER(username) AS key
+                                          FROM usuarios
+                                          GROUP BY LOWER(username)
+                                          HAVING COUNT(*) > 1
+                                      ) AS duplicados;";
+
+                var duplicates = Convert.ToInt64(await dupCmd.ExecuteScalarAsync() ?? 0L);
+                if (duplicates > 0)
+                {
+                    _logger.LogError(
+                        "No se pudo crear el índice único de username: existen {Count} identificadores duplicados " +
+                        "(comparación sin distinguir mayúsculas). Corrija los duplicados antes de reintentar.",
+                        duplicates);
+                    return;
+                }
+            }
+
             using var idxCmd = conn.CreateCommand();
-            idxCmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_usuarios_lower_username ON usuarios (LOWER(username));";
+            idxCmd.CommandText = @"
+                DROP INDEX IF EXISTS idx_usuarios_lower_username;
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_usuarios_lower_username ON usuarios (LOWER(username));";
             await idxCmd.ExecuteNonQueryAsync();
         }
-        catch
+        catch (Exception ex)
         {
-            // El índice es una optimización; su ausencia no impide operar.
+            // El índice es una garantía de integridad; si falla se registra para revisión.
+            _logger.LogWarning(ex, "No fue posible crear el índice único de username en minúsculas.");
         }
     }
 }

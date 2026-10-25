@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>LMS Primaria | Mi Escuela Virtual Divertida 🎒✨</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Plataforma educativa virtual para niños de primaria, con semáforo de asistencia y entrega divertida de tareas.">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <!--
+    Índice exclusivo del build de producción. Mantener sincronizado con src/index.html.
+    CSP para GitHub Pages (no permite cabeceras HTTP personalizadas).
+    frame-ancestors y sandbox no son válidos en meta; la API los aplica por su cuenta.
+    No se usa 'unsafe-inline' para scripts: el CSS crítico en línea se desactiva en el build.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' https://accounts.google.com https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://api.dicebear.com https://www.gstatic.com https://*.googleusercontent.com https://*.google.com; connect-src 'self' https://lms-primaria.onrender.com https://accounts.google.com https://www.google.com https://www.gstatic.com https://recaptcha.google.com; frame-src https://accounts.google.com https://www.google.com https://recaptcha.google.com; worker-src 'self' blob:; manifest-src 'self'; form-action 'self'; upgrade-insecure-requests">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Configuración PWA (Progressive Web App) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SciKids LMS">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192x192.png">
+
+  <!-- Fuentes modernas ideales para educación primaria: Nunito y Fredoka -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Sprint 4: Google Identity Services (OAuth 2.0) y Google reCAPTCHA v2 -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
+
+</head>
+<body>
+  <app-root></app-root>
+</body>
+</html>

@@ -21,6 +21,15 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
+# El proceso no debe ejecutarse como root. Se preparan solo los directorios
+# que la aplicación escribe (logs y almacenamiento local privado).
+RUN groupadd --system lms && \
+    useradd --system --gid lms --home-dir /app --shell /usr/sbin/nologin lmsapp && \
+    mkdir -p /app/logs /app/App_Data/uploads && \
+    chown -R lmsapp:lms /app
+
+USER lmsapp
+
 ENV ASPNETCORE_HTTP_PORTS=8080
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production

@@ -17,14 +17,17 @@ public sealed class ConsentService
     private readonly PrivacyOptions _options;
     private readonly string _hmacKey;
 
-    public ConsentService(IOptions<PrivacyOptions> options, IConfiguration configuration)
+    public ConsentService(IOptions<PrivacyOptions> options)
     {
         _options = options.Value;
 
-        _hmacKey = !string.IsNullOrWhiteSpace(_options.EvidenceHmacKey)
-            ? _options.EvidenceHmacKey
-            : configuration["Jwt:SecretKey"] ?? throw new InvalidOperationException(
-                "No hay clave disponible para firmar la evidencia de consentimiento (Privacy:EvidenceHmacKey o Jwt:SecretKey).");
+        _hmacKey = _options.EvidenceHmacKey;
+        if (string.IsNullOrWhiteSpace(_hmacKey) || _hmacKey.Length < 32)
+        {
+            throw new InvalidOperationException(
+                "Privacy:EvidenceHmacKey es obligatorio y debe tener al menos 32 caracteres. " +
+                "No se reutiliza Jwt:SecretKey para separar las claves criptográficas.");
+        }
     }
 
     public string CurrentVersion => _options.PolicyVersion;

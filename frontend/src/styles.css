@@ -698,16 +698,55 @@ body.dark-mode .glass-panel {
 }
 
 /* ==========================================================================
+   Controles flotantes (idioma y tema)
+   En escritorio mantienen posición fija; en móvil pasan a una fila superior
+   para no tapar campos del formulario ni el aviso de reCAPTCHA.
+   ========================================================================== */
+.floating-controls {
+  display: contents;
+}
+
+@media (max-width: 600px) {
+  .floating-controls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem 0;
+    position: relative;
+    z-index: 99999;
+  }
+
+  .floating-controls app-language-selector .language-selector-container.mode-floating {
+    position: static;
+  }
+
+  .floating-controls app-language-selector .language-selector-container.mode-floating .lang-dropdown-menu {
+    top: calc(100% + 8px) !important;
+    bottom: auto !important;
+  }
+
+  .floating-controls app-theme-toggle {
+    display: inline-flex;
+  }
+
+  .floating-controls app-theme-toggle .theme-emoji-btn {
+    position: static;
+    width: 42px;
+    height: 42px;
+    font-size: 1.25rem;
+  }
+}
+
+/* ==========================================================================
    Banner de Reactivación de Servidor (Cold Start - Render)
    ========================================================================== */
 .cold-start-banner {
-  position: fixed;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   z-index: 9999;
-  width: 90%;
+  width: calc(100% - 2rem);
   max-width: 580px;
+  margin: 8px auto 0;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -782,13 +821,37 @@ body.dark-mode .glass-panel {
   background: rgba(0, 0, 0, 0.06);
 }
 
+@media (max-width: 480px) {
+  .cold-start-banner {
+    width: calc(100% - 1rem);
+    margin-top: 4px;
+    padding: 10px 12px;
+  }
+
+  .cold-start-container {
+    gap: 10px;
+  }
+
+  .cold-start-icon {
+    font-size: 1.45rem;
+  }
+
+  .cold-start-title {
+    font-size: 0.92rem;
+  }
+
+  .cold-start-desc {
+    font-size: 0.8rem;
+  }
+}
+
 @keyframes slideDownBanner {
   from {
-    transform: translate(-50%, -100%);
+    transform: translateY(-100%);
     opacity: 0;
   }
   to {
-    transform: translate(-50%, 0);
+    transform: translateY(0);
     opacity: 1;
   }
 }
@@ -892,3 +955,17 @@ body.dark-mode .skeleton {
 
 
 
+
+/* ==========================================================================
+   Accesibilidad: respeta la preferencia del sistema por menos movimiento
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

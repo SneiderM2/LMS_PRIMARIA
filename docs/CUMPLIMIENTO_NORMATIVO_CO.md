@@ -66,7 +66,7 @@ Este documento traza cada obligación relevante a un control técnico u organiza
 | 4 | Evaluación de RNBD | Medio | Determinar si aplica y registrar la base ante la SIC. | Jurídica | 30 días |
 | 5 | Cifrado de respaldos | Alto | Implementar cifrado en reposo de los `.sql` exportados. | TI | 15 días |
 | 6 | Cabeceras del frontend (CSP/HSTS) | Medio | GitHub Pages no permite cabeceras; evaluar hosting con headers o proxy. | TI | 30 días |
-| 7 | Pruebas de seguridad automatizadas | Medio | Pipeline CI + smoke test + revisión OWASP ASVS (26 pruebas unitarias ya implementadas). | Desarrollo | 15 días |
+| 7 | Pruebas de seguridad automatizadas | Medio | Pipeline CI + smoke test + revisión OWASP ASVS (55 pruebas backend y 6 frontend implementadas). | Desarrollo | 15 días |
 | 8 | Migraciones EF Core | Bajo | Reemplazar `DbInitializer` por migraciones versionadas. | Desarrollo | 60 días |
 | 9 | Accesibilidad AA completa | Medio | Auditoría NTC 5854 y corrección de hallazgos. | Desarrollo | 45 días |
 | 10 | Política de retención aprobada | Medio | Aprobar tabla de retención y aplicación automatizada. | Jurídica / TI | 30 días |

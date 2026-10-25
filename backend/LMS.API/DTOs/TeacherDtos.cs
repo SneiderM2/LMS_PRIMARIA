@@ -15,7 +15,7 @@ public class CreateStudentDto
     public string FullName { get; set; } = string.Empty;
 
     /// <summary>Opcional. Si se omite, el servidor genera una contraseña temporal fuerte.</summary>
-    [MaxLength(128)]
+    [MaxLength(64)]
     public string? Password { get; set; }
 
     [Required(ErrorMessage = "El Grado escolar es obligatorio")]
