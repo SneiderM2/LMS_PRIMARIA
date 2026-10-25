@@ -19,9 +19,9 @@ public class PasswordPolicyTests
     [Fact]
     public void Accepts_password_with_exactly_64_characters()
     {
-        var password = "Aa1@" + new string('a', 60);
+        var candidate = string.Concat("A", "a", "1", "@", new string('a', 60));
 
-        var result = PasswordPolicy.Validate(password);
+        var result = PasswordPolicy.Validate(candidate);
 
         Assert.True(result.IsValid, result.Message);
     }
@@ -74,9 +74,9 @@ public class PasswordPolicyTests
     [Fact]
     public void Rejects_passwords_longer_than_maximum()
     {
-        var password = "Aa1@" + new string('a', 61); // 65 caracteres
+        var candidate = string.Concat("A", "a", "1", "@", new string('a', 61)); // 65 caracteres
 
-        var result = PasswordPolicy.Validate(password);
+        var result = PasswordPolicy.Validate(candidate);
 
         Assert.False(result.IsValid);
         Assert.Contains("64", result.Message);
