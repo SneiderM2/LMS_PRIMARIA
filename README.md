@@ -141,7 +141,7 @@ los lineamientos de la **SIC**, el **MSPI** de MinTIC, **ISO/IEC 27001**, **ISO/
 - **Auditoría e Inspección de Logs** del sistema en tiempo real (`SystemInspector`) con cobertura de más de 50 categorías de eventos
 - **Exportación de reportes** a PDF, Excel (.xls) y CSV según el panel
 - **💾 Descargar Backup BD** — genera un dump `.sql` de Supabase; contiene datos personales: debe cifrarse y almacenarse con acceso restringido
-- **📥 Restaurar Backup BD** — deshabilitado en producción para evitar ejecución remota de SQL. En desarrollo se habilita con `Features:EnableDatabaseRestore=true`, exige escribir `RESTAURAR` y solo acepta archivos `.sql`; el procedimiento seguro con `psql` está en [OPERACION_BACKUP.md](docs/OPERACION_BACKUP.md)
+- **📥 Restaurar Backup BD** — exige escribir `RESTAURAR` y solo acepta archivos `.sql` de hasta 5 MB. El backend está deshabilitado por defecto; en producción requiere `Features__EnableDatabaseRestore=true` y `Features__AllowRestoreInProduction=true` en Render. El botón se controla con `databaseRestoreEnabled` en `environment.prod.ts`. Procedimiento seguro con `psql` en [OPERACION_BACKUP.md](docs/OPERACION_BACKUP.md)
 
 ### ⚡ Rendimiento y Arquitectura de Despliegue
 - **Arranque asíncrono no bloqueante:** Kestrel abre el socket de escucha de inmediato al llamar a `app.Run()`; la verificación de esquema e inicialización (`DbInitializer.SeedAsync()`) se ejecuta en segundo plano vía `app.Lifetime.ApplicationStarted.Register()`, garantizando respuestas a health-checks de Render en `< 500ms`.
@@ -286,7 +286,7 @@ powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
 | `PUT` | `/api/admin/courses/{id}` | Editar curso |
 | `PUT` | `/api/admin/courses/{id}/toggle-status` | Activar / desactivar curso |
 | `GET` | `/api/admin/backup-database` | 💾 Genera y descarga dump `.sql` de Supabase (contiene datos personales: almacenar cifrado) |
-| `POST` | `/api/admin/restore-backup` | 📥 Restauración **deshabilitada en producción**; en desarrollo requiere `Features:EnableDatabaseRestore=true` y confirmación `RESTAURAR` |
+| `POST` | `/api/admin/restore-backup` | 📥 Restauración con confirmación `RESTAURAR`; el backend está deshabilitado por defecto y en producción requiere las banderas `Features__EnableDatabaseRestore` y `Features__AllowRestoreInProduction` en Render |
 | `GET` | `/api/admin/compliance` | Resumen de cumplimiento: cobertura de consentimiento y alertas |
 | `GET` | `/api/admin/audit-logs` | Consulta paginada de la auditoría persistida en `audit_logs` |
 | `GET` | `/api/admin/audit-logs/download` | Descarga del archivo consolidado de auditoría (`.log`) |

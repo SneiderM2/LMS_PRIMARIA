@@ -8,5 +8,8 @@ export const environment = {
   // Debe coincidir con Privacy:PolicyVersion del backend.
   dataPolicyVersion: '2026-10-19',
   // Página pública de la política (relativa al base-href del sitio).
-  dataPolicyUrl: 'privacidad.html'
+  dataPolicyUrl: 'privacidad.html',
+  // Habilita el botón de restauración de BD en el panel de administración.
+  // La API solo ejecuta la restauración si Render tiene las banderas Features__* correspondientes.
+  databaseRestoreEnabled: true
 };

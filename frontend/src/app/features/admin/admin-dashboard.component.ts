@@ -126,7 +126,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   // Estados de Operación de Backup
   public isDownloadingBackup = false;
   public isRestoringBackup = false;
-  public readonly isProduction = environment.production;
+  public readonly restoreEnabled = environment.databaseRestoreEnabled;
 
   // Toast Flotante
   public toastMessage: string | null = null;
@@ -679,8 +679,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   public triggerRestore(): void {
     if (this.isRestoringBackup) return;
-    if (this.isProduction) {
-      this.toastService.warning('La restauración de la base de datos solo está disponible en desarrollo.');
+    if (!this.restoreEnabled) {
+      this.toastService.warning('La restauración de la base de datos no está habilitada en esta compilación.');
       return;
     }
     try {
