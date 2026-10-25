@@ -3,6 +3,9 @@
 **Marco de referencia:** Decreto 1078 de 2015 (sector TIC), MSPI de MinTIC, ISO/IEC 27001:2022,
 ISO/IEC 27002:2022, NIST SP 800-63B, OWASP ASVS 4.0.3 y OWASP Top 10 2021.
 
+**Última verificación:** 2026-10-25, sobre `main` = `11938e0f`. Producción responde con
+`database: Healthy`; `audit_logs` está activa; el almacenamiento de archivos sigue en `Local`.
+
 ---
 
 ## 1. Alcance y activos
@@ -31,14 +34,15 @@ Navegador (GitHub Pages, Angular)
 Render (ASP.NET Core 8, contenedor no-root)
         │  TLS + Npgsql
         ▼
-Supabase PostgreSQL (pooler, SSL obligatorio)
+Supabase PostgreSQL 17.6 (pooler, SSL obligatorio)
 ```
 
 - El frontend no almacena datos de negocio; conserva el token y el perfil mínimo.
 - Los archivos se guardan en almacenamiento privado (`App_Data/uploads`) y se sirven por
-  `/api/files/...` con autorización.
+  `/api/files/...` con autorización. En producción actual `Storage:Provider=Local`, sobre el disco
+  efímero de Render; el bucket privado `lms-uploads` de Supabase está creado pero aún no conectado.
 - Los logs se escriben en el sistema de archivos del contenedor y se consultan por API de
-  administración.
+  administración. La auditoría de negocio se persiste además en `audit_logs` (PostgreSQL).
 - No hay integraciones de pago ni analítica de terceros.
 
 ---
@@ -93,8 +97,11 @@ administradores solo se crean desde el panel administrativo autenticado.
 - Registro de accesos, autenticación, cambios administrativos, descargas y eventos de privacidad.
 - Redacción de tokens, contraseñas y parámetros sensibles en logs.
 - Rotación de logs por tamaño y retención configurable (90 días por defecto).
+- Auditoría persistida en `audit_logs` con RLS, 3 índices y escritura exclusiva del propietario de
+  la tabla; verificado en producción el 25/10/2026 (125 registros).
 - Prohibición de borrar la auditoría desde la aplicación en producción.
-- Respaldos con advertencia de datos personales y procedimiento controlado.
+- Respaldos con advertencia de datos personales y procedimiento controlado; **no hay backups
+  automáticos** en Supabase Free, por lo que el control sigue incompleto.
 
 ### 4.5 Seguridad de la cadena de suministro (A.15)
 
@@ -110,7 +117,7 @@ administradores solo se crean desde el panel administrativo autenticado.
 | Capítulo | Control | Estado |
 | :--- | :--- | :---: |
 | V1 Arquitectura | Separación de capas, DTOs, configuración por entorno | ✅ |
-| V2 Autenticación | Longitud mínima, bloqueo, mensajes uniformes, sin credenciales por defecto | ✅ |
+| V2 Autenticación | Longitud 8–64, bloqueo, mensajes uniformes, sin credenciales por defecto | ✅ |
 | V3 Sesión | Expiración, revocación, token firmado | ✅ |
 | V4 Control de acceso | RBAC, pertenencia de recursos, denegación por defecto | ✅ |
 | V5 Validación | DataAnnotations, límites, tipos | ✅ |
@@ -142,7 +149,7 @@ administradores solo se crean desde el panel administrativo autenticado.
 
 | Indicador | Meta |
 | :--- | :--- |
-| Cobertura de consentimiento vigente | ≥ 95 % |
+| Cobertura de consentimiento vigente | ≥ 95 % · **actual 55,6 %** (10/18 al 25/10/2026) |
 | Incidentes críticos sin tratamiento | 0 |
 | Solicitudes ARCO atendidas en plazo | 100 % |
 | Vulnerabilidades críticas abiertas | 0 |
@@ -165,3 +172,18 @@ administradores solo se crean desde el panel administrativo autenticado.
 
 Este modelo se revisa anualmente o cuando cambie la normativa, la arquitectura o se produzca un
 incidente relevante. La versión aprobada se conserva con acta de comité.
+
+---
+
+## 10. Evidencias de la verificación (25/10/2026)
+
+| Control | Evidencia |
+| :--- | :--- |
+| CI/CodeQL | `success` para `11938e0f`; Deploy Pages `success` para `d2dad0cf` |
+| Pruebas | 55/55 backend y 6/6 frontend |
+| Salud | `/api/ping`, `/api/health` y `/api/health/live` 200; Swagger 404 |
+| CORS | Origen permitido `https://sneiderm2.github.io`; preflight 204; origen ajeno sin ACAO |
+| Cabeceras | HSTS, CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, COOP/CORP |
+| Base de datos | PostgreSQL 17.6; `audit_logs` con 125 registros, RLS y 3 índices |
+| Consentimiento | 10 de 18 usuarios (55,6 %) |
+| Dependencias | NuGet sin vulnerabilidades; `npm audit` crítico con código 0 |

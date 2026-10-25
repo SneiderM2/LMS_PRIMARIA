@@ -835,6 +835,11 @@ Al intentar iniciar sesión o registrarse, el sistema indicaba *"Por favor compl
 4. **Bypass automático y botón de desarrollo:** En Angular (`LoginComponent`), si `!environment.production`, se autocompleta con `DEV_TEST_TOKEN` o se permite activar la verificación local con un clic. Además, se añadió detección de bloqueo por adblockers con avisos claros y descriptivos.
 5. **Renderizado dinámico por pestaña:** Se separó la inicialización de los widgets de login y registro para evitar problemas al renderizar dentro de contenedores ocultos (`hidden`).
 
+> **Actualización 2026-10-25:** el punto 3 describía una tolerancia de producción que ya **no
+> existe**. El código actual es **fail-closed**: si `Recaptcha:SecretKey` no está configurada,
+> rechaza login y registro. El bypass solo funciona en Development y con
+> `Recaptcha:AllowDevBypass=true`. Ver `SECURITY.md`.
+
 **Archivos afectados:**
 - [ICaptchaService.cs](file:///c:/Users/SNEIDER/Documents/LMS/backend/LMS.API/Services/ICaptchaService.cs)
 - [appsettings.Development.json](file:///c:/Users/SNEIDER/Documents/LMS/backend/LMS.API/appsettings.Development.json)

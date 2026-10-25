@@ -36,11 +36,27 @@ masiva de datos personales.
 | :--- | :--- |
 | Backend | .NET 8 (LTS) — **fin de soporte 10/11/2026** |
 | Frontend | Angular 18 — **fuera de soporte; migración mayor pendiente** |
-| Base de datos | PostgreSQL 16 (Supabase) |
+| Base de datos | PostgreSQL 17.6 (Supabase) |
 | Navegadores | Dos últimas versiones de Chrome, Edge, Firefox y Safari |
 
 > La migración a .NET 10 y a una versión soportada de Angular no se ejecutó en la auditoría
 > 2026-10. Es una deuda de plataforma con fecha límite y debe planificarse antes del EOL de .NET 8.
+
+### 2.1 Estado verificado de producción (25/10/2026)
+
+| Comprobación | Resultado |
+| :--- | :--- |
+| Repositorio | `main` = `fix/audit-2026-10` = `11938e0f`; CI y CodeQL en `success`. |
+| Backend Release | 0 errores, 0 advertencias; 55/55 pruebas. |
+| Frontend | Build de producción correcto; 6/6 pruebas Karma; Pages sirve `main-EVFOMQUY.js` y `styles-T7YOE4RF.css`. |
+| Salud de la API | `/api/ping` 200; `/api/health` 200 (`database: Healthy`, `storage: Local`); `/api/health/live` 200. |
+| Swagger | `404` en producción. |
+| CORS | Origen `https://sneiderm2.github.io` permitido; preflight `204`; origen ajeno sin `Access-Control-Allow-Origin`. |
+| Cabeceras | HSTS, CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, COOP/CORP y `Permissions-Policy`. |
+| Base de datos | PostgreSQL 17.6; 18 usuarios; 10 con consentimiento vigente (55,6 %). |
+| Auditoría | `audit_logs` activa: 125 registros, último 25/10/2026 22:31 UTC, 45 nuevos desde 21:50 UTC; RLS habilitado, 0 políticas y 3 índices. |
+| Dependencias | NuGet sin paquetes vulnerables; `npm audit --omit=dev --audit-level=critical` con código 0; 9 vulnerabilidades de Angular 18 (4 moderadas, 5 altas, 0 críticas). |
+| Respaldos | Supabase Free sin backups automáticos visibles; no hay respaldo lógico programado. |
 
 ---
 
@@ -97,8 +113,10 @@ masiva de datos personales.
 - Contenedor ejecutado como usuario sin privilegios (`lmsapp`), con `Server` header deshabilitado.
 - TLS obligatorio en la base de datos (`SSL Mode=Require`); `Trust Server Certificate` es `false`
   por defecto y solo puede habilitarse explícitamente por configuración.
-- Respaldos con advertencia de datos personales y procedimiento de restauración controlado.
-- Registro de auditoría con retención configurable y salida a stdout para Render.
+- Respaldos con advertencia de datos personales y procedimiento de restauración controlado; el
+  respaldo automático de Supabase Free sigue pendiente.
+- Auditoría en dos destinos: tabla `audit_logs` en PostgreSQL (RLS, 3 índices) y archivos `.log`
+  del contenedor con retención configurable y salida a stdout para Render.
 
 ---
 
@@ -111,14 +129,15 @@ masiva de datos personales.
 | Secreto JWT y contraseña de BD estuvieron en el historial de Git | **Acción obligatoria** | Rotar credenciales y clave JWT; ver `SETUP_SECRETS.md`. |
 | Cuentas `admin`, `docente`, `estudiante` con contraseñas iniciales débiles | **Acción obligatoria** | Rotar contraseñas o desactivar cuentas; el sistema ya no las crea ni reactiva. |
 | .NET 8 sin soporte desde 10/11/2026 y Angular 18 fuera de soporte | **Riesgo alto** | Planificar migración mayor a .NET 10 y Angular soportado; no se ejecutó por falta de autorización. |
-| Vulnerabilidades altas/moderadas de Angular 18 | Aceptado temporalmente | `dompurify` crítico corregido por override; el resto exige actualización mayor. Revisar `npm audit --omit=dev`. |
-| `Storage:Provider=Local` en producción | **Acción obligatoria** | Verificado el 25/10/2026: Render está en plan Free, sin disco, y `/api/health` devuelve `storage: Local`. El bucket privado `lms-uploads` ya existe en Supabase (25 MB, sin acceso público); falta configurar `Storage__Provider=Supabase` y la Service Role Key en Render y desplegar. El fallback silencioso está deshabilitado. |
-| `audit_logs` ausente en producción | **Resuelto en producción; corrección pendiente de desplegar** | La tabla se creó manualmente el 25/10/2026 con RLS activo e índices, y una petición real quedó registrada. `DbInitializer` también se corrigió para crearla en bases ya migradas y habilitar RLS en entornos nuevos; esa corrección se desplegará con el próximo release. |
-| Supabase Free sin backups automáticos | **Acción obligatoria** | El panel muestra «No backups». Definir un respaldo lógico programado y cifrado, o pasar a un plan con backups/PITR, antes de usar datos reales. |
+| Vulnerabilidades altas/moderadas de Angular 18 | Aceptado temporalmente | Verificado el 25/10/2026: 9 vulnerabilidades (4 moderadas, 5 altas, 0 críticas) en dependencias de producción; el resto exige actualización mayor. `dompurify` crítico corregido por override. |
+| `Storage:Provider=Local` en producción | **Acción obligatoria** | Verificado de nuevo el 25/10/2026: Render está en plan Free, sin disco, y `/api/health` devuelve `storage: Local`. El bucket privado `lms-uploads` ya existe en Supabase (25 MB, sin acceso público); falta configurar `Storage__Provider=Supabase`, la URL y la Service Role Key en Render y desplegar. El fallback silencioso está deshabilitado. |
+| `audit_logs` ausente en producción | **Resuelto y verificado** | La tabla está activa en Supabase desde el 25/10/2026: 125 registros, último 22:31 UTC, 45 nuevos desde 21:50 UTC, RLS habilitado, 3 índices y 0 políticas (solo el propietario escribe). `DbInitializer` la crea de forma idempotente y habilita RLS en entornos nuevos. |
+| Supabase Free sin backups automáticos | **Acción obligatoria** | El panel muestra «No backups». No existe respaldo lógico programado ni copia cifrada externa. Definirlos, o pasar a un plan con backups/PITR, antes de usar datos reales. |
 | Anonimización por inactividad deshabilitada | Configurable | Activar solo con aprobación del responsable del tratamiento; iniciar en modo simulación. |
-| Política de privacidad con datos institucionales incompletos | **Acción obligatoria** | Completar NIT, dirección, teléfono, DPO y texto aprobado antes de una auditoría legal. |
+| Política pública de privacidad desactualizada | **Acción obligatoria** | `frontend/public/privacidad.html` todavía indica «12 caracteres» y conserva «Por definir»; la implementación real exige 8–64. Corregir el texto antes de una auditoría legal. |
+| Política de privacidad con datos institucionales incompletos | **Acción obligatoria** | Completar NIT, razón social, dirección, teléfono, correo, DPO y encargados antes de una auditoría legal. |
 | Migraciones de esquema en tiempo de ejecución | Deuda técnica | Migrar a EF Core Migrations y aprobar cambios por revisión. |
-| Pruebas automatizadas limitadas | En progreso | 55 pruebas backend (xUnit) y 6 frontend (Karma/Jasmine); pendiente integración/E2E y OWASP ZAP. |
+| Pruebas automatizadas limitadas | En progreso | Verificado el 25/10/2026: 55/55 pruebas backend (xUnit) y 6/6 frontend (Karma/Jasmine); pendiente integración/E2E y OWASP ZAP. |
 
 ---
 

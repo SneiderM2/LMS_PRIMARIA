@@ -3,6 +3,11 @@
 **Alcance:** accesos no autorizados, pérdida o alteración de datos, fuga de información de menores,
 compromiso de credenciales, indisponibilidad prolongada y errores de configuración.
 
+**Estado de herramientas (25/10/2026):** `audit_logs` activa en PostgreSQL 17.6, `/api/health` y
+`/api/health/live` operativos, CI/CodeQL en verde. **No hay respaldos automáticos ni copia externa
+verificada**, por lo que la fase de recuperación depende de un respaldo manual que aún no se ha
+programado.
+
 ---
 
 ## 1. Roles
@@ -35,8 +40,9 @@ directorio fuera de la plataforma.
 
 ### 3.1 Detección
 
-Fuentes: alertas de Render/Supabase, revisión de `error.log` y `app-audit.log`,
-reportes de usuarios, análisis de dependencias, monitoreo de `/api/health`.
+Fuentes: paneles y alertas disponibles en Render/Supabase, revisión de `error.log` y
+`app-audit.log`, consulta de `/api/admin/audit-logs` (tabla `audit_logs`), reportes de usuarios,
+análisis de dependencias, resultados de CI/CodeQL y monitoreo de `/api/health`.
 
 ### 3.2 Contención
 
@@ -49,8 +55,10 @@ reportes de usuarios, análisis de dependencias, monitoreo de `/api/health`.
 ### 3.3 Erradicación y recuperación
 
 - Corregir la causa raíz y desplegar.
-- Restaurar datos desde el respaldo verificado (`docs/OPERACION_BACKUP.md`).
-- Verificar integridad y funcionamiento.
+- Restaurar datos desde el respaldo verificado (`docs/OPERACION_BACKUP.md`). **Brecha actual:** no
+  existe respaldo automático ni copia externa programada; generar uno antes de una intervención
+  destructiva y documentar su ubicación.
+- Verificar integridad y funcionamiento (incluido `audit_logs`).
 - Monitorear durante 72 horas.
 
 ### 3.4 Notificación

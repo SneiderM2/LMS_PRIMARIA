@@ -12,6 +12,11 @@ con copias cifradas, verificables y restaurables.
 | Acceso | Solo administrador del sistema y DPO |
 | Verificación | Restauración de prueba mensual en entorno aislado |
 
+> ⚠️ **Estado actual (25/10/2026):** estos parámetros son el objetivo, no la operación vigente.
+> Supabase Free no muestra backups automáticos ni PITR, no existe un `pg_dump` programado y no se
+> ha ejecutado una prueba de restauración. El RPO/RTO **no se cumple** todavía. Los adjuntos, además,
+> están en el disco efímero de Render (`storage: Local`), por lo que tampoco se respaldan.
+
 ---
 
 ## 1. Estrategia
@@ -26,11 +31,21 @@ con copias cifradas, verificables y restaurables.
 > `App_Data/uploads` **no sobreviven a un redespliegue**. Para producción se recomienda migrar a
 > almacenamiento de objetos (Supabase Storage, S3 o equivalente) y respaldarlo por separado.
 
+### 1.1 Alcance del respaldo
+
+- **PostgreSQL:** todas las tablas, incluida `audit_logs` y la evidencia de consentimiento
+  (`usuarios.data_policy_evidence`). El dump contiene datos personales y hashes de contraseñas.
+- **Adjuntos:** hoy en `App_Data/uploads` (efímero). Cuando se habilite Supabase Storage, respaldar
+  el bucket `lms-uploads` por separado, ya que `pg_dump` no incluye objetos.
+- **Secretos:** no se incluyen en el dump; se conservan en el gestor de secretos de Render/Supabase.
+- **Configuración:** documentar las variables de entorno necesarias para reconstruir el servicio.
+
 ---
 
 ## 2. Respaldo manual recomendado (CLI)
 
-Requisitos: `pg_dump` 16+, variables de entorno y directorio cifrado.
+Requisitos: `pg_dump` 17+ (la instancia es PostgreSQL 17.6), variables de entorno y directorio
+cifrado. Ejecutar desde una máquina autorizada, nunca desde el contenedor efímero de Render.
 
 ```powershell
 # 1. Configurar la conexión (nunca en el repositorio)
@@ -80,6 +95,7 @@ pg_restore --clean --if-exists --no-owner --no-privileges `
 # 4. Verificar integridad
 psql $env:TEST_CONN -c "SELECT COUNT(*) FROM usuarios;"
 psql $env:TEST_CONN -c "SELECT COUNT(*) FROM entregas;"
+psql $env:TEST_CONN -c "SELECT COUNT(*) FROM audit_logs;"
 ```
 
 Pasos posteriores:
@@ -122,9 +138,10 @@ sistema operativo a través de PostgreSQL.
 
 ## 6. Lista de verificación mensual
 
-- [ ] Respaldo diario completado y con hash válido.
-- [ ] Copia mensual cifrada almacenada fuera del proveedor.
-- [ ] Restauración de prueba exitosa en entorno aislado.
-- [ ] Conteos de tablas coherentes con la aplicación.
+- [ ] Respaldo diario completado y con hash válido. **(Pendiente: no existe programación.)**
+- [ ] Copia mensual cifrada almacenada fuera del proveedor. **(Pendiente.)**
+- [ ] Restauración de prueba exitosa en entorno aislado. **(Pendiente.)**
+- [ ] Conteos de tablas coherentes con la aplicación (`usuarios`, `entregas`, `audit_logs`).
+- [ ] Adjuntos del bucket `lms-uploads` respaldados por separado. **(Pendiente: aún no se usa el bucket.)**
 - [ ] Credenciales de cifrado vigentes.
 - [ ] Registro de la prueba archivado.

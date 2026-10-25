@@ -25,11 +25,12 @@ Sistema de Gestión de Aprendizaje (LMS) diseñado con arquitectura limpia en **
 | **Documentación API** | Swagger / OpenAPI (Swashbuckle) | 6.6.2 |
 | **Hashing** | BCrypt.Net-Next | 4.0.3 |
 | **Frontend** | Angular 18 (Standalone Components) | 18.x — EOL |
-| **Base de datos** | PostgreSQL (Supabase Cloud / Pooler IPv4) | 16.x |
+| **Base de datos** | PostgreSQL (Supabase Cloud / Pooler IPv4) | 17.6 |
 | **Internacionalización** | i18n Multilingüe en tiempo real | ES, EN, ZH, JA, PT |
 | **Hosting Frontend** | GitHub Pages (SPA + PWA) | — |
 | **Hosting Backend** | Render (Docker / Web Service) | — |
-| **Exportación** | jsPDF + html2canvas + PapaParse | — |
+| **Exportación** | jsPDF + jspdf-autotable (PDF) · Excel `.xls` y CSV con `Blob` UTF-8 | — |
+| **Almacenamiento de archivos** | Local privado (`App_Data/uploads`); Supabase Storage pendiente de configuración en Render | — |
 | **Cumplimiento** | Ley 1581 de 2012, Decreto 1074 de 2015, MSPI (MinTIC), NTC 5854, ISO/IEC 25010 | — |
 
 ---
@@ -46,7 +47,7 @@ los lineamientos de la **SIC**, el **MSPI** de MinTIC, **ISO/IEC 27001**, **ISO/
 | Derechos del titular | Descarga de datos, rectificación y supresión/anonimización | `/api/privacy/*` |
 | Archivos | Almacenamiento privado, validación de firma binaria y descarga autorizada | `FilesController` |
 | Autorización | Roles canónicos y validación de pertenencia de cursos (anti-IDOR) | `SECURITY.md` |
-| Auditoría | Logs con redacción de datos sensibles y retención configurable | `/api/admin/audit-logs` |
+| Auditoría | Logs con redacción de datos sensibles y retención configurable; tabla `audit_logs` con RLS | `/api/admin/audit-logs` |
 | Incidentes | Plan de respuesta y notificación | [Plan](docs/PLAN_RESPUESTA_INCIDENTES.md) |
 | Riesgos | Matriz y plan de tratamiento | [Matriz](docs/MATRIZ_RIESGOS.md) |
 | Calidad y accesibilidad | ISO/IEC 25010 y NTC 5854 | [Calidad](docs/CALIDAD_Y_ACCESIBILIDAD.md) |
@@ -56,7 +57,12 @@ los lineamientos de la **SIC**, el **MSPI** de MinTIC, **ISO/IEC 27001**, **ISO/
 > reCAPTCHA (estuvieron versionadas), cambie las contraseñas de las cuentas demo y complete los datos
 > del responsable del tratamiento. Ver [SETUP_SECRETS.md](SETUP_SECRETS.md).
 
-### Estado de seguridad (auditoría 2026-10)
+### Estado de seguridad (auditoría 2026-10, verificado el 25/10/2026)
+
+> **Última verificación:** 2026-10-25, 22:28–22:31 UTC, sobre `main` = `fix/audit-2026-10` =
+> `11938e0f`. CI y CodeQL en verde; backend Release con 0 errores y 0 advertencias (55/55 pruebas);
+> frontend con build de producción y 6/6 pruebas Karma. GitHub Pages publica `main-EVFOMQUY.js` y
+> `styles-T7YOE4RF.css`.
 
 - La API **no arranca** sin `Jwt:SecretKey` (≥48 caracteres) ni sin `Privacy:EvidenceHmacKey`
   (≥32 caracteres, distinta de la JWT). Ya no existen claves de respaldo en el código.
@@ -65,16 +71,31 @@ los lineamientos de la **SIC**, el **MSPI** de MinTIC, **ISO/IEC 27001**, **ISO/
   explícitamente con `Recaptcha__AllowDevBypass=true`.
 - La sesión única y la aceptación vigente de la política se validan en el servidor para cada
   petición autenticada, no solo en el frontend.
+- **Auditoría persistente:** `audit_logs` está activa en Supabase (PostgreSQL **17.6**) con 125
+  registros; el último es del 25/10/2026 22:31 UTC y 45 se generaron desde las 21:50 UTC durante la
+  verificación. Tiene RLS habilitado, 3 índices y 0 políticas (solo el propietario de la tabla
+  escribe; los roles anónimos quedan bloqueados).
+- **Producción:** `/api/ping`, `/api/health` y `/api/health/live` responden `200`; `/api/health`
+  informa `database: "Healthy"`. Swagger responde `404`. CORS permite
+  `https://sneiderm2.github.io` (preflight `204`) y no devuelve `Access-Control-Allow-Origin` a
+  orígenes ajenos. HSTS, CSP, `X-Frame-Options`, `nosniff` y `Referrer-Policy` están presentes.
 - `Storage:Provider=Local` sigue disponible para desarrollo, pero en producción el disco de Render
   es efímero. El servicio actual usa el plan Free, que **no admite discos persistentes**. El bucket
   privado `lms-uploads` ya existe en Supabase (25 MB), pero la API todavía reporta `storage: "Local"`
   hasta configurar `Storage__Provider=Supabase`, la URL y la Service Role Key en Render, y desplegar.
   Si se migra a un plan con disco, use `Storage__RootPath` apuntando al disco montado. El fallback
   silencioso de Supabase a local está deshabilitado (`Storage:AllowLocalFallback=false`).
+- **Dependencias:** `npm audit --omit=dev --audit-level=critical` termina con código 0; hay 9
+  vulnerabilidades (4 moderadas, 5 altas) de Angular 18, sin críticas. NuGet no reporta paquetes
+  vulnerables. Las actualizaciones disponibles de .NET/NuGet y Angular son mayores y no se
+  ejecutaron por falta de autorización.
 - **Deuda de plataforma:** .NET 8 alcanza su fin de soporte el **10/11/2026** y Angular 18 ya está
   fuera de soporte. La migración mayor no se ejecutó en esta auditoría; debe planificarse antes de
-  la fecha de EOL de .NET. Mientras tanto, `npm audit --omit=dev` reporta vulnerabilidades altas y
-  moderadas de Angular 18 sin corrección dentro de esa versión mayor.
+  la fecha de EOL de .NET.
+- **Privacidad:** hay 18 usuarios y 10 con consentimiento vigente (55,6 %). La página pública
+  `frontend/public/privacidad.html` todavía dice «12 caracteres» y conserva «Por definir» en los
+  datos del responsable; la implementación real usa **8–64 caracteres**. Corregir la página y
+  completar los datos institucionales sigue pendiente.
 - La anonimización por inactividad está **deshabilitada y en modo simulación** por defecto. Actívela
   solo cuando el responsable del tratamiento apruebe la retención declarada
   (`Privacy:EnableInactivityAnonymization` y `Privacy:InactivityAnonymizationDryRun`).
@@ -109,7 +130,7 @@ los lineamientos de la **SIC**, el **MSPI** de MinTIC, **ISO/IEC 27001**, **ISO/
 - **Semáforo escolar** de desempeño: 🟢 Verde / 🟡 Amarillo / 🔴 Rojo
 - Publicación de tareas, recursos y materiales educativos
 - Calificación de entregas de estudiantes
-- Exportación de reportes en **PDF** y **CSV**
+- Exportación de reportes en **PDF**, **Excel (.xls)** y **CSV**
 
 ### 🛡️ Panel de Administrador
 - Métricas institucionales en tiempo real (usuarios, docentes, alumnos, cursos)
@@ -118,7 +139,7 @@ los lineamientos de la **SIC**, el **MSPI** de MinTIC, **ISO/IEC 27001**, **ISO/
 - **Suspensión lógica (Soft Delete)** de cuentas sin pérdida de historial
 - **CRUD de Materias y Cursos** institucional con asignación de docentes
 - **Auditoría e Inspección de Logs** del sistema en tiempo real (`SystemInspector`) con cobertura de más de 50 categorías de eventos
-- **Exportación de reportes** a PDF y CSV desde cualquier sección
+- **Exportación de reportes** a PDF, Excel (.xls) y CSV según el panel
 - **💾 Descargar Backup BD** — genera un dump `.sql` de Supabase; contiene datos personales: debe cifrarse y almacenarse con acceso restringido
 - **📥 Restaurar Backup BD** — deshabilitado por defecto para evitar ejecución remota de SQL; el procedimiento seguro con `psql` está en [OPERACION_BACKUP.md](docs/OPERACION_BACKUP.md)
 
@@ -267,7 +288,8 @@ powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
 | `GET` | `/api/admin/backup-database` | 💾 Genera y descarga dump `.sql` de Supabase (contiene datos personales: almacenar cifrado) |
 | `POST` | `/api/admin/restore-backup` | 📥 Restauración **deshabilitada por defecto** (`Features:EnableDatabaseRestore=false`) |
 | `GET` | `/api/admin/compliance` | Resumen de cumplimiento: cobertura de consentimiento y alertas |
-| `GET` | `/api/admin/audit-logs` | Consulta paginada de la auditoría |
+| `GET` | `/api/admin/audit-logs` | Consulta paginada de la auditoría persistida en `audit_logs` |
+| `GET` | `/api/admin/audit-logs/download` | Descarga del archivo consolidado de auditoría (`.log`) |
 
 ### Docente (`/api/teacher`)
 
@@ -289,12 +311,15 @@ powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
 | `GET` | `/api/student/dashboard` | Materias, tareas y notas |
 | `POST` | `/api/student/upload-assignment` | Entregar tarea con archivos |
 
-### Auditoría (`/api/systemfiles`)
+### Logs del sistema (`/api/systemfiles`)
 
 | Método | Ruta | Descripción |
 | :--- | :--- | :--- |
 | `GET` | `/api/systemfiles/tree` | Árbol de archivos de log |
 | `GET` | `/api/systemfiles/content` | Contenido en vivo de logs |
+
+> La auditoría de negocio se consulta en `/api/admin/audit-logs` y se persiste en la tabla
+> `audit_logs` de PostgreSQL. `/api/systemfiles` expone los archivos `.log` del contenedor.
 
 ---
 
@@ -409,7 +434,7 @@ el token vencido se descarta automáticamente y la sesión única se valida en e
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `no-referrer` |
 | `Cross-Origin-Opener-Policy` | `same-origin` |
-| `Cross-Origin-Resource-Policy` | `same-site` |
+| `Cross-Origin-Resource-Policy` | `cross-origin` |
 | `Permissions-Policy` | Bloquea cámara, micrófono, geolocalización, pagos, USB, etc. |
 | `Cache-Control` | `no-store` en rutas con datos personales |
 
@@ -486,6 +511,19 @@ powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
 - 🧹 **Integridad:** índice único `uq_usuarios_lower_username` y validación estricta de grados.
 - ♿ **Accesibilidad:** foco al contenido principal, `aria-live` y `prefers-reduced-motion`.
 - 🛡️ **CSP del frontend:** política por `<meta>` compatible con GitHub Pages.
+
+**Verificación post-despliegue (25/10/2026)**
+
+- ✅ `main`, `fix/audit-2026-10`, `origin/main` y `origin/fix/audit-2026-10` apuntan a `11938e0f`.
+- ✅ CI y CodeQL en verde para `11938e0f`; Deploy Angular to GitHub Pages en verde para `d2dad0cf`.
+- ✅ Backend Release: 0 errores, 0 advertencias y 55/55 pruebas.
+- ✅ Frontend: `npm ci`, build de producción y 6/6 pruebas Karma; bundle inicial de 152,4 KB.
+- ✅ API de producción: `/api/ping` 200, `/api/health` 200 (`database: Healthy`) y `/api/health/live`
+  200; Swagger 404; CORS y cabeceras de seguridad verificados.
+- ✅ Supabase PostgreSQL 17.6; `audit_logs` con 125 registros, RLS habilitado y 3 índices; 18 usuarios
+  y 10 con consentimiento.
+- ⚠️ Pendientes: `storage: Local` en Render, respaldos automáticos ausentes, datos institucionales
+  incompletos y página pública de privacidad desactualizada (dice «12 caracteres»).
 
 ### v7.0.0 — 2026-10-19
 
@@ -599,8 +637,9 @@ powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
 - ✅ **Dashboard del Estudiante** — Materias inscritas, tareas pendientes, estado de entregas y notas
 - ✅ **Drag & Drop de archivos** (`FileDrop ZoneComponent`) para entrega de tareas
 - ✅ **Semáforo escolar** (`SemaforoService`) — Algoritmo de desempeño 🟢/🟡/🔴 basado en entregas y fechas límite
-- ✅ **Exportación PDF** de reportes del docente con `jsPDF` + `html2canvas`
-- ✅ **Exportación CSV** con `PapaParse`
+- ✅ **Exportación PDF** de reportes del docente con `jsPDF` + `html2canvas` (sustituido después por
+  `jspdf-autotable`)
+- ✅ **Exportación CSV** con `PapaParse` (sustituido después por exportación nativa con `Blob` UTF-8)
 - ✅ **`ReportExportService`** — Servicio centralizado de exportación con tablas y tarjetas de resumen
 
 ### v1.1.0 — 2026-09-11
@@ -612,7 +651,7 @@ powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
 
 ### v1.0.0 — 2026-09-05 _(Sprint inicial)_
 
-- ✅ Arquitectura base .NET 10 Web API + Angular 18 Standalone
+- ✅ Arquitectura base .NET 8 Web API + Angular 18 Standalone
 - ✅ Autenticación JWT con `AuthController` y `TokenService`
 - ✅ Panel de Docente — CRUD de alumnos, cursos y matrícula
 - ✅ `LMSDbContext` con Fluent API en snake_case

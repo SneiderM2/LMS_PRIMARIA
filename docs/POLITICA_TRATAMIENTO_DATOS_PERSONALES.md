@@ -1,6 +1,7 @@
 # Política y manual operativo de tratamiento de datos personales
 
-**Versión:** 2026-10-19
+**Versión de política:** 2026-10-19
+**Revisión documental:** 2026-10-25 (no cambia la versión de consentimiento)
 **Marco:** Ley 1581 de 2012, Decreto 1074 de 2015, Ley 1098 de 2006, lineamientos de la SIC y MSPI (MinTIC).
 **Publicación:** `frontend/public/privacidad.html` (versión ciudadana y aviso de privacidad).
 
@@ -76,6 +77,15 @@ La evidencia se conserva mientras exista la relación académica y durante el t�
 prescripción de las obligaciones (mínimo 5 años). El acceso está restringido al DPO y al
 administrador del sistema.
 
+### 4.4 Estado verificado (25/10/2026)
+
+- 18 usuarios registrados; **10 con consentimiento vigente (55,6 %)**, por debajo de la meta del 95 %.
+- La evidencia se almacena en la columna `usuarios.data_policy_evidence` (texto JSON) y se firma
+  con HMAC-SHA256; la tabla `audit_logs` registra los eventos asociados.
+- La página pública `privacidad.html` **todavía dice «12 caracteres»** y conserva «Por definir» en
+  NIT, dirección, teléfono y DPO. La implementación real usa 8–64; la página debe corregirse y los
+  datos institucionales completarse antes de una auditoría legal.
+
 ---
 
 ## 5. Procedimiento de consultas, reclamos y derechos (ARCO)
@@ -129,8 +139,9 @@ La institución debe aprobar esta tabla y alinearla con su tabla de retención d
 
 | Proveedor | Servicio | País | Datos | Salvaguarda |
 | :--- | :--- | :--- | :--- | :--- |
-| Supabase | PostgreSQL administrado | EE. UU. | Todos los datos de la aplicación | Contrato, TLS, acceso restringido, copias cifradas |
-| Render | Hosting de API | EE. UU. | Tráfico y logs | Contrato, TLS, variables de entorno |
+| Supabase | PostgreSQL administrado | EE. UU. | Todos los datos de la aplicación | Contrato, TLS, acceso restringido; **pendiente**: copias cifradas y backups automáticos |
+| Supabase Storage | Bucket privado `lms-uploads` | EE. UU. | Adjuntos de tareas (previsto) | Bucket privado; **aún no activo** en la API, que usa `storage: Local` |
+| Render | Hosting de API | EE. UU. | Tráfico y logs; adjuntos mientras `Storage=Local` | Contrato, TLS, variables de entorno; disco efímero |
 | GitHub Pages | Frontend estático | EE. UU. | Sin datos de aplicación | No almacena datos personales |
 | Google | OAuth y reCAPTCHA | EE. UU. | Correo, token, IP | Términos de Google, uso opcional |
 
@@ -143,12 +154,15 @@ comunicar al titular la existencia de transferencias en la política.
 
 - Control de acceso por roles y mínimo privilegio.
 - Autenticación con JWT, expiración y revocación de sesión.
-- Contraseñas con BCrypt y política de 12 caracteres.
+- Contraseñas con BCrypt (factor 12) y política de **8 a 64 caracteres**, con mayúscula, minúscula,
+  número, símbolo y bloqueo de contraseñas comunes o datos predecibles del titular.
 - Cifrado en tránsito y verificación de certificados.
-- Registro de auditoría con redacción de datos sensibles.
+- Registro de auditoría en `audit_logs` (RLS, 3 índices) y en archivos `.log` con redacción de datos
+  sensibles.
 - Gestión de incidentes según `docs/PLAN_RESPUESTA_INCIDENTES.md`.
-- Respaldos cifrados y restauración controlada (`docs/OPERACION_BACKUP.md`).
-- Revisión de dependencias y análisis estático en CI.
+- Respaldos cifrados y restauración controlada (`docs/OPERACION_BACKUP.md`), **pendientes de
+  implementar**; Supabase Free no ofrece backups automáticos.
+- Revisión de dependencias y análisis estático en CI (CI y CodeQL en verde al 25/10/2026).
 
 ---
 
@@ -167,6 +181,9 @@ comunicar al titular la existencia de transferencias en la política.
 
 - Revisión anual de la política y del RAT.
 - Revisión tras cada incidente relevante o cambio normativo.
+- **Revisión documental 2026-10-25:** se actualizaron métricas, política de contraseñas y estado de
+  auditoría/almacenamiento. Se mantiene la versión de consentimiento `2026-10-19` para no forzar
+  una reaceptación sin cambios sustantivos en la política publicada.
 - Indicadores: cobertura de consentimiento, incidentes, solicitudes ARCO atendidas en plazo,
   vulnerabilidades abiertas, disponibilidad y tiempos de respuesta.
 - Registro de cambios con versión, fecha, autor y aprobación.

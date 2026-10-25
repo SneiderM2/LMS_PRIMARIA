@@ -90,9 +90,9 @@ $rng.GetBytes($bytes); $rng.Dispose()
 3. Verifica que `Cors__AllowedOrigins__0` sea exactamente `https://sneiderm2.github.io` (sin `/` final).
 4. Configura `Recaptcha__ExpectedHostname=sneiderm2.github.io`.
 5. Despliega con el `Dockerfile`; el contenedor corre como usuario sin privilegios `lmsapp`.
-6. Define `Storage__Provider=Supabase` con URL, Service Role Key y bucket. El plan Free de Render
-   **no admite discos persistentes**; usa `Local` solo en desarrollo o con un disco montado en un
-   plan superior. No uses `Local` con disco efímero para archivos reales.
+6. **Pendiente:** define `Storage__Provider=Supabase` con URL, Service Role Key y bucket. El plan
+   Free de Render **no admite discos persistentes**; usa `Local` solo en desarrollo o con un disco
+   montado en un plan superior. No uses `Local` con disco efímero para archivos reales.
 7. Comprueba:
    - `GET /api/ping` → 200.
    - `GET /api/health` → 200, `database: "Healthy"` y `storage` acorde al proveedor configurado.
@@ -103,17 +103,19 @@ $rng.GetBytes($bytes); $rng.Dispose()
 
 | Elemento | Estado observado | Implicación |
 | :--- | :--- | :--- |
-| Render `LMS_PRIMARIA` | Plan **Free**, región Virginia, auto-deploy en cada commit a `main`; última versión `ba00a00`. | La instancia se suspende por inactividad; los 503 iniciales son *cold start*. |
+| Render `LMS_PRIMARIA` | Plan **Free**, región US West según el CNAME `gcp-us-west1-1.origin.onrender.com`; auto-deploy desde `main`. Última verificación sobre `11938e0f`. | La instancia se suspende por inactividad; los 503 iniciales son *cold start*. |
 | Disco de Render | No hay disco. El plan Free no admite discos persistentes. | `Storage:Provider=Local` es efímero y no sirve para archivos reales. |
 | `/api/health` de producción | `database: "Healthy"`, `storage: "Local"`. | La API funciona, pero el almacenamiento de archivos no es persistente. |
-| Variables de entorno en Render | Solo `ConnectionStrings__DefaultConnection`. | El código endurecido exige además JWT, HMAC de evidencias, reCAPTCHA y almacenamiento; el despliegue fallará hasta configurarlas. |
-| Supabase | Proyecto activo y saludable; 27 MB de BD, 0/1 GB de Storage, sin backups automáticos visibles. Bucket `lms-uploads` creado el 25/10/2026: privado (`public=false`), límite de 25 MB (`26214400` bytes). | El bucket ya está listo; falta configurar la Service Role Key en Render y programar respaldos. |
-| Tabla `audit_logs` | Creada el 25/10/2026 con RLS activo, 13 columnas y 3 índices (`audit_logs_pkey`, `idx_audit_logs_timestamp`, `idx_audit_logs_level`). Una petición real a `/api/privacy/policy` quedó registrada. | La auditoría ya persiste en producción. La corrección de `DbInitializer` (creación idempotente + RLS) se desplegará en el próximo release para entornos nuevos. |
-| Frontend publicado | Sirve la versión anterior (`4 a 10` caracteres) desde GitHub Pages. | Los cambios de esta rama aún no están desplegados. |
+| Variables de entorno en Render | No fue posible leer el panel desde este entorno. La API arranca y responde, lo que confirma que JWT y HMAC de evidencias están configurados. No es posible verificar aquí la clave de reCAPTCHA; si faltara, login y registro fallarían cerrados. El único efecto observable es que `Storage` sigue en `Local`. | Falta configurar el proveedor de almacenamiento y su Service Role Key. |
+| Supabase | PostgreSQL **17.6**; proyecto activo y saludable. Bucket `lms-uploads`: privado (`public=false`), límite de 25 MB (`26214400` bytes). | El bucket está listo; falta conectar la API y programar respaldos. |
+| Datos | 18 usuarios; 10 con consentimiento vigente (55,6 %). | La cobertura está por debajo de la meta del 95 %; revisar consentimientos pendientes. |
+| Tabla `audit_logs` | Activa con 125 registros; último 25/10/2026 22:31 UTC; 45 nuevos desde 21:50 UTC. RLS habilitado, 0 políticas y 3 índices (`audit_logs_pkey`, `idx_audit_logs_timestamp`, `idx_audit_logs_level`). | La auditoría persiste en producción; solo el propietario de la tabla escribe. |
+| Respaldos | Supabase Free no muestra backups automáticos ni PITR. | No se cumple el RPO/RTO documentado; falta un respaldo lógico programado y cifrado. |
+| Frontend publicado | GitHub Pages sirve `main-EVFOMQUY.js` y `styles-T7YOE4RF.css`, con CSP por `<meta>`. | El código endurecido ya está desplegado. La página `privacidad.html` aún dice «12 caracteres» y «Por definir». |
 
 **Decisión de almacenamiento:** mientras Render sea Free, usar **Supabase Storage** con el bucket
 privado `lms-uploads` ya creado. Falta definir en Render `Storage__Provider=Supabase`,
-`Storage__Supabase__Url=https://rjvsbjjmlmvcihfgbiaz.supabase.co`,
+`Storage__Supabase__Url=https://<ref>.supabase.co`,
 `Storage__Supabase__Bucket=lms-uploads` y `Storage__Supabase__ServiceRoleKey` (copiada desde
 **Project Settings → API Keys → Secret keys**; nunca en el repositorio ni en el chat), y desplegar
 el código que usa `SupabaseStorageService`. Si se sube de plan y se monta un disco, se puede volver
@@ -161,6 +163,8 @@ Procedimiento:
 - [ ] `Privacy__EvidenceHmacKey` tiene 32+ caracteres y es distinta de la JWT.
 - [ ] `Recaptcha__SecretKey` está configurada; no se depende de bypass en producción.
 - [ ] `Storage__Provider` apunta a almacenamiento persistente y `AllowLocalFallback=false`.
+- [ ] `audit_logs` existe, tiene RLS habilitado y recibe registros reales.
+- [ ] Existe un respaldo lógico programado, cifrado y con prueba de restauración.
 - [ ] `Privacy__EnableInactivityAnonymization` y `InactivityAnonymizationDryRun` fueron revisados.
 - [ ] `Database__TrustServerCertificate=false` y el certificado TLS es válido.
 - [ ] CORS no contiene `*` ni `SetIsOriginAllowed(_ => true)`.
@@ -170,4 +174,6 @@ Procedimiento:
 - [ ] HTTPS/HSTS activo y certificado de base de datos validado.
 - [ ] Se ejecutó `scripts/security_smoke_test.ps1`.
 - [ ] Se revisaron dependencias vulnerables (`dotnet list package --vulnerable`, `npm audit`).
-- [ ] El responsable del tratamiento aprobó la política y completó los datos de `privacidad.html`.
+- [ ] El responsable del tratamiento aprobó la política y completó los datos de `privacidad.html`
+      (NIT, razón social, dirección, teléfono, correo, DPO y encargados).
+- [ ] `privacidad.html` refleja la política real de contraseñas (8–64 caracteres, no 12).
