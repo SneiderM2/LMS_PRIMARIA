@@ -103,7 +103,7 @@
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
             <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" [title]="'admin.restoreBackup' | translate">
+          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isProduction || isRestoringBackup" [title]="(isProduction ? 'admin.restoreDevOnly' : 'admin.restoreBackup') | translate">
             <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
           <button class="btn btn-secondary" (click)="goToTeacherView()">
@@ -342,7 +342,7 @@
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
             <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" [title]="'admin.restoreBackup' | translate">
+          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isProduction || isRestoringBackup" [title]="(isProduction ? 'admin.restoreDevOnly' : 'admin.restoreBackup') | translate">
             <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
         </div>
@@ -482,7 +482,7 @@
           <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
             <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
           </button>
-          <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" [title]="'admin.restoreBackup' | translate">
+          <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isProduction || isRestoringBackup" [title]="(isProduction ? 'admin.restoreDevOnly' : 'admin.restoreBackup') | translate">
             <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
           </button>
         </div>
@@ -502,7 +502,7 @@
             <button type="button" class="btn btn-secondary" (click)="downloadDatabaseBackup()" [disabled]="isDownloadingBackup" [title]="'admin.downloadBackup' | translate">
               <span>💾 {{ isDownloadingBackup ? ('admin.generatingDump' | translate) : ('admin.downloadBackup' | translate) }}</span>
             </button>
-            <button type="button" class="btn btn-secondary btn-restore" [disabled]="true" [title]="'admin.restoreBackup' | translate">
+            <button type="button" class="btn btn-secondary btn-restore" (click)="triggerRestore()" [disabled]="isProduction || isRestoringBackup" [title]="(isProduction ? 'admin.restoreDevOnly' : 'admin.restoreBackup') | translate">
               <span>{{ isRestoringBackup ? ('admin.restoring' | translate) : ('admin.restoreBackup' | translate) }}</span>
             </button>
           </div>

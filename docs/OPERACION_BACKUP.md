@@ -121,9 +121,12 @@ respaldo de emergencia porque:
 El endpoint registra la descarga en auditoría y devuelve `Cache-Control: no-store`.
 Almacene el archivo de forma cifrada y elimínelo al cumplir la retención.
 
-La restauración desde la interfaz está **deshabilitada por defecto** (`Features:EnableDatabaseRestore=false`)
+La restauración desde la interfaz está **deshabilitada en producción** (`Features:EnableDatabaseRestore=false`)
 porque ejecutar SQL arbitrario desde una carga HTTP permite borrar datos o ejecutar comandos del
-sistema operativo a través de PostgreSQL.
+sistema operativo a través de PostgreSQL. En desarrollo puede habilitarse con
+`Features:EnableDatabaseRestore=true`; el botón del panel exige escribir `RESTAURAR` y solo acepta
+archivos `.sql` de hasta 5 MB. No habilite `Features:AllowRestoreInProduction` sin una copia de
+seguridad verificada y aceptación formal del riesgo.
 
 ---
 

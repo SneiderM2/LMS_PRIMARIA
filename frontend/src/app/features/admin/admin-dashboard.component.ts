@@ -18,6 +18,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { PasswordPolicyMeterComponent } from '../../shared/components/password-policy-meter/password-policy-meter.component';
 import { ChangePasswordModalComponent } from '../../shared/components/change-password-modal/change-password-modal.component';
 import { PasswordPolicyService } from '../../core/services/password-policy.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -125,6 +126,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   // Estados de Operación de Backup
   public isDownloadingBackup = false;
   public isRestoringBackup = false;
+  public readonly isProduction = environment.production;
 
   // Toast Flotante
   public toastMessage: string | null = null;
@@ -677,6 +679,10 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   public triggerRestore(): void {
     if (this.isRestoringBackup) return;
+    if (this.isProduction) {
+      this.toastService.warning('La restauración de la base de datos solo está disponible en desarrollo.');
+      return;
+    }
     try {
       if (this.fileInput?.nativeElement) {
         this.fileInput.nativeElement.value = '';
@@ -722,14 +728,18 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     }
 
     const sizeKb = (file.size / 1024).toFixed(1);
-    const confirmed = await this.confirmDialogService.confirm({
+    const confirmation = await this.confirmDialogService.prompt({
       title: 'Restaurar Base de Datos',
-      message: `Se restaurará la información institucional a partir del archivo: "${file.name}" (${sizeKb} KB). ¿Deseas continuar?`,
-      tone: 'danger',
-      confirmText: 'Restaurar'
+      message: `Se ejecutará el archivo "${file.name}" (${sizeKb} KB) sobre la base de datos configurada. Esta operación puede modificar o eliminar datos. Verifica que la API apunte a la base correcta. Escribe RESTAURAR para confirmar.`,
+      placeholder: 'RESTAURAR',
+      confirmText: 'Restaurar',
+      cancelText: 'Cancelar'
     });
 
-    if (!confirmed) {
+    if (confirmation === null || confirmation.trim() !== 'RESTAURAR') {
+      if (confirmation !== null) {
+        this.toastService.warning('La restauración no se ejecutó: debes escribir exactamente RESTAURAR.');
+      }
       target.value = '';
       return;
     }
@@ -739,7 +749,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     (window as any).__swReloadBlocked = true;
     this.showToast('Restaurando la copia de seguridad... Por favor espera.', 'info');
 
-    this.adminService.restoreBackup(file)
+    this.adminService.restoreBackup(file, confirmation)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (res: { message?: string; fileName?: string; restoredAt?: string }) => {

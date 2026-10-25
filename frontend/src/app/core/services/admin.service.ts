@@ -141,10 +141,12 @@ export class AdminService {
 
   /**
    * Sube un archivo .sql para restaurar la base de datos PostgreSQL en Supabase.
+   * El backend exige la confirmación literal "RESTAURAR" y solo lo permite en desarrollo.
    */
-  public restoreBackup(file: File): Observable<{ message: string; fileName: string; restoredAt: string }> {
+  public restoreBackup(file: File, confirmation: string): Observable<{ message: string; fileName: string; restoredAt: string }> {
     const formData = new FormData();
     formData.append('file', file, file.name);
+    formData.append('confirmation', confirmation);
     return this.http.post<{ message: string; fileName: string; restoredAt: string }>(
       `${this.API_URL}/restore-backup`,
       formData
