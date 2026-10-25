@@ -4,7 +4,7 @@
     <div class="header-titles">
       <div class="shield-badge">
         <span class="badge-icon">🛡️</span>
-        <span class="badge-role">Rol Requerido: <code>.admin</code> / Administrador</span>
+        <span class="badge-role">{{ 'audit.badgeRole' | translate }}</span>
       </div>
       <h2>{{ 'audit.title' | translate }}</h2>
       <p class="header-desc">
@@ -13,7 +13,7 @@
     </div>
 
     <div class="header-actions">
-      <span *ngIf="lastRefreshedAt()" class="last-sync-badge" title="Hora de última sincronización">
+      <span *ngIf="lastRefreshedAt()" class="last-sync-badge" [title]="'audit.lastSync' | translate">
         🕒 {{ lastRefreshedAt() }}
       </span>
 
@@ -23,24 +23,24 @@
         [class.btn-live-active]="autoRefreshEnabled()"
         [class.btn-secondary]="!autoRefreshEnabled()"
         (click)="toggleAutoRefresh()"
-        title="Activar/Desactivar actualización automática cada 8 segundos">
+        [title]="'audit.autoRefreshTitle' | translate">
         <span>{{ autoRefreshEnabled() ? '🟢' : '⚡' }}</span>
-        {{ autoRefreshEnabled() ? 'En Vivo (ON)' : 'Tiempo Real' }}
+        {{ autoRefreshEnabled() ? ('audit.liveOn' | translate) : ('audit.realTime' | translate) }}
       </button>
 
-      <button class="btn btn-secondary btn-sm" (click)="refreshCurrent()" [disabled]="isLoading() || isAuditLoading()" title="Actualizar datos">
+      <button class="btn btn-secondary btn-sm" (click)="refreshCurrent()" [disabled]="isLoading() || isAuditLoading()" [title]="'audit.refresh' | translate">
         <span [class.spin]="isLoading() || isAuditLoading()">🔄</span> {{ 'audit.refresh' | translate }}
       </button>
 
-      <button *ngIf="activeTab() === 'audit'" class="btn btn-primary btn-sm" (click)="downloadAuditFile()" title="Descargar log de auditoría completo">
+      <button *ngIf="activeTab() === 'audit'" class="btn btn-primary btn-sm" (click)="downloadAuditFile()" [title]="'audit.download' | translate">
         📥 {{ 'audit.download' | translate }}
       </button>
 
-      <button class="btn btn-secondary btn-sm" (click)="copyToClipboard()" [disabled]="isLoading() || isAuditLoading()" title="Copiar datos al portapapeles">
+      <button class="btn btn-secondary btn-sm" (click)="copyToClipboard()" [disabled]="isLoading() || isAuditLoading()" [title]="'audit.copy' | translate">
         📋 {{ 'audit.copy' | translate }}
       </button>
 
-      <button *ngIf="activeTab() === 'logs' && selectedLogName()" class="btn btn-danger btn-sm" (click)="clearCurrentLog()" [disabled]="isLoading()" title="Vaciar este archivo de log">
+      <button *ngIf="activeTab() === 'logs' && selectedLogName()" class="btn btn-danger btn-sm" (click)="clearCurrentLog()" [disabled]="isLoading()" [title]="'audit.clear' | translate">
         🗑️ {{ 'audit.clear' | translate }}
       </button>
     </div>
@@ -50,7 +50,7 @@
   <div *ngIf="errorMessage()" class="alert alert-danger" role="alert" aria-live="assertive">
     <span aria-hidden="true">⚠️</span>
     <div class="alert-content">
-      <strong>Aviso del Sistema:</strong>
+      <strong>{{ 'audit.systemNotice' | translate }}</strong>
       <p>{{ errorMessage() }}</p>
     </div>
   </div>
@@ -71,7 +71,7 @@
       class="tab-btn" 
       [class.active]="activeTab() === 'audit'" 
       (click)="selectTab('audit')">
-      🛡️ Auditoría Global
+      🛡️ {{ 'audit.tabAudit' | translate }}
       <span *ngIf="auditTotalCount() > 0" class="tab-pill tab-pill-audit">{{ auditTotalCount() }}</span>
     </button>
     <button 
@@ -81,7 +81,7 @@
       class="tab-btn" 
       [class.active]="activeTab() === 'logs'" 
       (click)="selectTab('logs')">
-      📋 Registros del Sistema
+      📋 {{ 'audit.tabLogs' | translate }}
       <span *ngIf="logFiles().length > 0" class="tab-pill">{{ logFiles().length }}</span>
     </button>
   </div>
@@ -94,27 +94,27 @@
     <div class="log-kpi-strip">
       <button type="button" class="log-kpi-chip" [class.active]="auditSeverity() === 'ALL'" (click)="filterAuditBySeverityChip('ALL')">
         <span class="kpi-dot dot-all">📊</span>
-        <span class="kpi-label">Total Eventos</span>
+        <span class="kpi-label">{{ 'audit.kpiTotal' | translate }}</span>
         <strong class="kpi-count">{{ auditTotalCount() }}</strong>
       </button>
       <button type="button" class="log-kpi-chip chip-audit" [class.active]="auditSeverity() === 'AUDIT'" (click)="filterAuditBySeverityChip('AUDIT')">
         <span class="kpi-dot">🟣</span>
-        <span class="kpi-label">AUDIT (Negocio/Ley 1581)</span>
+        <span class="kpi-label">{{ 'audit.kpiAudit' | translate }}</span>
         <strong class="kpi-count">{{ auditPageStats.audit }}</strong>
       </button>
       <button type="button" class="log-kpi-chip chip-info" [class.active]="auditSeverity() === 'INFO'" (click)="filterAuditBySeverityChip('INFO')">
         <span class="kpi-dot">🟢</span>
-        <span class="kpi-label">INFO (Consultas)</span>
+        <span class="kpi-label">{{ 'audit.kpiInfo' | translate }}</span>
         <strong class="kpi-count">{{ auditPageStats.info }}</strong>
       </button>
       <button type="button" class="log-kpi-chip chip-warn" [class.active]="auditSeverity() === 'WARNING'" (click)="filterAuditBySeverityChip('WARNING')">
         <span class="kpi-dot">🟡</span>
-        <span class="kpi-label">WARNING (Alertas 4xx)</span>
+        <span class="kpi-label">{{ 'audit.kpiWarn' | translate }}</span>
         <strong class="kpi-count">{{ auditPageStats.warning }}</strong>
       </button>
       <button type="button" class="log-kpi-chip chip-err" [class.active]="auditSeverity() === 'ERROR'" (click)="filterAuditBySeverityChip('ERROR')">
         <span class="kpi-dot">🔴</span>
-        <span class="kpi-label">ERROR (Fallos 5xx)</span>
+        <span class="kpi-label">{{ 'audit.kpiError' | translate }}</span>
         <strong class="kpi-count">{{ auditPageStats.error }}</strong>
       </button>
     </div>
@@ -127,7 +127,7 @@
         <div class="search-wrap">
           <input 
             type="text" 
-            placeholder="IP, correo, acción, ruta..."
+            [placeholder]="'audit.searchPlaceholder' | translate"
             [ngModel]="auditKeyword()" 
             (ngModelChange)="auditKeyword.set($event)"
             (keyup.enter)="applyAuditFilters()"
@@ -142,11 +142,11 @@
           [ngModel]="auditSeverity()" 
           (ngModelChange)="auditSeverity.set($event); applyAuditFilters()"
           class="form-select">
-          <option value="ALL">Todos los niveles</option>
-          <option value="INFO">🟢 INFO (Lecturas / Acceso)</option>
-          <option value="AUDIT">🟣 AUDIT (Auth / Operaciones CRUD)</option>
-          <option value="WARNING">🟡 WARNING (Alertas / 4xx)</option>
-          <option value="ERROR">🔴 ERROR (Fallos / 5xx)</option>
+          <option value="ALL">{{ 'audit.allLevels' | translate }}</option>
+          <option value="INFO">{{ 'audit.optInfo' | translate }}</option>
+          <option value="AUDIT">{{ 'audit.optAudit' | translate }}</option>
+          <option value="WARNING">{{ 'audit.optWarning' | translate }}</option>
+          <option value="ERROR">{{ 'audit.optError' | translate }}</option>
         </select>
       </div>
 
@@ -157,16 +157,16 @@
           [ngModel]="auditRole()" 
           (ngModelChange)="auditRole.set($event); applyAuditFilters()"
           class="form-select">
-          <option value="ALL">Todos los roles</option>
-          <option value="Admin">Administrador / .admin</option>
-          <option value="Docente">Docente</option>
-          <option value="Alumno">Estudiante / Alumno</option>
+          <option value="ALL">{{ 'audit.allRoles' | translate }}</option>
+          <option value="Admin">{{ 'role.admin' | translate }}</option>
+          <option value="Docente">{{ 'role.teacher' | translate }}</option>
+          <option value="Alumno">{{ 'role.student' | translate }}</option>
         </select>
       </div>
 
       <!-- Filtro por Rango de Fecha -->
       <div class="filter-item">
-        <label>Desde:</label>
+        <label>{{ 'audit.fromDate' | translate }}:</label>
         <input 
           type="date" 
           [ngModel]="auditFromDate()" 
@@ -175,7 +175,7 @@
       </div>
 
       <div class="filter-item">
-        <label>Hasta:</label>
+        <label>{{ 'audit.toDate' | translate }}:</label>
         <input 
           type="date" 
           [ngModel]="auditToDate()" 
@@ -186,10 +186,10 @@
       <!-- Botones de Acción de Filtro -->
       <div class="filter-actions-group">
         <button class="btn btn-primary btn-sm" (click)="applyAuditFilters()">
-          Filtrar
+          {{ 'audit.btnFilter' | translate }}
         </button>
-        <button class="btn btn-secondary btn-sm" (click)="resetAuditFilters()" title="Restablecer filtros">
-          Limpiar
+        <button class="btn btn-secondary btn-sm" (click)="resetAuditFilters()" [title]="'audit.btnClear' | translate">
+          {{ 'audit.btnClear' | translate }}
         </button>
       </div>
     </div>
@@ -197,7 +197,7 @@
     <!-- Indicador de Carga -->
     <div *ngIf="isAuditLoading()" class="logs-loading">
       <div class="spinner"></div>
-      <p>Consultando registros de auditoría en tiempo real...</p>
+      <p>{{ 'audit.loadingAudit' | translate }}</p>
     </div>
 
     <!-- Estado Vacío -->
@@ -233,7 +233,7 @@
                   [class.badge-audit]="entry.level === 'AUDIT'"
                   [class.badge-warning]="entry.level === 'WARNING'"
                   [class.badge-error]="entry.level === 'ERROR'">
-                  {{ entry.level === 'INFO' ? '🟢 INFO' : (entry.level === 'AUDIT' ? '🟣 AUDIT' : (entry.level === 'WARNING' ? '🟡 WARN' : '🔴 ERROR')) }}
+                  {{ entry.level === 'INFO' ? ('audit.levelInfo' | translate) : (entry.level === 'AUDIT' ? ('audit.levelAudit' | translate) : (entry.level === 'WARNING' ? ('audit.levelWarning' | translate) : ('audit.levelError' | translate))) }}
                 </span>
               </td>
               <td class="cell-meta">
@@ -252,7 +252,7 @@
               </td>
               <td class="cell-user">
                 <div class="user-cell-meta">
-                  <span class="user-pill-inline">{{ entry.userEmail || entry.userId || 'Anónimo' }}</span>
+                  <span class="user-pill-inline">{{ entry.userEmail || entry.userId || ('audit.anonymous' | translate) }}</span>
                   <span *ngIf="entry.userRole" class="user-role-tag">{{ entry.userRole }}</span>
                 </div>
               </td>
@@ -268,8 +268,8 @@
                   class="btn-accordion" 
                   [class.is-open]="expandedLogId() === entry.id"
                   (click)="toggleAccordion(entry.id)"
-                  title="Ver detalles o traza del evento">
-                  {{ expandedLogId() === entry.id ? 'Ocultar ▲' : 'Ver ▼' }}
+                  [title]="'audit.colDetails' | translate">
+                  {{ expandedLogId() === entry.id ? ('audit.hideDetails' | translate) : ('audit.viewDetails' | translate) }}
                 </button>
                 <span *ngIf="!entry.details" class="no-details">—</span>
               </td>
@@ -280,8 +280,8 @@
               <td colspan="8" class="accordion-cell">
                 <div class="accordion-content">
                   <div class="accordion-header">
-                    <span class="acc-title">Contexto Detallado del Evento de Auditoría</span>
-                    <span class="acc-ip">IP: {{ entry.ip }} | Usuario: {{ entry.userEmail || entry.userId || 'N/A' }}</span>
+                    <span class="acc-title">{{ 'audit.accTitle' | translate }}</span>
+                    <span class="acc-ip">IP: {{ entry.ip }} | {{ 'audit.colUser' | translate }}: {{ entry.userEmail || entry.userId || 'N/A' }}</span>
                   </div>
                   <pre class="sanitized-trace">{{ entry.details }}</pre>
                 </div>
@@ -324,7 +324,7 @@
     <!-- Barra de Selección de Archivos de Log y Modo de Vista -->
     <div class="logs-selector-bar">
       <div class="file-chips-group">
-        <span class="selector-label">Archivo:</span>
+        <span class="selector-label">{{ 'audit.fileLabel' | translate }}:</span>
         <div class="log-chips">
           <button 
             *ngFor="let file of logFiles()" 
@@ -343,13 +343,13 @@
           class="mode-btn" 
           [class.active]="logViewMode() === 'friendly'" 
           (click)="setViewMode('friendly')">
-          📊 Tabla Estructurada
+          📊 {{ 'audit.viewFriendly' | translate }}
         </button>
         <button 
           class="mode-btn" 
           [class.active]="logViewMode() === 'raw'" 
           (click)="setViewMode('raw')">
-          💻 Consola Cruda
+          💻 {{ 'audit.viewRaw' | translate }}
         </button>
       </div>
     </div>
@@ -365,43 +365,43 @@
         </button>
         <button type="button" class="log-kpi-chip chip-audit" [class.active]="selectedSeverity() === 'AUDIT'" (click)="filterParsedBySeverityChip('AUDIT')">
           <span class="kpi-dot">🟣</span>
-          <span class="kpi-label">AUDIT</span>
+          <span class="kpi-label">{{ 'audit.levelAudit' | translate }}</span>
           <strong class="kpi-count">{{ parsedLogStats.audit }}</strong>
         </button>
         <button type="button" class="log-kpi-chip chip-info" [class.active]="selectedSeverity() === 'INFO'" (click)="filterParsedBySeverityChip('INFO')">
           <span class="kpi-dot">🟢</span>
-          <span class="kpi-label">INFO</span>
+          <span class="kpi-label">{{ 'audit.levelInfo' | translate }}</span>
           <strong class="kpi-count">{{ parsedLogStats.info }}</strong>
         </button>
         <button type="button" class="log-kpi-chip chip-warn" [class.active]="selectedSeverity() === 'WARNING'" (click)="filterParsedBySeverityChip('WARNING')">
           <span class="kpi-dot">🟡</span>
-          <span class="kpi-label">WARNING</span>
+          <span class="kpi-label">{{ 'audit.levelWarning' | translate }}</span>
           <strong class="kpi-count">{{ parsedLogStats.warning }}</strong>
         </button>
         <button type="button" class="log-kpi-chip chip-err" [class.active]="selectedSeverity() === 'ERROR'" (click)="filterParsedBySeverityChip('ERROR')">
           <span class="kpi-dot">🔴</span>
-          <span class="kpi-label">ERROR</span>
+          <span class="kpi-label">{{ 'audit.levelError' | translate }}</span>
           <strong class="kpi-count">{{ parsedLogStats.error }}</strong>
         </button>
       </div>
 
       <div class="friendly-filters-bar">
         <div class="filter-item">
-          <label>Severidad:</label>
+          <label>{{ 'audit.filterSeverity' | translate }}:</label>
           <select 
             [ngModel]="selectedSeverity()" 
             (ngModelChange)="selectedSeverity.set($event); loadParsedLogs()"
             class="form-select">
-            <option value="ALL">Todas las severidades</option>
-            <option value="AUDIT">🟣 AUDIT (Dominio / Ley 1581)</option>
-            <option value="INFO">🟢 INFO (Acceso / Sistema)</option>
-            <option value="WARNING">🟡 WARNING (Alertas / 4xx)</option>
-            <option value="ERROR">🔴 ERROR (Fallos / 5xx)</option>
+            <option value="ALL">{{ 'audit.allSeverities' | translate }}</option>
+            <option value="AUDIT">{{ 'audit.optAudit' | translate }}</option>
+            <option value="INFO">{{ 'audit.optInfo' | translate }}</option>
+            <option value="WARNING">{{ 'audit.optWarning' | translate }}</option>
+            <option value="ERROR">{{ 'audit.optError' | translate }}</option>
           </select>
         </div>
 
         <div class="filter-item">
-          <label>Fecha:</label>
+          <label>{{ 'audit.filterDate' | translate }}:</label>
           <input 
             type="date" 
             [ngModel]="selectedDate()" 
@@ -410,40 +410,40 @@
         </div>
 
         <div class="filter-item filter-search">
-          <label>Usuario / Carnet / Acción:</label>
+          <label>{{ 'audit.searchUserAction' | translate }}:</label>
           <div class="search-wrap">
             <input 
               type="text" 
-              placeholder="Buscar por usuario, carnet, sección o mensaje..."
+              [placeholder]="'audit.searchUserPlaceholder' | translate"
               [ngModel]="searchUser()" 
               (ngModelChange)="searchUser.set($event)"
               (keyup.enter)="loadParsedLogs()"
               class="form-input" />
-            <button class="btn btn-secondary btn-xs" (click)="loadParsedLogs()">Buscar</button>
+            <button class="btn btn-secondary btn-xs" (click)="loadParsedLogs()">{{ 'audit.btnSearch' | translate }}</button>
           </div>
         </div>
       </div>
 
       <div *ngIf="isLoading()" class="logs-loading">
         <div class="spinner"></div>
-        <p>Procesando registros de log...</p>
+        <p>{{ 'audit.loadingLogs' | translate }}</p>
       </div>
 
       <div *ngIf="!isLoading() && parsedLogs().length === 0" class="logs-empty">
         <span class="empty-icon">📭</span>
-        <p>No se encontraron eventos registrados.</p>
+        <p>{{ 'audit.noLogsFound' | translate }}</p>
       </div>
 
       <div *ngIf="!isLoading() && parsedLogs().length > 0" class="friendly-table-wrap">
         <table class="friendly-table">
           <thead>
             <tr>
-              <th style="width: 170px;">Fecha y Hora</th>
-              <th style="width: 110px;">Severidad</th>
-              <th style="width: 165px;">Actor / Rol</th>
-              <th>Evento / Acción Registrada</th>
-              <th style="width: 135px;">IP / Estado / Latencia</th>
-              <th style="width: 110px; text-align: center;">Detalles</th>
+              <th style="width: 170px;">{{ 'audit.colTime' | translate }}</th>
+              <th style="width: 110px;">{{ 'audit.colSeverity' | translate }}</th>
+              <th style="width: 165px;">{{ 'audit.colActorRole' | translate }}</th>
+              <th>{{ 'audit.colEventAction' | translate }}</th>
+              <th style="width: 135px;">{{ 'audit.colIpStatusLatency' | translate }}</th>
+              <th style="width: 110px; text-align: center;">{{ 'audit.colDetails' | translate }}</th>
             </tr>
           </thead>
           <tbody>
@@ -457,7 +457,7 @@
                     [class.badge-audit]="entry.level === 'AUDIT'"
                     [class.badge-warning]="entry.level === 'WARNING'"
                     [class.badge-error]="entry.level === 'ERROR'">
-                    {{ entry.level === 'INFO' ? '🟢 INFO' : (entry.level === 'AUDIT' ? '🟣 AUDIT' : (entry.level === 'WARNING' ? '🟡 WARN' : '🔴 ERROR')) }}
+                    {{ entry.level === 'INFO' ? ('audit.levelInfo' | translate) : (entry.level === 'AUDIT' ? ('audit.levelAudit' | translate) : (entry.level === 'WARNING' ? ('audit.levelWarning' | translate) : ('audit.levelError' | translate))) }}
                   </span>
                 </td>
                 <td class="cell-user">
@@ -481,8 +481,9 @@
                     *ngIf="entry.details" 
                     class="btn-accordion" 
                     [class.is-open]="expandedLogId() === entry.id"
-                    (click)="toggleAccordion(entry.id)">
-                    {{ expandedLogId() === entry.id ? 'Ocultar ▲' : 'Ver Traza ▼' }}
+                    (click)="toggleAccordion(entry.id)"
+                    [title]="'audit.colDetails' | translate">
+                    {{ expandedLogId() === entry.id ? ('audit.hideDetails' | translate) : ('audit.viewTrace' | translate) }}
                   </button>
                   <span *ngIf="!entry.details" class="no-details">—</span>
                 </td>
@@ -492,8 +493,8 @@
                 <td colspan="6" class="accordion-cell">
                   <div class="accordion-content">
                     <div class="accordion-header">
-                      <span class="acc-title">Detalle del Evento Registrado</span>
-                      <span class="acc-ip" *ngIf="entry.clientIp">IP: {{ entry.clientIp }} | Usuario: {{ entry.user }}</span>
+                      <span class="acc-title">{{ 'audit.logDetailTitle' | translate }}</span>
+                      <span class="acc-ip" *ngIf="entry.clientIp">IP: {{ entry.clientIp }} | {{ 'audit.colUser' | translate }}: {{ entry.user }}</span>
                     </div>
                     <pre class="sanitized-trace">{{ entry.details }}</pre>
                   </div>
@@ -512,11 +513,11 @@
           <span class="pill-dot"></span>
           <strong class="file-name">{{ currentFileName() }}</strong>
           <span class="file-divider">|</span>
-          <span class="file-stat">Tamaño: <strong>{{ formatFileSize(fileSize()) }}</strong></span>
+          <span class="file-stat">{{ 'audit.fileSize' | translate }}: <strong>{{ formatFileSize(fileSize()) }}</strong></span>
           <span *ngIf="lastModified()" class="file-divider">|</span>
-          <span *ngIf="lastModified()" class="file-stat">Modificado: <strong>{{ lastModified() | date:'yyyy-MM-dd HH:mm:ss' }}</strong></span>
+          <span *ngIf="lastModified()" class="file-stat">{{ 'audit.fileModified' | translate }}: <strong>{{ lastModified() | date:'yyyy-MM-dd HH:mm:ss' }}</strong></span>
           <span class="file-divider">|</span>
-          <span class="file-stat">Líneas: <strong>{{ filteredLines.length }}</strong></span>
+          <span class="file-stat">{{ 'audit.fileLines' | translate }}: <strong>{{ filteredLines.length }}</strong></span>
         </div>
 
         <div class="filter-box">
@@ -525,7 +526,7 @@
             type="text" 
             [ngModel]="filterQuery()"
             (ngModelChange)="filterQuery.set($event)"
-            placeholder="Filtrar por texto, ERROR, 401, GET..." 
+            [placeholder]="'audit.filterFilePlaceholder' | translate" 
             class="search-input" />
           <button *ngIf="filterQuery()" class="clear-search" (click)="filterQuery.set('')">✕</button>
         </div>
@@ -538,22 +539,22 @@
             <span class="dot yellow"></span>
             <span class="dot green"></span>
           </div>
-          <span class="terminal-title">Consola de Registros — {{ currentFileName() }}</span>
+          <span class="terminal-title">{{ 'audit.terminalTitle' | translate }} — {{ currentFileName() }}</span>
           <span class="terminal-status" [class.loading]="isLoading()">
-            {{ isLoading() ? 'Leyendo...' : 'Listo' }}
+            {{ isLoading() ? ('audit.reading' | translate) : ('audit.ready' | translate) }}
           </span>
         </div>
 
         <div class="terminal-body" [class.is-loading]="isLoading()">
           <div *ngIf="isLoading()" class="terminal-loader">
             <div class="spinner"></div>
-            <p>Consultando registros...</p>
+            <p>{{ 'audit.queryingLogs' | translate }}</p>
           </div>
 
           <div *ngIf="!isLoading() && filteredLines.length === 0" class="terminal-empty">
             <span class="empty-icon">📭</span>
-            <p *ngIf="filterQuery()">No se encontraron coincidencias para "{{ filterQuery() }}" en este archivo.</p>
-            <p *ngIf="!filterQuery()">El archivo está vacío.</p>
+            <p *ngIf="filterQuery()">{{ 'audit.noMatches' | translate }} "{{ filterQuery() }}"</p>
+            <p *ngIf="!filterQuery()">{{ 'audit.emptyFile' | translate }}</p>
           </div>
 
           <div *ngIf="!isLoading() && filteredLines.length > 0" class="code-lines">

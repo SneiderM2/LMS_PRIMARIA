@@ -18,8 +18,8 @@
         <span class="user-role-badge">🛡️ {{ 'role.superAdmin' | translate }}</span>
       </div>
       <app-language-selector mode="inline"></app-language-selector>
-      <button class="btn btn-secondary btn-sm" (click)="showChangePasswordModal = true" title="Cambiar mi contraseña">
-        🔑 Contraseña
+      <button class="btn btn-secondary btn-sm" (click)="showChangePasswordModal = true" [title]="'nav.changePassword' | translate">
+        🔑 {{ 'nav.password' | translate }}
       </button>
       <button class="btn btn-secondary btn-sm" (click)="logout()" [title]="'nav.logout' | translate">
         🚪 {{ 'nav.logout' | translate }}
@@ -66,7 +66,7 @@
         class="admin-tab-btn" 
         [class.active]="activeSection === 'stats'"
         (click)="setSection('stats')">
-        📈 Analítica
+        {{ 'admin.tabStats' | translate }}
       </button>
     </div>
   </nav>
@@ -140,7 +140,7 @@
           <span class="box-label">{{ 'admin.metricServicesLabel' | translate }}</span>
           <div class="metric-subdetail">
             <span>{{ 'admin.metricLatency' | translate }}</span>
-            <span>🔍 Ver Auditoría</span>
+            <span>🔍 {{ 'admin.metricAuditAction' | translate }}</span>
           </div>
         </div>
 
@@ -170,7 +170,7 @@
           <span class="box-label">{{ 'admin.metricCoursesLabel' | translate }}</span>
           <div class="metric-subdetail">
             <span>{{ 'admin.metricEnrollments' | translate }}</span>
-            <span>⚙️ Administrar</span>
+            <span>⚙️ {{ 'admin.metricManageAction' | translate }}</span>
           </div>
         </div>
       </section>
@@ -492,7 +492,7 @@
       <section class="crud-users-card glass-panel db-backup-panel" style="margin-bottom: 1.5rem;">
         <div class="db-backup-header">
           <div class="db-backup-info">
-            <span class="db-badge">🗄️ Copias de Seguridad Institucionales</span>
+            <span class="db-badge">🗄️ {{ 'admin.dbBadge' | translate }}</span>
             <h2 style="margin: 0.35rem 0; font-size: 1.35rem;">{{ 'admin.dbTitle' | translate }}</h2>
             <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
               {{ 'admin.dbDesc' | translate }}
@@ -520,10 +520,10 @@
         <div class="banner-content">
           <div class="status-pill-live">
             <span class="live-dot"></span>
-            <span>Métricas en Tiempo Real</span>
+            <span>{{ 'stats.liveMetrics' | translate }}</span>
           </div>
-          <h1>📈 Analítica y Rendimiento Institucional</h1>
-          <p>Tendencia de entregas, distribución de notas escolares y participación estudiantil por grado.</p>
+          <h1>{{ 'stats.title' | translate }}</h1>
+          <p>{{ 'stats.subtitle' | translate }}</p>
         </div>
       </section>
 
@@ -535,21 +535,21 @@
         <div class="kpi-card glass-panel">
           <div class="kpi-icon" style="background: #e0f2fe;">📝</div>
           <div class="kpi-content">
-            <div class="kpi-label">Tareas Publicadas (30d)</div>
+            <div class="kpi-label">{{ 'stats.kpiTasks' | translate }}</div>
             <div class="kpi-value">{{ activityStats.tasksCreatedLast30Days }}</div>
           </div>
         </div>
         <div class="kpi-card glass-panel">
           <div class="kpi-icon" style="background: #dcfce7;">📬</div>
           <div class="kpi-content">
-            <div class="kpi-label">Entregas de Alumnos (30d)</div>
+            <div class="kpi-label">{{ 'stats.kpiSubmissions' | translate }}</div>
             <div class="kpi-value">{{ activityStats.submissionsLast30Days }}</div>
           </div>
         </div>
         <div class="kpi-card glass-panel">
           <div class="kpi-icon" style="background: #fef3c7;">📊</div>
           <div class="kpi-content">
-            <div class="kpi-label">Semanas Monitoreadas</div>
+            <div class="kpi-label">{{ 'stats.kpiWeeks' | translate }}</div>
             <div class="kpi-value">{{ activityStats.submissionsPerWeek.length }}</div>
           </div>
         </div>
@@ -562,17 +562,17 @@
         <div class="crud-users-card glass-panel" style="padding: 1.5rem;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
             <div>
-              <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a;">📅 Entregas por Semana</h3>
-              <p style="margin: 2px 0 0; font-size: 0.85rem; color: var(--text-muted);">Actividad en las últimas 8 semanas</p>
+              <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a;">{{ 'stats.chartWeeklyTitle' | translate }}</h3>
+              <p style="margin: 2px 0 0; font-size: 0.85rem; color: var(--text-muted);">{{ 'stats.chartWeeklySub' | translate }}</p>
             </div>
-            <span class="badge-active" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Semanas ISO</span>
+            <span class="badge-active" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">{{ 'stats.isoWeeks' | translate }}</span>
           </div>
 
           <app-mini-bar-chart
             [data]="weeklySubmissionsChartData"
             [height]="170"
-            valueSuffix=" entregas"
-            ariaLabel="Entregas semanales recibidas">
+            [valueSuffix]="' ' + ('stats.submissions' | translate)"
+            [ariaLabel]="'stats.ariaWeeklySubmissions' | translate">
           </app-mini-bar-chart>
         </div>
 
@@ -580,16 +580,16 @@
         <div class="crud-users-card glass-panel" style="padding: 1.5rem;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
             <div>
-              <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a;">🎯 Distribución de Notas</h3>
-              <p style="margin: 2px 0 0; font-size: 0.85rem; color: var(--text-muted);">Desempeño en tareas evaluadas</p>
+              <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a;">{{ 'stats.chartGradesTitle' | translate }}</h3>
+              <p style="margin: 2px 0 0; font-size: 0.85rem; color: var(--text-muted);">{{ 'stats.chartGradesSub' | translate }}</p>
             </div>
-            <span class="badge-active" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Escala 0.0 - 5.0</span>
+            <span class="badge-active" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">{{ 'stats.scale' | translate }}</span>
           </div>
 
           <app-donut-chart
             [segments]="gradeDistributionDonutSegments"
             [size]="160"
-            centerLabel="Total Calificadas"
+            [centerLabel]="'stats.totalGraded' | translate"
             [centerValue]="activityStats.submissionsLast30Days.toString()">
           </app-donut-chart>
         </div>
@@ -598,14 +598,14 @@
 
       <!-- Alumnos Activos por Grado Escolar -->
       <div *ngIf="!isLoadingActivityStats && activityStats" class="crud-users-card glass-panel" style="padding: 1.5rem;">
-        <h3 style="margin: 0 0 0.5rem; font-size: 1.15rem; color: #0f172a;">🎒 Estudiantes Activos por Grado</h3>
-        <p style="margin: 0 0 1.25rem; font-size: 0.85rem; color: var(--text-muted);">Matrícula y cobertura escolar distribuida por nivel de primaria</p>
+        <h3 style="margin: 0 0 0.5rem; font-size: 1.15rem; color: #0f172a;">{{ 'stats.activeByGradeTitle' | translate }}</h3>
+        <p style="margin: 0 0 1.25rem; font-size: 0.85rem; color: var(--text-muted);">{{ 'stats.activeByGradeSub' | translate }}</p>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem;">
           <div *ngFor="let g of activityStats.activeStudentsByGrade" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius-sm); padding: 1rem; text-align: center;">
             <div style="font-size: 1.25rem; margin-bottom: 0.25rem;">⭐</div>
             <strong style="display: block; font-size: 0.95rem; color: #0f172a;">{{ g.grade }}</strong>
-            <span style="font-size: 0.85rem; color: #0284c7; font-weight: 700;">{{ g.count }} alumnos</span>
+            <span style="font-size: 0.85rem; color: #0284c7; font-weight: 700;">{{ g.count }} {{ 'admin.metricStudentsTag' | translate }}</span>
           </div>
         </div>
       </div>
@@ -672,15 +672,15 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
               <label style="margin: 0;">{{ 'admin.formPassword' | translate }} (8 a 64 caract.)</label>
               <button type="button" class="btn btn-sm btn-secondary" style="padding: 0.2rem 0.55rem; font-size: 0.75rem;" (click)="generatePasswordForNewUser()">
-                🎲 Generar clave (12 caract.)
+                🎲 {{ 'admin.generatePasswordBtn' | translate }}
               </button>
             </div>
             <div style="position: relative; display: flex; align-items: center;">
               <input type="text" [(ngModel)]="newUser.password" name="password" class="form-input"
                 minlength="8" maxlength="64" autocomplete="new-password"
-                placeholder="Ej: Clave1&#64;Segura (8 a 64 caract.)" />
-              <button *ngIf="newUser.password" type="button" class="btn btn-sm btn-secondary" style="position: absolute; right: 6px; padding: 0.25rem 0.55rem; font-size: 0.75rem;" (click)="copyPassword(newUser.password)" title="Copiar al portapapeles">
-                📋 Copiar
+                [placeholder]="'admin.passwordPlaceholder' | translate" />
+              <button *ngIf="newUser.password" type="button" class="btn btn-sm btn-secondary" style="position: absolute; right: 6px; padding: 0.25rem 0.55rem; font-size: 0.75rem;" (click)="copyPassword(newUser.password)" [title]="'audit.copy' | translate">
+                📋 {{ 'audit.copy' | translate }}
               </button>
             </div>
             <app-password-policy-meter
@@ -690,7 +690,7 @@
               [compact]="true">
             </app-password-policy-meter>
             <small *ngIf="!newUser.password" style="display:block; margin-top:0.3rem; font-size:0.76rem; color:#64748b;">
-              Entre 8 y 64 caracteres con mayúscula, minúscula, número y símbolo (&#64;, #, !, etc.). Si se deja vacío, el sistema genera una temporal automáticamente.
+              {{ 'admin.passwordRequirementHint' | translate }}
             </small>
           </div>
 
@@ -743,15 +743,15 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
               <label style="margin: 0;">{{ 'admin.formResetPassword' | translate }} (8 a 64 caract.)</label>
               <button type="button" class="btn btn-sm btn-secondary" style="padding: 0.2rem 0.55rem; font-size: 0.75rem;" (click)="generatePasswordForEditUser()">
-                🎲 Generar clave (12 caract.)
+                🎲 {{ 'admin.generatePasswordBtn' | translate }}
               </button>
             </div>
             <div style="position: relative; display: flex; align-items: center;">
               <input type="text" [(ngModel)]="editUserForm.password" name="ePass" class="form-input"
                 minlength="8" maxlength="64" autocomplete="new-password"
-                placeholder="Dejar en blanco para no cambiarla" />
-              <button *ngIf="editUserForm.password" type="button" class="btn btn-sm btn-secondary" style="position: absolute; right: 6px; padding: 0.25rem 0.55rem; font-size: 0.75rem;" (click)="copyPassword(editUserForm.password)" title="Copiar al portapapeles">
-                📋 Copiar
+                [placeholder]="'admin.leaveBlankPassword' | translate" />
+              <button *ngIf="editUserForm.password" type="button" class="btn btn-sm btn-secondary" style="position: absolute; right: 6px; padding: 0.25rem 0.55rem; font-size: 0.75rem;" (click)="copyPassword(editUserForm.password)" [title]="'audit.copy' | translate">
+                📋 {{ 'audit.copy' | translate }}
               </button>
             </div>
             <app-password-policy-meter
