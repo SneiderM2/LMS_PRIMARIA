@@ -57,12 +57,15 @@ los lineamientos de la **SIC**, el **MSPI** de MinTIC, **ISO/IEC 27001**, **ISO/
 > reCAPTCHA (estuvieron versionadas), cambie las contraseñas de las cuentas demo y complete los datos
 > del responsable del tratamiento. Ver [SETUP_SECRETS.md](SETUP_SECRETS.md).
 
-### Estado de seguridad (auditoría 2026-10, verificado el 25/10/2026)
+### Estado de seguridad (auditoría 2026-10, verificado el 28/10/2026)
 
-> **Última verificación:** 2026-10-25, 22:28–22:31 UTC, sobre `main` = `fix/audit-2026-10` =
-> `11938e0f`. CI y CodeQL en verde; backend Release con 0 errores y 0 advertencias (55/55 pruebas);
-> frontend con build de producción y 6/6 pruebas Karma. GitHub Pages publica `main-EVFOMQUY.js` y
-> `styles-T7YOE4RF.css`.
+> **Última verificación:** 2026-10-28, 04:30 UTC. Backend Release compilado con **0 errores y 0 advertencias** (**119/119 pruebas xUnit** de seguridad y penetración superadas); frontend con build de producción correcto (**23/23 pruebas Karma/Jasmine** aprobadas en ChromeHeadless). Se incorporó auditoría DAST automatizada mediante [OWASP ZAP Baseline Scan](.github/workflows/dast-scan.yml).
+
+- **Hardening BOLA/IDOR:** Validación estricta de pertenencia y titularidad docente en `TeacherController.CreateContent` y restricción de grado institucional en `StudentController.EnrollInCourse`.
+- **Rotación de Sesión Inmediata:** Al cambiar la contraseña en `AuthController.ChangePassword`, se genera un nuevo `SessionToken`, invalidando cualquier sesión abierta en otros dispositivos y emitiendo un JWT renovado.
+- **Blindaje Path Traversal:** `FilesController` y `SystemFilesController` validan y rechazan secuencias de escape de directorio (`..`, separadores de ruta normalizados y nombres nulos).
+- **Prevención de Fuga de Token JWT (CWE-200 / CWE-522):** En `jwt.interceptor.ts`, la función `isTrustedApiUrl` restringe estrictamente el envío del encabezado `Authorization: Bearer` al origen canónico del backend escolar, previniendo fugas hacia URLs externas.
+- **Accesibilidad WCAG 2.1 AA & Modo Oscuro:** Sincronización de `<meta name="color-scheme" content="light dark">`, eliminación de pseudo-protocolos `javascript:void(0)` en favor de botones nativos accesibles, soporte de foco visible (`:focus-visible`) y armonización de variables semánticas en dashboards y gráficos SVG.
 
 - La API **no arranca** sin `Jwt:SecretKey` (≥48 caracteres) ni sin `Privacy:EvidenceHmacKey`
   (≥32 caracteres, distinta de la JWT). Ya no existen claves de respaldo en el código.

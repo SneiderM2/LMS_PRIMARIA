@@ -23,7 +23,7 @@ export interface BarChartItem {
         </defs>
 
         <!-- Baseline -->
-        <line x1="20" y1="130" x2="390" y2="130" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="2,2" />
+        <line x1="20" y1="130" x2="390" y2="130" stroke="var(--border-color, #cbd5e1)" stroke-width="1" stroke-dasharray="2,2" />
 
         <!-- Bars -->
         <g *ngFor="let item of data; let i = index">

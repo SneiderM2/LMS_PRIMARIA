@@ -390,8 +390,8 @@ public class TeacherController : ControllerBase
             .Where(c => c.Activo)
             .AsQueryable();
 
-        // Si es Docente (no Admin), filtrar solo sus cursos asignados
-        if (currentUser != null && currentUser.Rol.Nombre == "DOCENTE")
+        // Si no es Administrador, filtrar estrictamente solo sus cursos asignados
+        if (currentUser != null && !IsAdmin(currentUser.Rol?.Nombre))
         {
             query = query.Where(c => c.DocenteId == currentUser.Id);
         }
@@ -606,10 +606,7 @@ public class TeacherController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var currentUsername = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var currentUser = await _context.Usuarios
-            .FirstOrDefaultAsync(u => u.Username == currentUsername);
-
+        var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
         {
             return Unauthorized();
@@ -631,17 +628,31 @@ public class TeacherController : ControllerBase
             });
         }
 
+        var isAdmin = IsAdmin(currentUser.Rol?.Nombre);
         Curso? curso = null;
         if (dto.CourseId.HasValue && dto.CourseId.Value > 0)
         {
             curso = await _context.Cursos
                 .Include(c => c.Grado)
                 .FirstOrDefaultAsync(c => c.Id == dto.CourseId.Value);
+
+            if (curso == null)
+            {
+                return NotFound(new { message = "El curso especificado no existe." });
+            }
+
+            if (!isAdmin && curso.DocenteId != currentUser.Id)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = "Solo puedes publicar actividades en los cursos que tienes asignados."
+                });
+            }
         }
 
         curso ??= await _context.Cursos
             .FirstOrDefaultAsync(c => c.DocenteId == currentUser.Id && c.Nombre == dto.Subject && c.GradoId == grado.Id)
-            ?? await _context.Cursos.FirstOrDefaultAsync(c => c.Nombre == dto.Subject && c.GradoId == grado.Id)
+            ?? (isAdmin ? await _context.Cursos.FirstOrDefaultAsync(c => c.Nombre == dto.Subject && c.GradoId == grado.Id) : null)
             ?? await _context.Cursos.FirstOrDefaultAsync(c => c.DocenteId == currentUser.Id);
 
         if (curso == null)
@@ -1083,13 +1094,13 @@ public class TeacherController : ControllerBase
 
         if (currentUser == null) return Unauthorized();
 
-        var isTeacher = currentUser.Rol.Nombre == "DOCENTE";
+        var isAdmin = IsAdmin(currentUser.Rol?.Nombre);
 
         var coursesQuery = _context.Cursos
             .Include(c => c.Inscripciones.Where(i => i.Estado == "ACTIVA"))
             .Where(c => c.Activo);
 
-        if (isTeacher)
+        if (!isAdmin)
         {
             coursesQuery = coursesQuery.Where(c => c.DocenteId == currentUser.Id);
         }
@@ -1147,14 +1158,14 @@ public class TeacherController : ControllerBase
 
         if (currentUser == null) return Unauthorized();
 
-        var isTeacher = currentUser.Rol.Nombre == "DOCENTE";
+        var isAdmin = IsAdmin(currentUser.Rol?.Nombre);
 
         var coursesQuery = _context.Cursos
             .Include(c => c.Grado)
             .Include(c => c.Inscripciones.Where(i => i.Estado == "ACTIVA"))
             .Where(c => c.Activo);
 
-        if (isTeacher)
+        if (!isAdmin)
         {
             coursesQuery = coursesQuery.Where(c => c.DocenteId == currentUser.Id);
         }

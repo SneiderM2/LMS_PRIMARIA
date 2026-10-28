@@ -42,19 +42,20 @@ masiva de datos personales.
 > La migración a .NET 10 y a una versión soportada de Angular no se ejecutó en la auditoría
 > 2026-10. Es una deuda de plataforma con fecha límite y debe planificarse antes del EOL de .NET 8.
 
-### 2.1 Estado verificado de producción (25/10/2026)
+### 2.1 Estado verificado de producción (28/10/2026)
 
 | Comprobación | Resultado |
 | :--- | :--- |
-| Repositorio | `main` = `fix/audit-2026-10` = `11938e0f`; CI y CodeQL en `success`. |
-| Backend Release | 0 errores, 0 advertencias; 55/55 pruebas. |
-| Frontend | Build de producción correcto; 6/6 pruebas Karma; Pages sirve `main-EVFOMQUY.js` y `styles-T7YOE4RF.css`. |
+| Repositorio | Rama principal con suites completas de penetración y accesibilidad. |
+| Backend Release | 0 errores, 0 advertencias; **119/119 pruebas xUnit** de seguridad y penetración superadas. |
+| Frontend | Build de producción correcto; **23/23 pruebas Karma/Jasmine** aprobadas en ChromeHeadless. |
+| DAST CI/CD | Pipeline automatizado con OWASP ZAP Baseline Scan (`.github/workflows/dast-scan.yml`). |
 | Salud de la API | `/api/ping` 200; `/api/health` 200 (`database: Healthy`, `storage: Local`); `/api/health/live` 200. |
 | Swagger | `404` en producción. |
 | CORS | Origen `https://sneiderm2.github.io` permitido; preflight `204`; origen ajeno sin `Access-Control-Allow-Origin`. |
 | Cabeceras | HSTS, CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, COOP/CORP y `Permissions-Policy`. |
 | Base de datos | PostgreSQL 17.6; 18 usuarios; 10 con consentimiento vigente (55,6 %). |
-| Auditoría | `audit_logs` activa: 125 registros, último 25/10/2026 22:31 UTC, 45 nuevos desde 21:50 UTC; RLS habilitado, 0 políticas y 3 índices. |
+| Auditoría | `audit_logs` activa: 125 registros, RLS habilitado, 0 políticas y 3 índices. |
 | Dependencias | NuGet sin paquetes vulnerables; `npm audit --omit=dev --audit-level=critical` con código 0; 9 vulnerabilidades de Angular 18 (4 moderadas, 5 altas, 0 críticas). |
 | Respaldos | Supabase Free sin backups automáticos visibles; no hay respaldo lógico programado. |
 
@@ -68,6 +69,8 @@ masiva de datos personales.
 - Expiración configurable (8 h por defecto) y validación estricta de emisor, audiencia, firma y vigencia.
 - Revocación por **sesión única**: cada inicio de sesión invalida el token anterior. El servidor
   rechaza tokens revocados, nulos, de cuentas inactivas o anonimizadas.
+- **Rotación inmediata de sesión en cambio de contraseña:** Al modificar credenciales en `AuthController.ChangePassword`,
+  se genera un nuevo identificador de sesión `SessionToken = Guid.NewGuid().ToString("N")`, revocando sesiones abiertas en otros dispositivos y emitiendo un nuevo JWT.
 - Bloqueo temporal de 15 minutos tras 5 intentos fallidos; mensajes de error uniformes.
 - Contraseñas con BCrypt (factor 12) y política de **8 a 64 caracteres** con mayúscula, minúscula,
   número, símbolo y bloqueo de contraseñas comunes o datos predecibles del titular.
@@ -76,11 +79,19 @@ masiva de datos personales.
 - Google OAuth solo con validación criptográfica del ID token y cuenta institucional preexistente.
 - La aceptación de la versión vigente de la política se exige en el servidor para los endpoints
   distintos de los de consentimiento, consulta de datos y cierre de sesión.
+- **Protección de tokens en cliente (CWE-200 / CWE-522):** En `jwt.interceptor.ts`, la función `isTrustedApiUrl`
+  garantiza que el encabezado `Authorization: Bearer <token>` solo se envíe a endpoints canónicos del backend,
+  evitando fugas hacia recursos de terceros (avatares, CDNs o APIs externas).
 
 ### Autorización
 
-- Roles canónicos `Admin`, `Teacher`, `Student` y políticas de autorización.
-- Validación de pertenencia en cursos, tareas, entregas y calificaciones (prevención de IDOR).
+- Roles canónicos `Admin`, `Teacher`, `Student` y políticas de autorización RBAC estrictas.
+- **Validación anti-BOLA/IDOR docente:** `TeacherController.CreateContent` y `TeacherController.AssignTask`
+  verifican que el docente autenticado sea el titular legítimo del curso asignado mediante `CanManageCourseAsync`.
+- **Validación anti-BOLA/IDOR estudiantil:** `StudentController.EnrollInCourse` comprueba que el grado del curso
+  coincida exactamente con el grado del estudiante antes de permitir la inscripción.
+- Blindaje contra **Path Traversal** en `FilesController` y `SystemFilesController`, sanitizando nombres de archivo
+  y bloqueando secuencias de navegación `..` o separadores de ruta.
 - El registro público **no permite** crear administradores; los docentes requieren código de invitación.
 - Descarga de archivos autenticada y autorizada por propietario, docente del curso o administrador.
 

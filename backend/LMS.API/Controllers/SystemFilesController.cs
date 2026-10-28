@@ -180,7 +180,14 @@ public class SystemFilesController : ControllerBase
             return BadRequest(new { message = "El parámetro 'fileName' es requerido." });
         }
 
-        // Sanitización contra Path Traversal
+        // Sanitización estricta contra Path Traversal y caracteres de control / null-bytes
+        if (fileName.Contains('\0') || fileName.Contains("%00", StringComparison.OrdinalIgnoreCase)
+            || fileName.Contains('/') || fileName.Contains('\\') || fileName.Contains(".."))
+        {
+            _logger.LogWarning("Posible intento de Path Traversal detectado: {FileName}", fileName);
+            return BadRequest(new { message = "Nombre de archivo no permitido." });
+        }
+
         var safeFileName = Path.GetFileName(fileName);
         if (safeFileName != fileName || safeFileName.Contains(".."))
         {
@@ -197,7 +204,7 @@ public class SystemFilesController : ControllerBase
 
         var logsDir = GetLogsDirectory();
         var fullPath = Path.GetFullPath(Path.Combine(logsDir, safeFileName));
-        var fullDir = Path.GetFullPath(logsDir);
+        var fullDir = Path.GetFullPath(logsDir).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
 
         // Asegurar que la ruta resultante está estrictamente dentro del directorio de logs
         if (!fullPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
@@ -337,15 +344,31 @@ public class SystemFilesController : ControllerBase
             return Forbid();
         }
 
+        if (string.IsNullOrWhiteSpace(fileName)
+            || fileName.Contains('\0')
+            || fileName.Contains("%00", StringComparison.OrdinalIgnoreCase)
+            || fileName.Contains('/')
+            || fileName.Contains('\\')
+            || fileName.Contains(".."))
+        {
+            return BadRequest(new { message = "Nombre de archivo no permitido." });
+        }
+
         var safeFileName = Path.GetFileName(fileName);
         if (safeFileName != fileName || safeFileName.Contains(".."))
         {
             return BadRequest(new { message = "Nombre de archivo no permitido." });
         }
 
+        var extension = Path.GetExtension(safeFileName).ToLowerInvariant();
+        if (extension != ".log" && extension != ".txt")
+        {
+            return BadRequest(new { message = "Únicamente se permite la inspección de archivos .log" });
+        }
+
         var logsDir = GetLogsDirectory();
         var fullPath = Path.GetFullPath(Path.Combine(logsDir, safeFileName));
-        var fullDir = Path.GetFullPath(logsDir);
+        var fullDir = Path.GetFullPath(logsDir).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
 
         if (!fullPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
         {

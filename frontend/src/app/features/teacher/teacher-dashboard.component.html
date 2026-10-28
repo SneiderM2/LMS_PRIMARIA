@@ -1227,8 +1227,8 @@
           <div *ngFor="let p of studentProgressList" class="submission-item-card" style="margin-bottom: 0;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap;">
               <div>
-                <strong style="font-size: 1rem; color: #0f172a;">{{ p.taskTitle }}</strong>
-                <div style="font-size: 0.82rem; color: #64748b; margin-top: 2px;">
+                <strong style="font-size: 1rem; color: var(--text-main);">{{ p.taskTitle }}</strong>
+                <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">
                   <span>📘 {{ p.courseName }}</span>
                   <span style="margin: 0 6px;">•</span>
                   <span>Enviado: {{ p.submittedAt | date:'dd/MM/yyyy, h:mm a' }}</span>
@@ -1259,7 +1259,7 @@
 
       </div>
 
-      <div class="modal-footer" style="padding: 1rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end;">
+      <div class="modal-footer" style="padding: 1rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
         <button type="button" class="btn btn-secondary btn-sm" (click)="closeStudentProgress()">
           Cerrar
         </button>

@@ -96,7 +96,13 @@ export class AuthService {
    */
   public changePassword(currentPassword: string, newPassword: string, confirmNewPassword?: string): Observable<any> {
     const body = { currentPassword, newPassword, confirmNewPassword };
-    return this.http.post<any>(`${this.apiUrl}/auth/change-password`, body);
+    return this.http.post<any>(`${this.apiUrl}/auth/change-password`, body).pipe(
+      tap((res) => {
+        if (res?.token) {
+          localStorage.setItem(this.TOKEN_KEY, res.token);
+        }
+      })
+    );
   }
 
   /**
@@ -154,21 +160,22 @@ export class AuthService {
     return !!this.currentUser() && !!this.getToken();
   }
 
-  public redirectByRole(role: UserRole): void {
+  public getRoleHomeRoute(role: UserRole): string {
     switch (role) {
       case 'Teacher':
-        this.router.navigate(['/dashboard/teacher']);
-        break;
+        return '/dashboard/teacher';
       case 'Student':
-        this.router.navigate(['/dashboard/student']);
-        break;
+        return '/dashboard/student';
       case 'Admin':
       case '.admin':
-        this.router.navigate(['/dashboard/admin']);
-        break;
+        return '/dashboard/admin';
       default:
-        this.router.navigate(['/login']);
+        return '/login';
     }
+  }
+
+  public redirectByRole(role: UserRole): void {
+    this.router.navigate([this.getRoleHomeRoute(role)]);
   }
 
   private handleAuthResponse(response: LoginResponse): void {

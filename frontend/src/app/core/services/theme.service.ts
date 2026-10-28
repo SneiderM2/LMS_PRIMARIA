@@ -17,6 +17,16 @@ export class ThemeService {
   constructor() {
     // Aplicar inmediatamente el tema inicial en el DOM
     this.applyTheme(this.currentTheme());
+
+    // Mantener sincronizado el esquema si cambia en otra pestaña
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (event: StorageEvent) => {
+        if (event.key === this.THEME_KEY && (event.newValue === 'light' || event.newValue === 'dark')) {
+          this.currentTheme.set(event.newValue);
+          this.applyTheme(event.newValue);
+        }
+      });
+    }
   }
 
   /**
@@ -40,6 +50,11 @@ export class ThemeService {
     if (typeof document !== 'undefined') {
       const root = document.documentElement;
       const body = document.body;
+
+      const colorSchemeMeta = document.querySelector('meta[name="color-scheme"]');
+      if (colorSchemeMeta) {
+        colorSchemeMeta.setAttribute('content', theme);
+      }
 
       if (theme === 'dark') {
         root.classList.add('dark-theme', 'dark-mode');

@@ -860,7 +860,11 @@ public class AdminController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generando copia de seguridad SQL.");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error al generar copia de seguridad SQL.", detail = ex.Message });
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                message = "Error interno al generar la copia de seguridad SQL.",
+                detail = _env.IsDevelopment() ? ex.Message : null
+            });
         }
     }
 

@@ -38,6 +38,17 @@ public class FilesController : ControllerBase
             return NotFound();
         }
 
+        var normalizedKey = Uri.UnescapeDataString(key).Replace('\\', '/').TrimStart('/');
+
+        // Bloqueo explícito de path traversal y null-bytes antes de tocar base de datos o sistema de archivos.
+        if (normalizedKey.Contains("..", StringComparison.Ordinal)
+            || key.Contains("..", StringComparison.Ordinal)
+            || normalizedKey.Contains('\0')
+            || key.Contains("%00", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "Ruta de archivo no válida." });
+        }
+
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
         {
@@ -45,13 +56,6 @@ public class FilesController : ControllerBase
         }
 
         var isAdmin = IsAdmin(currentUser.Rol?.Nombre);
-        var normalizedKey = key.Replace('\\', '/').TrimStart('/');
-
-        // Bloqueo explícito de path traversal antes de tocar el sistema de archivos.
-        if (normalizedKey.Contains("..", StringComparison.Ordinal) || normalizedKey.Contains('\0'))
-        {
-            return BadRequest(new { message = "Ruta de archivo no válida." });
-        }
 
         var isLegacy = normalizedKey.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase);
 

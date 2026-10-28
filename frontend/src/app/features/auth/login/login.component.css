@@ -343,14 +343,22 @@
   transition: color 0.3s;
 }
 
-.register-prompt a {
+.register-prompt a,
+.register-prompt .btn-inline-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
   color: var(--primary-hover);
   text-decoration: none;
   font-weight: 700;
+  cursor: pointer;
   transition: color 0.15s;
 }
 
-.register-prompt a:hover {
+.register-prompt a:hover,
+.register-prompt .btn-inline-link:hover {
   text-decoration: underline;
   color: var(--primary);
 }
@@ -361,7 +369,9 @@
 :host-context(body.dark-theme) .portal-subtitle,
 :host-context(body.dark-mode) .portal-subtitle,
 :host-context(body.dark-theme) .register-prompt a,
-:host-context(body.dark-mode) .register-prompt a {
+:host-context(body.dark-mode) .register-prompt a,
+:host-context(body.dark-theme) .register-prompt .btn-inline-link,
+:host-context(body.dark-mode) .register-prompt .btn-inline-link {
   color: #38bdf8;
 }
 

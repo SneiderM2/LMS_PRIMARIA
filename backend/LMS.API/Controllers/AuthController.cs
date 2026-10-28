@@ -743,7 +743,7 @@ public class AuthController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var user = await GetCurrentUserAsync(includeStudent: false);
+        var user = await GetCurrentUserAsync(includeStudent: true);
         if (user == null || !user.Activo)
         {
             return Unauthorized();
@@ -790,16 +790,27 @@ public class AuthController : ControllerBase
         }
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword, workFactor: 12);
+        // Rotar SessionToken para invalidar inmediatamente sesiones previas o comprometidas en otros dispositivos.
+        user.SessionToken = Guid.NewGuid().ToString("N");
         user.AccessFailedCount = 0;
         user.LockoutEnd = null;
         await _context.SaveChangesAsync();
 
+        var (newToken, newExpiration) = _tokenService.GenerateToken(
+            user,
+            user.FullName,
+            user.Rol?.Nombre ?? "ALUMNO",
+            user.Alumno?.Grado?.Nombre,
+            user.AvatarUrl);
+
         await AuditAsync(user, "Autenticación: Cambio de contraseña exitoso",
-            "Contraseña actualizada cumpliendo política estricta y hash BCrypt (workFactor 12).");
+            "Contraseña actualizada cumpliendo política estricta, hash BCrypt (workFactor 12) y rotación de sesión.");
 
         return Ok(new
         {
-            message = "Tu contraseña ha sido actualizada exitosamente."
+            message = "Tu contraseña ha sido actualizada exitosamente.",
+            token = newToken,
+            expiration = newExpiration
         });
     }
 

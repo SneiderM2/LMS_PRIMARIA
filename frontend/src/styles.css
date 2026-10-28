@@ -3,7 +3,15 @@
    ========================================================================== */
 
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
+
+  &:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+  }
+
+  &:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+  }
 
   /* Paleta de Colores Estimulante y Cómoda para Primaria */
   --primary: #0284c7;        /* Azul Cielo Equilibrado (WCAG AA) */
@@ -84,7 +92,7 @@ html, body {
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-main);
 }
 
 /* ==========================================================================
@@ -945,7 +953,23 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 3px solid #0284c7;
+  outline: 3px solid var(--primary, #0284c7);
+  outline-offset: 2px;
+}
+
+body.dark-theme button:focus-visible,
+body.dark-mode button:focus-visible,
+body.dark-theme a:focus-visible,
+body.dark-mode a:focus-visible,
+body.dark-theme input:focus-visible,
+body.dark-mode input:focus-visible,
+body.dark-theme select:focus-visible,
+body.dark-mode select:focus-visible,
+body.dark-theme textarea:focus-visible,
+body.dark-mode textarea:focus-visible,
+body.dark-theme [tabindex]:focus-visible,
+body.dark-mode [tabindex]:focus-visible {
+  outline: 3px solid #38bdf8;
   outline-offset: 2px;
 }
 

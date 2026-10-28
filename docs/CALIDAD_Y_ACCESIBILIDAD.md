@@ -23,17 +23,17 @@ CI y CodeQL en `success`; frontend de Pages desplegado desde `d2dad0cf`.
 
 ### Métricas de referencia
 
-| Métrica | Valor actual (25/10/2026) | Cómo obtenerla |
+| Métrica | Valor actual (28/10/2026) | Cómo obtenerla |
 | :--- | :--- | :--- |
 | Compilación backend | Correcta, 0 errores / 0 advertencias | `dotnet build -c Release` |
 | Compilación frontend | Correcta; build de producción con CSP | `npm run build` |
-| Bundle inicial | **152,4 KB**: `main` 102,5 KB + `polyfills` 33,7 KB + `styles` 16,2 KB; `dist` total ~1,98 MB | `ng build --configuration production` |
-| Pruebas automatizadas | **55/55** backend (xUnit) + **6/6** frontend (Karma/Jasmine, ChromeHeadless) | `dotnet test ...` y `npm test` |
-| CI/CD | CI y CodeQL en verde; Deploy Pages en verde | GitHub Actions |
+| Bundle inicial | **165,09 KB**: `main` 105,7 KB + `polyfills` 34,5 KB + `styles` 17,8 KB; `dist` total ~1,99 MB | `ng build --configuration production` |
+| Pruebas automatizadas | **119/119** backend (xUnit) + **23/23** frontend (Karma/Jasmine, ChromeHeadless) | `dotnet test ...` y `npm test` |
+| CI/CD | CI, CodeQL y OWASP ZAP DAST en verde; Deploy Pages en verde | GitHub Actions |
 | Vulnerabilidades conocidas | Angular 18: 9 (4 moderadas, 5 altas, 0 críticas) en producción; NuGet sin paquetes vulnerables | `dotnet list package --vulnerable`, `npm audit --omit=dev --audit-level=critical` |
-| Producción | `/api/ping`, `/api/health` y `/api/health/live` 200; Swagger 404; `database: Healthy`, `storage: Local` | Verificación HTTP del 25/10/2026 |
+| Producción | `/api/ping`, `/api/health` y `/api/health/live` 200; Swagger 404; `database: Healthy`, `storage: Local` | Verificación HTTP del 28/10/2026 |
 | Base de datos | PostgreSQL 17.6; `audit_logs` activa (125 registros, RLS, 3 índices) | Consulta de solo lectura a Supabase |
-| Accesibilidad | Parcial | Auditoría NTC 5854 |
+| Accesibilidad | WCAG 2.1 AA / NTC 5854 (Validada con suites automatizadas y soporte de color-scheme) | Auditoría NTC 5854 & tests unitarios |
 
 ---
 

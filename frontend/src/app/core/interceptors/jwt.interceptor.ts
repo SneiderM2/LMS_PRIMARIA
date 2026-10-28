@@ -3,7 +3,37 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { ServerStatusService } from '../services/server-status.service';
+import { getApiBaseUrl } from '../services/api.config';
 import { catchError, tap, throwError } from 'rxjs';
+
+/**
+ * Verifica estrictamente si la URL destino pertenece al backend de confianza del LMS
+ * para prevenir fugas del token JWT hacia dominios de terceros (CWE-200 / CWE-522).
+ */
+export function isTrustedApiUrl(url: string): boolean {
+  if (!url) return false;
+  if (url === '/api' || url.startsWith('/api/')) {
+    return true;
+  }
+
+  try {
+    const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4200';
+    const parsedReq = new URL(url, baseOrigin);
+    const configuredApiOrigin = new URL(getApiBaseUrl(), baseOrigin).origin;
+
+    const trustedOrigins = new Set<string>([
+      configuredApiOrigin,
+      'https://lms-primaria.onrender.com',
+      'http://localhost:5000',
+      'http://127.0.0.1:5000'
+    ]);
+
+    return trustedOrigins.has(parsedReq.origin) &&
+           (parsedReq.pathname === '/api' || parsedReq.pathname.startsWith('/api/'));
+  } catch {
+    return false;
+  }
+}
 
 export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
@@ -11,10 +41,7 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   const serverStatus = inject(ServerStatusService);
 
   const token = authService.getToken();
-  const isApiUrl = req.url.includes('onrender.com') || 
-                   req.url.includes('localhost:5000') || 
-                   req.url.startsWith('/api') ||
-                   req.url.includes('/api/');
+  const isApiUrl = isTrustedApiUrl(req.url);
 
   const skipRedirect = req.headers.has('X-Skip-Interceptor-Redirect');
 

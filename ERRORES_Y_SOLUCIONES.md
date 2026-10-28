@@ -29,6 +29,10 @@ Registro histórico de errores, bugs y problemas técnicos encontrados durante e
 | 19 | Backend / Render / Startup | Timeout en deploy de Render por inicialización bloqueante de BD (`DbInitializer`) | ✅ Resuelto |
 | 20 | Rendimiento / Auth | Login demoraba ~20 segundos (Render Cold Start + inicialización pesada) | ✅ Resuelto |
 | 21 | Frontend / i18n | Desfase y traducción incompleta en vistas dinámicas de Angular (i18n) | ✅ Resuelto |
+| 22 | Backend / Seguridad | BOLA/IDOR en asignación de contenidos y matrícula escolar cruzada | ✅ Resuelto |
+| 23 | Backend / Sesión | Persistencia de sesiones previas activas tras cambio de contraseña | ✅ Resuelto |
+| 24 | Frontend / Seguridad | Fuga potencial de credenciales JWT hacia recursos de terceros (CWE-200) | ✅ Resuelto |
+| 25 | Frontend / UI & A11y | Desbalance de contraste en Modo Oscuro, colisión de controles y enlaces `javascript:` | ✅ Resuelto |
 
 ---
 
@@ -851,6 +855,111 @@ Al intentar iniciar sesión o registrarse, el sistema indicaba *"Por favor compl
 
 ---
 
+### #22 — BOLA/IDOR en asignación de contenidos y matrícula escolar cruzada
+
+**Categoría:** Backend / Seguridad & Autorización  
+**Fecha:** 2026-10-28  
+**Gravedad:** 🔴 Crítico
+
+**Síntoma:**
+Un docente malicioso o cuenta comprometida podía asociar contenidos (`CreateContent`) o asignar tareas a cursos que pertenecían a otros profesores manipulando el identificador numérico de curso (`CourseId`). De igual manera, un estudiante podía matricularse en cursos correspondientes a grados distintos al suyo alterando la llamada a `EnrollInCourse`.
+
+**Causa:**
+`TeacherController.cs` carecía de verificación de titularidad (`c.DocenteId == currentUser.Id` o rol Admin) al resolver cursos automáticos o validar pertenencia en la creación de contenidos. En `StudentController.cs`, la acción `EnrollInCourse` verificaba la existencia del curso pero no contrastaba su `GradoId` con el `GradoId` asignado en el perfil del estudiante.
+
+**Solución aplicada:**
+- En `TeacherController.cs`, se implementó validación de autorización con `CanManageCourseAsync(courseId, currentUser)` en `CreateContent` y resolución restringida de cursos por `DocenteId`.
+- En `StudentController.cs`, se añadió una comprobación estricta: `if (course.GradoId != student.GradoId) return Forbid(...)`.
+- Se crearon suites unitarias dedicadas en `TeacherControllerSecurityTests.cs` y `StudentControllerSecurityTests.cs`.
+
+**Archivos afectados:**
+- `backend/LMS.API/Controllers/TeacherController.cs`
+- `backend/LMS.API/Controllers/StudentController.cs`
+- `backend/LMS.API.Tests/TeacherControllerSecurityTests.cs`
+- `backend/LMS.API.Tests/StudentControllerSecurityTests.cs`
+
+---
+
+### #23 — Persistencia de sesiones previas activas tras cambio de contraseña
+
+**Categoría:** Backend & Frontend / Autenticación & Sesión  
+**Fecha:** 2026-10-28  
+**Gravedad:** 🔴 Alta
+
+**Síntoma:**
+Cuando un usuario cambiaba su contraseña tras sospechar un acceso no autorizado, los tokens JWT previamente emitidos para otros dispositivos permanecían vigentes hasta su tiempo natural de expiración (8 horas).
+
+**Causa:**
+El método `ChangePassword` en `AuthController.cs` actualizaba únicamente el hash de la contraseña (`PasswordHash`), sin rotar el campo `user.SessionToken`.
+
+**Solución aplicada:**
+- En `AuthController.cs`, se regeneró el identificador de sesión `user.SessionToken = Guid.NewGuid().ToString("N")` al cambiar la clave y se emitió un nuevo JWT firmado en la respuesta.
+- En `auth.service.ts`, el cliente actualiza inmediatamente el token en `localStorage` tras la respuesta de éxito.
+- Se verificó mediante prueba unitaria en `AuthControllerSecurityTests.cs` y `auth.service.spec.ts`.
+
+**Archivos afectados:**
+- `backend/LMS.API/Controllers/AuthController.cs`
+- `frontend/src/app/core/services/auth.service.ts`
+- `backend/LMS.API.Tests/AuthControllerSecurityTests.cs`
+- `frontend/src/app/core/services/auth.service.spec.ts`
+
+---
+
+### #24 — Fuga potencial de credenciales JWT hacia recursos de terceros (CWE-200)
+
+**Categoría:** Frontend / Seguridad HTTP  
+**Fecha:** 2026-10-28  
+**Gravedad:** 🟠 Media-Alta
+
+**Síntoma:**
+Cualquier llamada HTTP saliente a URLs que contuvieran subcadenas como `onrender.com` o `/api/` (ej. avatares externos o CDNs) recibía automáticamente la cabecera `Authorization: Bearer <token>`.
+
+**Causa:**
+La comprobación `isApiUrl` en `jwt.interceptor.ts` utilizaba `req.url.includes('onrender.com') || req.url.includes('/api/')`, coincidiendo con dominios de terceros ajenos a la escuela.
+
+**Solución aplicada:**
+- Se implementó la función `isTrustedApiUrl(url: string)` que compara estrictamente el origen canónico del backend (`getApiBaseUrl()`, `localhost:5000` o `https://lms-primaria.onrender.com`) y el prefijo `/api/`.
+- Se crearon pruebas automatizadas en `jwt.interceptor.spec.ts` simulando URLs legítimas y maliciosas.
+
+**Archivos afectados:**
+- `frontend/src/app/core/interceptors/jwt.interceptor.ts`
+- `frontend/src/app/core/interceptors/jwt.interceptor.spec.ts`
+
+---
+
+### #25 — Desbalance de contraste en Modo Oscuro, colisión de controles y enlaces `javascript:`
+
+**Categoría:** Frontend / UI, Accesibilidad & CSP  
+**Fecha:** 2026-10-28  
+**Gravedad:** 🟡 Media
+
+**Síntoma:**
+1. En pantallas móviles (`<= 480px`), el botón flotante de tema recuperaba `position: fixed` por especificidad de Angular, solapándose sobre el botón del formulario de login.
+2. Cajas y textos en los dashboards usaban colores fijos (`#0f172a`, `#e2e8f0`) que en modo oscuro resultaban invisibles o de contraste deficiente.
+3. El uso de `href="javascript:void(0)"` generaba advertencias de accesibilidad y violaba directivas estrictas de CSP.
+
+**Causa:**
+Falta de variables semánticas en plantillas HTML y falta de sincronización del `<meta name="color-scheme">`.
+
+**Solución aplicada:**
+- Se adoptó `<meta name="color-scheme" content="light dark">` y se mapeó en CSS con `:root`.
+- Se reemplazaron colores fijos en línea por variables CSS (`var(--text-main)`, `var(--bg-surface-alt)`, `var(--border-color)`).
+- Se reemplazaron los enlaces por botones accesibles `<button type="button" class="btn-inline-link">`.
+- Se añadió prueba de accesibilidad automatizada en `login.accessibility.spec.ts`.
+
+**Archivos afectados:**
+- `frontend/src/index.html`
+- `frontend/src/index.production.html`
+- `frontend/src/styles.css`
+- `frontend/src/app/features/auth/login/login.component.html`
+- `frontend/src/app/features/admin/admin-dashboard.component.html`
+- `frontend/src/app/features/student/student-dashboard.component.html`
+- `frontend/src/app/features/teacher/teacher-dashboard.component.html`
+- `frontend/src/app/shared/components/theme-toggle/theme-toggle.component.css`
+- `frontend/src/app/features/auth/login/login.accessibility.spec.ts`
+
+---
+
 | Categoría | Total de Errores |
 |:---|:---:|
 | 🔴 Backend / Base de Datos | 2 |
@@ -860,14 +969,17 @@ Al intentar iniciar sesión o registrarse, el sistema indicaba *"Por favor compl
 | 🔴 Frontend / SPA / GitHub Pages | 3 |
 | 🔴 Frontend / PWA / Service Worker | 2 |
 | 🟡 Frontend / Angular | 1 |
-| 🔴 Backend / Autenticación | 1 |
+| 🔴 Backend / Autenticación & Sesión | 2 |
 | 🟢 Frontend / UX | 1 |
 | 🟡 Frontend / Deploy (GitHub Pages) | 1 |
 | 🟡 Frontend / System Inspector | 1 |
 | 🟢 Frontend / Avatares / Assets | 1 |
 | 🟡 Frontend / Internacionalización (i18n) | 1 |
 | 🔴 Seguridad / reCAPTCHA & Auth Bypass | 1 |
-| **Total** | **22** |
+| 🔴 Backend / Autorización & IDOR | 1 |
+| 🟠 Frontend / Seguridad HTTP & Tokens | 1 |
+| 🟡 Frontend / Accesibilidad & Dark Mode | 1 |
+| **Total** | **26** |
 
 ---
 

@@ -1,12 +1,11 @@
 # Matriz de riesgos de seguridad y privacidad
 
 **Metodología:** probabilidad (1-5) × impacto (1-5). Nivel: bajo (1-6), medio (7-12), alto (13-19), crítico (20-25).
-**Fecha de revisión:** 2026-10-25 · **Revisión:** anual o tras incidente.
+**Fecha de revisión:** 2026-10-28 · **Revisión:** anual o tras incidente.
 
-> **Estado verificado el 25/10/2026:** backend y frontend desplegados; `audit_logs` activa en
-> PostgreSQL 17.6 (125 registros, RLS y 3 índices); CI/CodeQL en verde; 55/55 pruebas backend y
-> 6/6 frontend. Persisten `storage: Local`, la ausencia de respaldos automáticos y los datos
-> institucionales incompletos.
+> **Estado verificado el 28/10/2026:** backend y frontend desplegados; `audit_logs` activa en
+> PostgreSQL 17.6 (125 registros, RLS y 3 índices); CI/CodeQL en verde; **119/119 pruebas backend** y
+> **23/23 frontend** aprobadas. Pipeline DAST OWASP ZAP integrado en GitHub Actions.
 
 | ID | Riesgo | Prob. | Impacto | Nivel | Tratamiento | Control implementado | Responsable | Estado |
 | :---: | :--- | :---: | :---: | :---: | :--- | :--- | :--- | :--- |
@@ -14,7 +13,7 @@
 | R-02 | Fuga de la clave JWT y suplantación de administradores | 3 | 5 | **Crítico** | Mitigar | Clave de 48+ caracteres, expiración, sesión única, revocación; **rotación pendiente de confirmar** | TI | En tratamiento |
 | R-03 | Ejecución remota de SQL mediante la restauración de respaldos | 2 | 5 | **Crítico** | Evitar | Endpoint deshabilitado por defecto, confirmación, lista negra, solo desarrollo | Desarrollo | Mitigado |
 | R-04 | Acceso no autorizado a archivos de tareas de menores | 4 | 4 | **Alto** | Mitigar | Almacenamiento privado, descarga autenticada, autorización por propietario/docente, firma binaria | Desarrollo | Mitigado (acceso); persistencia pendiente en R-23 |
-| R-05 | IDOR en calificaciones, matrículas o cursos de otros docentes | 4 | 3 | **Alto** | Mitigar | Validación de pertenencia de curso en cada endpoint | Desarrollo | Mitigado |
+| R-05 | IDOR/BOLA en calificaciones, matrículas o cursos de otros docentes | 2 | 4 | **Medio** | Mitigar | Validación de titularidad (`CanManageCourseAsync`) en creación de contenidos y comprobación de grado en matrícula estudiantil | Desarrollo | Mitigado |
 | R-06 | Auto-registro como administrador o docente | 3 | 5 | **Crítico** | Evitar | Registro público solo estudiantes; docentes con código; admin solo desde panel | Desarrollo | Mitigado |
 | R-07 | Fuerza bruta o credential stuffing | 5 | 3 | **Alto** | Mitigar | Bloqueo 15 min, rate limit 30/min en autenticación, CAPTCHA, mensajes uniformes | Desarrollo | Mitigado |
 | R-08 | Secuestro de sesión por XSS en el frontend | 3 | 4 | **Alto** | Mitigar | Angular escapa HTML, sin `innerHTML` con datos, CSP por `<meta>` en Pages y CSP de API, expiración; evaluar cookies HttpOnly | Desarrollo | Parcial |
@@ -29,7 +28,7 @@
 | R-17 | CAPTCHA deshabilitado o con claves de prueba en producción | 2 | 4 | **Medio** | Mitigar | Fail-closed, bypass solo en Development y con bandera, clave por entorno | Desarrollo | Mitigado |
 | R-18 | CORS abierto con credenciales | 3 | 4 | **Alto** | Evitar | Lista blanca explícita, sin comodín, sin `AllowCredentials` | Desarrollo | Mitigado |
 | R-19 | Restauración de respaldo con datos incompletos o corruptos | 3 | 4 | **Alto** | Mitigar | Verificación, entorno de pruebas, respaldo previo, procedimiento documentado | TI | Parcial |
-| R-20 | Incumplimiento de accesibilidad (NTC 5854) | 4 | 2 | **Medio** | Mitigar | Etiquetas, foco, contraste, auditoría pendiente | Desarrollo | Parcial |
+| R-20 | Incumplimiento de accesibilidad (NTC 5854 / WCAG 2.1 AA) | 2 | 2 | **Bajo** | Mitigar | Eliminación de `javascript:void(0)`, etiquetas obligatorias, `:focus-visible`, sincronización `color-scheme` y suite de pruebas | Desarrollo | Mitigado |
 | R-21 | Falsificación de `X-Forwarded-For` para eludir límites por IP | 3 | 2 | **Medio** | Mitigar | Render sobrescribe el encabezado en su proxy; límites por IP complementados con bloqueo por cuenta | TI | Aceptado |
 | R-22 | Política pública de privacidad desactualizada (dice «12 caracteres» y «Por definir») | 4 | 2 | **Medio** | Mitigar | Corregir `frontend/public/privacidad.html` a la política real 8–64 y completar los datos del responsable | DPO / TI | En tratamiento |
 | R-23 | Pérdida de adjuntos por almacenamiento local efímero en Render | 4 | 3 | **Medio** | Mitigar | Bucket privado `lms-uploads` listo; falta configurar `Storage__Provider=Supabase` y la Service Role Key, y respaldar los objetos | TI | En tratamiento |

@@ -562,7 +562,7 @@
         <div class="crud-users-card glass-panel" style="padding: 1.5rem;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
             <div>
-              <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a;">{{ 'stats.chartWeeklyTitle' | translate }}</h3>
+              <h3 style="margin: 0; font-size: 1.15rem; color: var(--text-main);">{{ 'stats.chartWeeklyTitle' | translate }}</h3>
               <p style="margin: 2px 0 0; font-size: 0.85rem; color: var(--text-muted);">{{ 'stats.chartWeeklySub' | translate }}</p>
             </div>
             <span class="badge-active" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">{{ 'stats.isoWeeks' | translate }}</span>
@@ -580,7 +580,7 @@
         <div class="crud-users-card glass-panel" style="padding: 1.5rem;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
             <div>
-              <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a;">{{ 'stats.chartGradesTitle' | translate }}</h3>
+              <h3 style="margin: 0; font-size: 1.15rem; color: var(--text-main);">{{ 'stats.chartGradesTitle' | translate }}</h3>
               <p style="margin: 2px 0 0; font-size: 0.85rem; color: var(--text-muted);">{{ 'stats.chartGradesSub' | translate }}</p>
             </div>
             <span class="badge-active" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">{{ 'stats.scale' | translate }}</span>
@@ -598,14 +598,14 @@
 
       <!-- Alumnos Activos por Grado Escolar -->
       <div *ngIf="!isLoadingActivityStats && activityStats" class="crud-users-card glass-panel" style="padding: 1.5rem;">
-        <h3 style="margin: 0 0 0.5rem; font-size: 1.15rem; color: #0f172a;">{{ 'stats.activeByGradeTitle' | translate }}</h3>
+        <h3 style="margin: 0 0 0.5rem; font-size: 1.15rem; color: var(--text-main);">{{ 'stats.activeByGradeTitle' | translate }}</h3>
         <p style="margin: 0 0 1.25rem; font-size: 0.85rem; color: var(--text-muted);">{{ 'stats.activeByGradeSub' | translate }}</p>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem;">
-          <div *ngFor="let g of activityStats.activeStudentsByGrade" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius-sm); padding: 1rem; text-align: center;">
+          <div *ngFor="let g of activityStats.activeStudentsByGrade" style="background: var(--bg-surface-alt); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1rem; text-align: center;">
             <div style="font-size: 1.25rem; margin-bottom: 0.25rem;">⭐</div>
-            <strong style="display: block; font-size: 0.95rem; color: #0f172a;">{{ g.grade }}</strong>
-            <span style="font-size: 0.85rem; color: #0284c7; font-weight: 700;">{{ g.count }} {{ 'admin.metricStudentsTag' | translate }}</span>
+            <strong style="display: block; font-size: 0.95rem; color: var(--text-main);">{{ g.grade }}</strong>
+            <span style="font-size: 0.85rem; color: var(--primary); font-weight: 700;">{{ g.count }} {{ 'admin.metricStudentsTag' | translate }}</span>
           </div>
         </div>
       </div>

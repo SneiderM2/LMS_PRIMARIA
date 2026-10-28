@@ -31,7 +31,7 @@ interface ComputedArc {
             [attr.cy]="center"
             [attr.r]="radius"
             fill="transparent"
-            stroke="#e2e8f0"
+            stroke="var(--border-color, #e2e8f0)"
             [attr.stroke-width]="strokeWidth" />
 
           <!-- Colored Segments -->

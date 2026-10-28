@@ -1,0 +1,35 @@
+name: OWASP ZAP DAST Baseline Scan
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1' # Lunes 06:00 UTC
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  owasp_zap_baseline:
+    name: OWASP ZAP Passive DAST Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: OWASP ZAP Baseline Scan against API & Portal
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: 'https://lms-primaria.onrender.com/api/health'
+          cmd_options: '-a -j'
+          fail_action: false
+
+      - name: Upload OWASP ZAP Security Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owasp-zap-dast-reports
+          path: |
+            report_html.html
+            report_md.md
+            report_json.json

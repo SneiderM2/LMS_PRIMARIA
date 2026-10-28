@@ -502,6 +502,14 @@ public class StudentController : ControllerBase
         var course = await _context.Cursos.FirstOrDefaultAsync(c => c.Id == courseId && c.Activo);
         if (course == null) return NotFound(new { message = "La clase no existe o está inactiva." });
 
+        if (course.GradoId != student.GradoId)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "No tienes autorización para inscribirte a cursos de un grado académico diferente al tuyo."
+            });
+        }
+
         var existingEnrollment = student.Inscripciones.FirstOrDefault(i => i.CursoId == courseId);
         if (existingEnrollment != null)
         {

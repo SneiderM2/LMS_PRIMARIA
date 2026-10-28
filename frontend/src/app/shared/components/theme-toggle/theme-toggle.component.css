@@ -48,6 +48,11 @@
   transform: translateY(1px) scale(0.92);
 }
 
+.theme-emoji-btn:focus-visible {
+  outline: 3px solid var(--primary, #0284c7);
+  outline-offset: 3px;
+}
+
 /* Estado modo oscuro */
 .theme-emoji-btn.dark-active {
   background: rgba(30, 41, 59, 0.9);
@@ -57,6 +62,11 @@
     0 0 0 0 rgba(168, 85, 247, 0);
 }
 
+.theme-emoji-btn.dark-active:focus-visible {
+  outline: 3px solid #38bdf8;
+  outline-offset: 3px;
+}
+
 .theme-emoji-btn.dark-active:hover {
   box-shadow:
     0 8px 22px rgba(0, 0, 0, 0.4),
@@ -64,13 +74,12 @@
   border-color: #a855f7;
 }
 
-/* Responsive: más pequeño en móvil */
-@media (max-width: 480px) {
+/* Responsive: alineado con .floating-controls en móvil (<= 600px) para evitar solapamiento */
+@media (max-width: 600px) {
   .theme-emoji-btn {
+    position: static;
     width: 42px;
     height: 42px;
     font-size: 1.25rem;
-    bottom: 1rem;
-    right: 1rem;
   }
 }
