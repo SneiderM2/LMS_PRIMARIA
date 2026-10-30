@@ -11,7 +11,41 @@ public class ConsentRequestDto
 
     public string? GuardianFullName { get; set; }
     public string? GuardianDocument { get; set; }
+    public string? GuardianDocumentType { get; set; } = "CC";
     public bool GuardianAuthorization { get; set; }
+    public bool AutorizaServicioEducativo { get; set; } = true;
+    public bool AutorizaDatosOpcionales { get; set; } = false;
+    public bool AutorizaTransmisionInternacional { get; set; } = true;
+}
+
+public class SolicitudArcoCreateDto
+{
+    /// <summary>
+    /// Tipo de solicitud ARCO: CONOCER (Consulta - 10 días hábiles),
+    /// ACTUALIZAR, RECTIFICAR, SUPRIMIR o REVOCAR (Reclamo - 15 días hábiles).
+    /// </summary>
+    [Required(ErrorMessage = "El tipo de solicitud ARCO es obligatorio.")]
+    [MaxLength(30)]
+    public string TipoSolicitud { get; set; } = "CONOCER";
+
+    [Required(ErrorMessage = "La descripción de la solicitud es obligatoria.")]
+    [MinLength(10, ErrorMessage = "Describa su solicitud con al menos 10 caracteres.")]
+    [MaxLength(2000)]
+    public string Descripcion { get; set; } = string.Empty;
+
+    [MaxLength(150)]
+    public string? SolicitanteNombre { get; set; }
+
+    [MaxLength(50)]
+    public string? SolicitanteDocumento { get; set; }
+}
+
+public class RevokeGuardianConsentDto
+{
+    [Required(ErrorMessage = "Debe indicar el motivo de la revocatoria del consentimiento.")]
+    [MinLength(5)]
+    [MaxLength(500)]
+    public string Motivo { get; set; } = string.Empty;
 }
 
 public class DeleteAccountDto

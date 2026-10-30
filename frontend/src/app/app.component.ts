@@ -60,7 +60,12 @@ export class AppComponent implements OnInit, OnDestroy {
       return false;
     }
 
-    return user.dataPolicyAccepted === false || user.requiresPolicyAcceptance === true;
+    return (
+      user.dataPolicyAccepted === false ||
+      user.requiresPolicyAcceptance === true ||
+      user.hasActiveMinorConsent === false ||
+      this.authService.requiresPolicyAcceptance()
+    );
   }
 
   public get requiresGuardian(): boolean {

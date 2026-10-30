@@ -30,8 +30,13 @@ public class GoogleRecaptchaService : ICaptchaService
         _logger = logger;
     }
 
+    private static bool IsConfiguredValue(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+           && !(value.Trim().StartsWith("__ENV_", StringComparison.OrdinalIgnoreCase)
+                && value.Trim().EndsWith("__", StringComparison.OrdinalIgnoreCase));
+
     private static string? FirstNonEmpty(params string?[] values)
-        => values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+        => values.FirstOrDefault(IsConfiguredValue);
 
     /// <summary>
     /// El bypass solo existe en Development y debe habilitarse explícitamente.

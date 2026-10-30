@@ -94,15 +94,15 @@ public sealed class AuditLogDbBackgroundService : BackgroundService
                     Timestamp = parsedTime,
                     Level = e.Level ?? "INFO",
                     Method = e.Method ?? "GET",
-                    Path = e.Path ?? "/",
+                    Path = RequestLoggingMiddleware.SanitizeSensitiveText(e.Path) ?? "/",
                     StatusCode = e.StatusCode,
                     ElapsedMs = e.ElapsedMs,
                     Ip = e.Ip ?? "0.0.0.0",
                     UserId = e.UserId,
                     UserEmail = e.UserEmail,
                     UserRole = e.UserRole,
-                    Action = e.Action ?? "Operación",
-                    Details = e.Details
+                    Action = RequestLoggingMiddleware.SanitizeSensitiveText(e.Action) ?? "Operación",
+                    Details = RequestLoggingMiddleware.SanitizeSensitiveText(e.Details)
                 };
             }).ToList();
 

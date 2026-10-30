@@ -20,6 +20,8 @@ public class LMSDbContext : DbContext
     public DbSet<ArchivoEntrega> ArchivosEntrega => Set<ArchivoEntrega>();
     public DbSet<Material> Materiales => Set<Material>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ConsentimientoHabeasData> ConsentimientosHabeasData => Set<ConsentimientoHabeasData>();
+    public DbSet<SolicitudArco> SolicitudesArco => Set<SolicitudArco>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -321,6 +323,78 @@ public class LMSDbContext : DbContext
 
             entity.HasIndex(a => a.Timestamp).HasDatabaseName("idx_audit_logs_timestamp");
             entity.HasIndex(a => a.Level).HasDatabaseName("idx_audit_logs_level");
+        });
+
+        // 13. CONSENTIMIENTO HABEAS DATA (Ley 1581 de 2012 Art. 7 y 9 / Decreto 1377 de 2013 / Ley 1098 de 2006)
+        modelBuilder.Entity<ConsentimientoHabeasData>(entity =>
+        {
+            entity.ToTable("consentimientos_habeas_data");
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            entity.Property(c => c.AlumnoId).HasColumnName("alumno_id").IsRequired();
+            entity.Property(c => c.UsuarioId).HasColumnName("usuario_id");
+            entity.Property(c => c.AcudienteNombre).HasColumnName("acudiente_nombre").HasMaxLength(150).IsRequired();
+            entity.Property(c => c.AcudienteDocumento).HasColumnName("acudiente_documento").HasMaxLength(50).IsRequired();
+            entity.Property(c => c.TipoDocumento).HasColumnName("tipo_documento").HasMaxLength(20).HasDefaultValue("CC").IsRequired();
+            entity.Property(c => c.VersionPolitica).HasColumnName("version_politica").HasMaxLength(32).IsRequired();
+            entity.Property(c => c.HashTextoPolitica).HasColumnName("hash_texto_politica").HasMaxLength(128).IsRequired();
+            entity.Property(c => c.AutorizaServicioEducativo).HasColumnName("autoriza_servicio_educativo").IsRequired();
+            entity.Property(c => c.AutorizaDatosOpcionales).HasColumnName("autoriza_datos_opcionales").HasDefaultValue(false);
+            entity.Property(c => c.AutorizaTransmisionInternacional).HasColumnName("autoriza_transmision_internacional").HasDefaultValue(false);
+            entity.Property(c => c.IpOrigen).HasColumnName("ip_origen").HasMaxLength(64).IsRequired();
+            entity.Property(c => c.UserAgent).HasColumnName("user_agent").HasMaxLength(300).IsRequired();
+            entity.Property(c => c.FechaAutorizacionUtc).HasColumnName("fecha_autorizacion_utc").IsRequired();
+            entity.Property(c => c.FechaRevocatoriaUtc).HasColumnName("fecha_revocatoria_utc");
+
+            entity.HasIndex(c => c.AlumnoId).HasDatabaseName("idx_consentimiento_alumno");
+            entity.HasIndex(c => new { c.AlumnoId, c.FechaRevocatoriaUtc }).HasDatabaseName("idx_consentimiento_alumno_vigente");
+
+            entity.HasOne(c => c.Alumno)
+                  .WithMany(a => a.ConsentimientosHabeasData)
+                  .HasForeignKey(c => c.AlumnoId)
+                  .OnDelete(DeleteBehavior.Cascade)
+                  .HasConstraintName("fk_consentimientos_alumnos");
+
+            entity.HasOne(c => c.Usuario)
+                  .WithMany(u => u.ConsentimientosHabeasData)
+                  .HasForeignKey(c => c.UsuarioId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .HasConstraintName("fk_consentimientos_usuarios");
+        });
+
+        // 14. SOLICITUDES ARCO (Ley 1581 de 2012 Art. 8, 14 y 15)
+        modelBuilder.Entity<SolicitudArco>(entity =>
+        {
+            entity.ToTable("solicitudes_arco");
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            entity.Property(s => s.UsuarioId).HasColumnName("usuario_id");
+            entity.Property(s => s.AlumnoId).HasColumnName("alumno_id");
+            entity.Property(s => s.SolicitanteNombre).HasColumnName("solicitante_nombre").HasMaxLength(150).IsRequired();
+            entity.Property(s => s.SolicitanteDocumento).HasColumnName("solicitante_documento").HasMaxLength(50).IsRequired();
+            entity.Property(s => s.TipoSolicitud).HasColumnName("tipo_solicitud").HasMaxLength(30).IsRequired();
+            entity.Property(s => s.Descripcion).HasColumnName("descripcion").HasMaxLength(2000).IsRequired();
+            entity.Property(s => s.Estado).HasColumnName("estado").HasMaxLength(30).HasDefaultValue("RADICADA").IsRequired();
+            entity.Property(s => s.FechaSolicitudUtc).HasColumnName("fecha_solicitud_utc").IsRequired();
+            entity.Property(s => s.FechaLimiteLegalUtc).HasColumnName("fecha_limite_legal_utc").IsRequired();
+            entity.Property(s => s.FechaRespuestaUtc).HasColumnName("fecha_respuesta_utc");
+            entity.Property(s => s.Respuesta).HasColumnName("respuesta").HasMaxLength(2000);
+            entity.Property(s => s.IpOrigen).HasColumnName("ip_origen").HasMaxLength(64);
+
+            entity.HasIndex(s => s.UsuarioId).HasDatabaseName("idx_solicitudes_arco_usuario");
+            entity.HasIndex(s => new { s.Estado, s.FechaLimiteLegalUtc }).HasDatabaseName("idx_solicitudes_arco_estado_limite");
+
+            entity.HasOne(s => s.Usuario)
+                  .WithMany(u => u.SolicitudesArco)
+                  .HasForeignKey(s => s.UsuarioId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .HasConstraintName("fk_solicitudes_arco_usuarios");
+
+            entity.HasOne(s => s.Alumno)
+                  .WithMany(a => a.SolicitudesArco)
+                  .HasForeignKey(s => s.AlumnoId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .HasConstraintName("fk_solicitudes_arco_alumnos");
         });
     }
 }

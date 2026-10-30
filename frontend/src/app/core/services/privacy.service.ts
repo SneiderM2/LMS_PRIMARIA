@@ -64,4 +64,44 @@ export class PrivacyService {
       reason
     });
   }
+
+  public getConsentStatus(): Observable<{
+    policyAccepted: boolean;
+    policyVersion: string;
+    currentPolicyVersion: string;
+    isStudent: boolean;
+    hasActiveMinorConsent: boolean;
+  }> {
+    return this.http.get<any>(`${this.apiUrl}/consent-status`);
+  }
+
+  public revokeConsent(motivo: string): Observable<{
+    message: string;
+    revokedAtUtc: string;
+    solicitudArcoId: number;
+    fechaLimiteLegalUtc: string;
+  }> {
+    return this.http.post<any>(`${this.apiUrl}/consent/revoke`, { motivo });
+  }
+
+  public createSolicitudArco(payload: {
+    tipoSolicitud: 'CONOCER' | 'ACTUALIZAR' | 'RECTIFICAR' | 'SUPRIMIR' | 'REVOCAR';
+    descripcion: string;
+    solicitanteNombre?: string;
+    solicitanteDocumento?: string;
+  }): Observable<{
+    id: number;
+    tipoSolicitud: string;
+    estado: string;
+    terminoDiasHabiles: number;
+    fechaSolicitudUtc: string;
+    fechaLimiteLegalUtc: string;
+    message: string;
+  }> {
+    return this.http.post<any>(`${this.apiUrl}/arco`, payload);
+  }
+
+  public getMySolicitudesArco(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/arco`);
+  }
 }

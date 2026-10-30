@@ -11,6 +11,7 @@ export interface User {
   dataPolicyAccepted?: boolean;
   dataPolicyVersion?: string;
   requiresPolicyAcceptance?: boolean;
+  hasActiveMinorConsent?: boolean;
 }
 
 export interface LoginRequest {
@@ -29,7 +30,11 @@ export interface RegisterRequest {
   teacherInviteCode?: string;
   guardianFullName?: string;
   guardianDocument?: string;
+  guardianDocumentType?: string;
   guardianAuthorization?: boolean;
+  autorizaServicioEducativo?: boolean;
+  autorizaDatosOpcionales?: boolean;
+  autorizaTransmisionInternacional?: boolean;
   acceptDataPolicy: boolean;
   dataPolicyVersion?: string;
   honeypotTrap?: string;
@@ -48,7 +53,11 @@ export interface ConsentPayload {
   version: string;
   guardianFullName?: string;
   guardianDocument?: string;
+  guardianDocumentType?: string;
   guardianAuthorization?: boolean;
+  autorizaServicioEducativo?: boolean;
+  autorizaDatosOpcionales?: boolean;
+  autorizaTransmisionInternacional?: boolean;
 }
 
 export interface TeacherStudent {

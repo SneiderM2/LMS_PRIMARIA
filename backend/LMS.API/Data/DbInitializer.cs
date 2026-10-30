@@ -364,7 +364,45 @@ public class DbInitializer
                 details TEXT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);
-            CREATE INDEX IF NOT EXISTS idx_audit_logs_level ON audit_logs (level);";
+            CREATE INDEX IF NOT EXISTS idx_audit_logs_level ON audit_logs (level);
+
+            CREATE TABLE IF NOT EXISTS consentimientos_habeas_data (
+                id SERIAL PRIMARY KEY,
+                alumno_id INT NOT NULL REFERENCES alumnos(usuario_id) ON DELETE CASCADE,
+                usuario_id INT NULL REFERENCES usuarios(id) ON DELETE SET NULL,
+                acudiente_nombre VARCHAR(150) NOT NULL,
+                acudiente_documento VARCHAR(50) NOT NULL,
+                tipo_documento VARCHAR(20) NOT NULL DEFAULT 'CC',
+                version_politica VARCHAR(32) NOT NULL,
+                hash_texto_politica VARCHAR(128) NOT NULL,
+                autoriza_servicio_educativo BOOLEAN NOT NULL,
+                autoriza_datos_opcionales BOOLEAN NOT NULL DEFAULT FALSE,
+                autoriza_transmision_internacional BOOLEAN NOT NULL DEFAULT FALSE,
+                ip_origen VARCHAR(64) NOT NULL,
+                user_agent VARCHAR(300) NOT NULL,
+                fecha_autorizacion_utc TIMESTAMPTZ NOT NULL,
+                fecha_revocatoria_utc TIMESTAMPTZ NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_consentimiento_alumno ON consentimientos_habeas_data (alumno_id);
+            CREATE INDEX IF NOT EXISTS idx_consentimiento_alumno_vigente ON consentimientos_habeas_data (alumno_id, fecha_revocatoria_utc);
+
+            CREATE TABLE IF NOT EXISTS solicitudes_arco (
+                id SERIAL PRIMARY KEY,
+                usuario_id INT NULL REFERENCES usuarios(id) ON DELETE SET NULL,
+                alumno_id INT NULL REFERENCES alumnos(usuario_id) ON DELETE SET NULL,
+                solicitante_nombre VARCHAR(150) NOT NULL,
+                solicitante_documento VARCHAR(50) NOT NULL,
+                tipo_solicitud VARCHAR(30) NOT NULL,
+                descripcion VARCHAR(2000) NOT NULL,
+                estado VARCHAR(30) NOT NULL DEFAULT 'RADICADA',
+                fecha_solicitud_utc TIMESTAMPTZ NOT NULL,
+                fecha_limite_legal_utc TIMESTAMPTZ NOT NULL,
+                fecha_respuesta_utc TIMESTAMPTZ NULL,
+                respuesta VARCHAR(2000) NULL,
+                ip_origen VARCHAR(64) NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_solicitudes_arco_usuario ON solicitudes_arco (usuario_id);
+            CREATE INDEX IF NOT EXISTS idx_solicitudes_arco_estado_limite ON solicitudes_arco (estado, fecha_limite_legal_utc);";
             await auditCmd.ExecuteNonQueryAsync();
 
             // La tabla no debe quedar expuesta por la Data API a roles anónimos.

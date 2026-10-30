@@ -37,7 +37,11 @@ public class AcceptDataPolicyDto
 
     public string? GuardianFullName { get; set; }
     public string? GuardianDocument { get; set; }
+    public string? GuardianDocumentType { get; set; } = "CC";
     public bool GuardianAuthorization { get; set; }
+    public bool AutorizaServicioEducativo { get; set; } = true;
+    public bool AutorizaDatosOpcionales { get; set; } = false;
+    public bool AutorizaTransmisionInternacional { get; set; } = true;
 }
 
 public class GoogleLoginDto
@@ -99,7 +103,11 @@ public class RegisterRequestDto
     // Autorización del representante legal para menores de edad (Ley 1581 de 2012, art. 7).
     public string? GuardianFullName { get; set; }
     public string? GuardianDocument { get; set; }
+    public string? GuardianDocumentType { get; set; } = "CC";
     public bool GuardianAuthorization { get; set; }
+    public bool AutorizaServicioEducativo { get; set; } = true;
+    public bool AutorizaDatosOpcionales { get; set; } = false;
+    public bool AutorizaTransmisionInternacional { get; set; } = true;
 
     /// <summary>Aceptación explícita de la política de tratamiento de datos.</summary>
     public bool AcceptDataPolicy { get; set; }
@@ -130,6 +138,7 @@ public class UserDto
     public bool DataPolicyAccepted { get; set; } = false;
     public string? DataPolicyVersion { get; set; }
     public bool RequiresPolicyAcceptance { get; set; } = false;
+    public bool HasActiveMinorConsent { get; set; } = true;
 }
 
 public class ChangePasswordDto

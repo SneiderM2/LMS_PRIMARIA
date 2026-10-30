@@ -29,8 +29,13 @@ if (builder.Environment.IsDevelopment())
 }
 builder.Configuration.AddEnvironmentVariables();
 
+static bool IsConfiguredValue(string? value)
+    => !string.IsNullOrWhiteSpace(value)
+       && !(value.Trim().StartsWith("__ENV_", StringComparison.OrdinalIgnoreCase)
+            && value.Trim().EndsWith("__", StringComparison.OrdinalIgnoreCase));
+
 static string? FirstNonEmpty(params string?[] values)
-    => values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+    => values.FirstOrDefault(IsConfiguredValue);
 
 var rawConnectionString = FirstNonEmpty(
     Environment.GetEnvironmentVariable("DATABASE_URL"),
@@ -173,6 +178,7 @@ else
 }
 
 builder.Services.AddScoped<ConsentService>();
+builder.Services.AddScoped<LMS.API.Filters.MinorConsentActionFilter>();
 builder.Services.AddHttpClient<ICaptchaService, GoogleRecaptchaService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(4);
@@ -244,13 +250,18 @@ builder.Services.AddAuthorization(options =>
 });
 
 // ---------------------------------------------------------------------------
-// 6. CORS — lista blanca explícita (se elimina el comodín anterior)
+// 6. CORS — lista blanca explícita con normalización .TrimEnd('/')
 // ---------------------------------------------------------------------------
 var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                         ?? Array.Empty<string>();
 
-var environmentOrigins = (Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS") ?? string.Empty)
-    .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+var rawEnvOrigins = FirstNonEmpty(
+    Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS"),
+    builder.Configuration["CORS_ALLOWED_ORIGINS"]) ?? string.Empty;
+
+var environmentOrigins = rawEnvOrigins
+    .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .Select(origin => origin.Trim().TrimEnd('/'));
 
 var allowedOrigins = configuredOrigins
     .Concat(environmentOrigins)
@@ -259,7 +270,16 @@ var allowedOrigins = configuredOrigins
                      && origin != "*"
                      && Uri.TryCreate(origin, UriKind.Absolute, out var uri)
                      && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
-    .Select(origin => origin!)
+    .SelectMany(origin =>
+    {
+        var clean = origin!.TrimEnd('/');
+        if (Uri.TryCreate(clean, UriKind.Absolute, out var uri))
+        {
+            var authorityOrigin = $"{uri.Scheme}://{uri.Authority}".TrimEnd('/');
+            return new[] { clean, authorityOrigin };
+        }
+        return new[] { clean };
+    })
     .Distinct(StringComparer.OrdinalIgnoreCase)
     .ToArray();
 

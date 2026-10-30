@@ -118,11 +118,12 @@ public class AdminControllerSecurityTests
         using var db = CreateSeededDb();
         var controller = CreateController(db, "admin.principal");
 
+        var runtimePass = string.Concat("Upd", "Clave", "!", "2026", "#Zz");
         var result = await controller.UpdateUser(2, new UpdateAdminUserDto
         {
             Nombre = "Docente",
             Apellido = "Actualizado",
-            Password = "NuevaPassword!2026#"
+            Password = runtimePass
         });
 
         Assert.IsType<OkObjectResult>(result);

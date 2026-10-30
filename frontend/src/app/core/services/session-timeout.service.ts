@@ -7,9 +7,9 @@ import { AuthService } from './auth.service';
   providedIn: 'root'
 })
 export class SessionTimeoutService implements OnDestroy {
-  // Requerimientos del sprint: 2.5 minutos para aviso, 5 minutos para cierre total
-  private readonly WARNING_MS = 2.5 * 60 * 1000; // 150 segundos
-  private readonly LOGOUT_MS = 5 * 60 * 1000;    // 300 segundos
+  // Computadores compartidos en aulas de primaria: aviso a los 12.5 min y cierre/limpieza total tras 15 min de inactividad
+  private readonly WARNING_MS = 12.5 * 60 * 1000; // 750 segundos (12.5 minutos)
+  private readonly LOGOUT_MS = 15 * 60 * 1000;    // 900 segundos (15 minutos)
 
   // Polling de sesión única: cada 45 segundos verifica que no haya doble sesión
   private readonly SESSION_POLL_INTERVAL_MS = 45 * 1000;

@@ -57,9 +57,12 @@ public class SingleSessionMiddleware
         var dbContext = context.RequestServices.GetRequiredService<LMSDbContext>();
         var user = await dbContext.Usuarios
             .AsNoTracking()
+            .Include(u => u.Rol)
             .Where(u => u.Username.ToLower() == username.ToLower())
             .Select(u => new
             {
+                u.Id,
+                RolNombre = u.Rol.Nombre,
                 u.SessionToken,
                 u.Activo,
                 u.AnonymizedAt,
@@ -99,6 +102,37 @@ public class SingleSessionMiddleware
             return;
         }
 
+        // Validación adicional de Protección de Menores (Ley 1581 de 2012 Art. 7 y Ley 1098 de 2006)
+        var isMinorStudent = string.Equals(user.RolNombre, "ALUMNO", StringComparison.OrdinalIgnoreCase)
+                             || string.Equals(user.RolNombre, "Student", StringComparison.OrdinalIgnoreCase);
+
+        if (!IsPolicyExemptPath(path) && isMinorStudent && _privacy.RequireGuardianConsentForMinors)
+        {
+            var hasAnyConsentRows = await dbContext.ConsentimientosHabeasData
+                .AsNoTracking()
+                .AnyAsync(c => c.AlumnoId == user.Id);
+
+            if (hasAnyConsentRows)
+            {
+                var hasActiveConsent = await dbContext.ConsentimientosHabeasData
+                    .AsNoTracking()
+                    .AnyAsync(c => c.AlumnoId == user.Id
+                                   && c.AutorizaServicioEducativo
+                                   && c.FechaRevocatoriaUtc == null
+                                   && c.VersionPolitica == _privacy.PolicyVersion);
+
+                if (!hasActiveConsent)
+                {
+                    _logger.LogWarning("Estudiante menor '{Username}' con consentimiento Habeas Data revocado o vencido.", username);
+                    await WriteErrorAsync(context, StatusCodes.Status403Forbidden,
+                        "MINOR_CONSENT_REQUIRED",
+                        "El estudiante menor de edad requiere autorización activa y vigente firmada por su representante legal (Ley 1581 de 2012).",
+                        new { currentVersion = _privacy.PolicyVersion });
+                    return;
+                }
+            }
+        }
+
         await _next(context);
     }
 
@@ -125,6 +159,9 @@ public class SingleSessionMiddleware
            || path.Equals("/api/auth/accept-data-policy", StringComparison.OrdinalIgnoreCase)
            || path.Equals("/api/privacy/policy", StringComparison.OrdinalIgnoreCase)
            || path.Equals("/api/privacy/consent", StringComparison.OrdinalIgnoreCase)
+           || path.Equals("/api/privacy/consent-status", StringComparison.OrdinalIgnoreCase)
+           || path.Equals("/api/privacy/consent/revoke", StringComparison.OrdinalIgnoreCase)
+           || path.Equals("/api/privacy/arco", StringComparison.OrdinalIgnoreCase)
            || path.Equals("/api/privacy/my-data", StringComparison.OrdinalIgnoreCase)
            || path.Equals("/api/privacy/delete-account", StringComparison.OrdinalIgnoreCase);
 

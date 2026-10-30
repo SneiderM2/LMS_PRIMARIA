@@ -16,6 +16,7 @@ namespace LMS.API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "Student,ALUMNO")]
+[ServiceFilter(typeof(LMS.API.Filters.MinorConsentActionFilter))]
 public class StudentController : ControllerBase
 {
     private readonly LMSDbContext _context;
@@ -33,6 +34,43 @@ public class StudentController : ControllerBase
         _fileStorage = fileStorage;
         _storageOptions = storageOptions.Value;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Valida contra vulnerabilidades IDOR que el UserId del JWT corresponda al AlumnoId
+    /// y que el menor cuente con un registro activo y vigente en ConsentimientoHabeasData
+    /// firmado por su representante legal (Ley 1581 de 2012 Art. 7 y Ley 1098 de 2006).
+    /// </summary>
+    private async Task<IActionResult?> ValidateStudentOwnershipAndConsentAsync(Alumno student)
+    {
+        var userIdClaim = User.FindFirstValue("user_id");
+        if (!string.IsNullOrWhiteSpace(userIdClaim)
+            && int.TryParse(userIdClaim, out var claimedUserId)
+            && claimedUserId != student.UsuarioId)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = "IDOR_ACCESS_DENIED",
+                message = "El identificador de usuario del token no coincide con el expediente del estudiante solicitado."
+            });
+        }
+
+        var hasActiveConsent = await _context.ConsentimientosHabeasData
+            .AsNoTracking()
+            .AnyAsync(c => c.AlumnoId == student.UsuarioId
+                           && c.AutorizaServicioEducativo
+                           && c.FechaRevocatoriaUtc == null);
+
+        if (!hasActiveConsent)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = "MINOR_CONSENT_REQUIRED",
+                message = "El perfil de estudiante menor de edad requiere autorización activa y vigente en ConsentimientoHabeasData firmada por su representante legal (Ley 1581 de 2012)."
+            });
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -59,6 +97,9 @@ public class StudentController : ControllerBase
         {
             return NotFound("Estudiante no encontrado.");
         }
+
+        var accessError = await ValidateStudentOwnershipAndConsentAsync(student);
+        if (accessError != null) return accessError;
 
         var studentFullName = !string.IsNullOrWhiteSpace(student.Usuario.FullName) 
             ? student.Usuario.FullName 
@@ -201,6 +242,9 @@ public class StudentController : ControllerBase
         {
             return NotFound("Estudiante no encontrado.");
         }
+
+        var accessError = await ValidateStudentOwnershipAndConsentAsync(student);
+        if (accessError != null) return accessError;
 
         var studentFullName = !string.IsNullOrWhiteSpace(student.Usuario.FullName)
             ? student.Usuario.FullName
@@ -372,6 +416,9 @@ public class StudentController : ControllerBase
 
         if (student == null) return NotFound("Estudiante no encontrado.");
 
+        var accessCheck = await ValidateStudentOwnershipAndConsentAsync(student);
+        if (accessCheck != null) return accessCheck;
+
         var activeEnrolledCourseIds = student.Inscripciones
             .Where(i => i.Estado == "ACTIVA")
             .Select(i => i.CursoId)
@@ -432,6 +479,9 @@ public class StudentController : ControllerBase
             .FirstOrDefaultAsync(a => a.Usuario.Username.ToLower() == username.ToLower());
 
         if (student == null) return NotFound("Estudiante no encontrado.");
+
+        var accessCheck = await ValidateStudentOwnershipAndConsentAsync(student);
+        if (accessCheck != null) return accessCheck;
 
         var allCourses = await _context.Cursos
             .Include(c => c.Grado)
@@ -499,6 +549,9 @@ public class StudentController : ControllerBase
 
         if (student == null) return NotFound("Estudiante no encontrado.");
 
+        var accessCheck = await ValidateStudentOwnershipAndConsentAsync(student);
+        if (accessCheck != null) return accessCheck;
+
         var course = await _context.Cursos.FirstOrDefaultAsync(c => c.Id == courseId && c.Activo);
         if (course == null) return NotFound(new { message = "La clase no existe o está inactiva." });
 
@@ -555,6 +608,9 @@ public class StudentController : ControllerBase
 
         if (student == null) return NotFound("Estudiante no encontrado.");
 
+        var accessCheck = await ValidateStudentOwnershipAndConsentAsync(student);
+        if (accessCheck != null) return accessCheck;
+
         var enrollment = student.Inscripciones.FirstOrDefault(i => i.CursoId == courseId && i.Estado == "ACTIVA");
         if (enrollment == null)
         {
@@ -591,6 +647,9 @@ public class StudentController : ControllerBase
             .FirstOrDefaultAsync(a => a.Usuario.Username.ToLower() == username.ToLower());
 
         if (student == null) return NotFound("Estudiante no encontrado.");
+
+        var accessCheck = await ValidateStudentOwnershipAndConsentAsync(student);
+        if (accessCheck != null) return accessCheck;
 
         var now = DateTime.UtcNow;
         var activeEnrolledCourseIds = student.Inscripciones

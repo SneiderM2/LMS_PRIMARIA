@@ -19,11 +19,12 @@ public class SecurityHeadersMiddleware
         var headers = context.Response.Headers;
         var isFileDownload = context.Request.Path.StartsWithSegments("/api/files", StringComparison.OrdinalIgnoreCase);
 
-        // El contenido de la API nunca debe renderizarse como documento.
-        // En descargas se omite "sandbox" para no interferir con el visor de PDF del navegador.
+        // El contenido de la API nunca debe renderizarse como documento embebido no autorizado.
+        // Se habilitan en script-src, frame-src y connect-src los dominios oficiales de Google reCAPTCHA
+        // y de Supabase Storage/Auth para no bloquear integraciones en producción.
         headers["Content-Security-Policy"] = isFileDownload
-            ? "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
-            : "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox";
+            ? "default-src 'none'; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-ancestors 'none'; base-uri 'none'"
+            : "default-src 'none'; script-src 'self' https://www.google.com https://www.gstatic.com; frame-src 'self' https://www.google.com https://www.gstatic.com; connect-src 'self' https://www.google.com https://www.gstatic.com https://*.supabase.co; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
         headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload";
         headers["X-Frame-Options"] = "DENY";
         headers["X-Content-Type-Options"] = "nosniff";

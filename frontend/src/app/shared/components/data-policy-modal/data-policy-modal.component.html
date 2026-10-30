@@ -63,40 +63,17 @@
         </a>
       </div>
 
-      <div class="guardian-box" *ngIf="requiresGuardian">
-        <strong>Autorización del acudiente (menor de edad)</strong>
-        <p>
-          Por tratarse de un estudiante menor de edad, la autorización debe otorgarla su
-          padre, madre o representante legal (Ley 1581 de 2012, art. 7; Ley 1098 de 2006).
-        </p>
-
-        <label class="guardian-label" for="guardianName">Nombre completo del acudiente</label>
-        <input
-          id="guardianName"
-          type="text"
-          class="form-input guardian-input"
-          [(ngModel)]="guardianFullName"
-          name="guardianFullName"
-          maxlength="150"
-          autocomplete="name"
-          placeholder="Nombres y apellidos del acudiente" />
-
-        <label class="guardian-label" for="guardianDocument">Documento del acudiente (opcional)</label>
-        <input
-          id="guardianDocument"
-          type="text"
-          class="form-input guardian-input"
-          [(ngModel)]="guardianDocument"
-          name="guardianDocument"
-          maxlength="30"
-          inputmode="numeric"
-          placeholder="Se almacena enmascarado" />
-
-        <label class="guardian-check">
-          <input type="checkbox" [(ngModel)]="guardianAuthorization" name="guardianAuthorization" />
-          <span>Declaro ser el padre, madre o acudiente y autorizo el tratamiento de los datos del menor.</span>
-        </label>
-      </div>
+      <app-guardian-consent-notice
+        *ngIf="requiresGuardian"
+        [policyVersion]="policyVersion"
+        [guardianFullName]="guardianFullName"
+        [guardianDocument]="guardianDocument"
+        [guardianDocumentType]="guardianDocumentType"
+        [autorizaServicioEducativo]="autorizaServicioEducativo"
+        [autorizaDatosOpcionales]="autorizaDatosOpcionales"
+        [autorizaTransmisionInternacional]="autorizaTransmisionInternacional"
+        (consentChange)="onGuardianConsentChange($event)">
+      </app-guardian-consent-notice>
 
       <p class="policy-error" role="alert" *ngIf="errorMessage">{{ errorMessage }}</p>
 

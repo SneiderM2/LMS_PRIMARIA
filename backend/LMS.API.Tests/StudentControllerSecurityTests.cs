@@ -35,9 +35,27 @@ public class StudentControllerSecurityTests
 
         db.Usuarios.AddRange(
             new Usuario { Id = 10, RolId = 2, Username = "profe.ciencias", Nombre = "Mario", Apellido = "Vargas", PasswordHash = "h", Activo = true },
-            new Usuario { Id = 50, RolId = 3, Username = "alumno.primero", Nombre = "Sofia", Apellido = "Castro", PasswordHash = "h", Activo = true }
+            new Usuario { Id = 50, RolId = 3, Username = "alumno.primero", Nombre = "Sofia", Apellido = "Castro", PasswordHash = "h", Activo = true, DataPolicyAccepted = true, DataPolicyVersion = "2026-10-19" }
         );
         db.Alumnos.Add(new Alumno { UsuarioId = 50, GradoId = 1 });
+        db.ConsentimientosHabeasData.Add(new ConsentimientoHabeasData
+        {
+            Id = 1,
+            AlumnoId = 50,
+            UsuarioId = 50,
+            AcudienteNombre = "Acudiente Sofia Castro",
+            AcudienteDocumento = "****789",
+            TipoDocumento = "CC",
+            VersionPolitica = "2026-10-19",
+            HashTextoPolitica = "sha256-policy-hash",
+            AutorizaServicioEducativo = true,
+            AutorizaDatosOpcionales = false,
+            AutorizaTransmisionInternacional = true,
+            IpOrigen = "127.0.0.1",
+            UserAgent = "UnitTest",
+            FechaAutorizacionUtc = DateTime.UtcNow,
+            FechaRevocatoriaUtc = null
+        });
 
         // Curso 1 es de 1° grado; Curso 5 es de 5° grado
         db.Cursos.AddRange(
@@ -168,6 +186,21 @@ public class StudentControllerSecurityTests
         var result = await controller.WithdrawFromCourse(courseId: 1);
 
         Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetStudentDashboard_WhenMinorConsentRevoked_Returns403Forbidden()
+    {
+        using var db = CreateSeededDb();
+        var consent = await db.ConsentimientosHabeasData.FirstAsync(c => c.AlumnoId == 50);
+        consent.FechaRevocatoriaUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db, "alumno.primero");
+        var result = await controller.GetStudentDashboard();
+
+        var forbidden = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);
     }
 
     private sealed class StubStorageService : IFileStorageService

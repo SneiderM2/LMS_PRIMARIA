@@ -82,4 +82,48 @@ public class ConsentServiceTests
         Assert.True(service.VerifyEvidenceSignature(evidence));
         Assert.False(service.VerifyEvidenceSignature(evidence.Replace("Maria Gomez", "Alterado")));
     }
+
+    [Fact]
+    public void SolicitudArco_CalculatesColombianBusinessDays_WithLeyEmilianiAndEasterHolidays()
+    {
+        // Lunes 2 de marzo de 2026:
+        // En 2026, el 19 de marzo (San José, jueves) se traslada por Ley Emiliani al lunes 23 de marzo.
+        var startMonday = new DateTime(2026, 3, 2, 10, 0, 0, DateTimeKind.Utc);
+
+        var limiteConsulta = SolicitudArco.CalcularFechaLimiteLegalColombia(startMonday, "CONOCER");
+        var limiteReclamo = SolicitudArco.CalcularFechaLimiteLegalColombia(startMonday, "SUPRIMIR");
+
+        // 10 días hábiles desde lunes 2 de marzo -> lunes 16 de marzo de 2026
+        Assert.Equal(new DateTime(2026, 3, 16).Date, limiteConsulta.Date);
+        // 15 días hábiles desde lunes 2 de marzo -> martes 24 de marzo de 2026 (salta lunes festivo Emiliani 23 de marzo)
+        Assert.Equal(new DateTime(2026, 3, 24).Date, limiteReclamo.Date);
+
+        // Verificar Semana Santa dinámica en 2026 (Domingo de Pascua: 5 de abril de 2026; Jueves Santo: 2 abril, Viernes Santo: 3 abril)
+        Assert.False(SolicitudArco.EsDiaHabilColombia(new DateTime(2026, 4, 2)));
+        Assert.False(SolicitudArco.EsDiaHabilColombia(new DateTime(2026, 4, 3)));
+    }
+
+    [Fact]
+    public void CreateHabeasDataRecord_PopulatesRequiredLegalFieldsAndMasksDocument()
+    {
+        var service = CreateService("2026-10-19");
+        var record = service.CreateHabeasDataRecord(
+            alumnoId: 50,
+            usuarioId: 50,
+            guardianFullName: "Carlos Perez",
+            guardianDocument: "1020304050",
+            tipoDocumento: "CC",
+            autorizaServicioEducativo: true,
+            autorizaDatosOpcionales: false,
+            autorizaTransmisionInternacional: true,
+            ip: "190.10.20.30",
+            userAgent: "Mozilla/5.0");
+
+        Assert.Equal(50, record.AlumnoId);
+        Assert.Equal("CC", record.TipoDocumento);
+        Assert.Equal("*******050", record.AcudienteDocumento);
+        Assert.Equal("2026-10-19", record.VersionPolitica);
+        Assert.Equal(64, record.HashTextoPolitica.Length);
+        Assert.True(record.EstaVigente);
+    }
 }

@@ -131,7 +131,7 @@ public class PrivacyController : ControllerBase
         if (_privacy.RequireGuardianConsentForMinors && isStudent)
         {
             var guardianValidation = ConsentService.ValidateGuardianConsent(
-                dto.GuardianAuthorization,
+                dto.GuardianAuthorization && dto.AutorizaServicioEducativo,
                 dto.GuardianFullName,
                 dto.GuardianDocument);
 
@@ -156,6 +156,32 @@ public class PrivacyController : ControllerBase
             dto.GuardianFullName,
             dto.GuardianDocument);
 
+        if (isStudent && user.Alumno != null)
+        {
+            var previousConsents = await _context.ConsentimientosHabeasData
+                .Where(c => c.AlumnoId == user.Alumno.UsuarioId && c.FechaRevocatoriaUtc == null)
+                .ToListAsync();
+
+            foreach (var prev in previousConsents)
+            {
+                prev.FechaRevocatoriaUtc = DateTime.UtcNow;
+            }
+
+            var consentRecord = _consent.CreateHabeasDataRecord(
+                alumnoId: user.Alumno.UsuarioId,
+                usuarioId: user.Id,
+                guardianFullName: dto.GuardianFullName,
+                guardianDocument: dto.GuardianDocument,
+                tipoDocumento: dto.GuardianDocumentType,
+                autorizaServicioEducativo: dto.AutorizaServicioEducativo,
+                autorizaDatosOpcionales: dto.AutorizaDatosOpcionales,
+                autorizaTransmisionInternacional: dto.AutorizaTransmisionInternacional,
+                ip: ClientIp,
+                userAgent: Request.Headers.UserAgent.ToString());
+
+            _context.ConsentimientosHabeasData.Add(consentRecord);
+        }
+
         await _context.SaveChangesAsync();
 
         await AuditAsync(user, "Privacidad: Aceptación de política de tratamiento de datos",
@@ -165,8 +191,231 @@ public class PrivacyController : ControllerBase
         {
             message = "Política de tratamiento de datos aceptada y registrada.",
             acceptedAt = user.DataPolicyAcceptedAt,
-            version = user.DataPolicyVersion
+            version = user.DataPolicyVersion,
+            hasActiveMinorConsent = true
         });
+    }
+
+    /// <summary>
+    /// Consulta el estado vigente del consentimiento de Habeas Data del usuario o estudiante menor de edad.
+    /// </summary>
+    [HttpGet("consent-status")]
+    [Authorize]
+    public async Task<IActionResult> GetConsentStatus()
+    {
+        var user = await GetCurrentUserAsync(includeStudent: true);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        var isStudent = user.Alumno != null
+                        || string.Equals(user.Rol?.Nombre, "ALUMNO", StringComparison.OrdinalIgnoreCase);
+
+        ConsentimientoHabeasData? activeMinorConsent = null;
+        if (isStudent && user.Alumno != null)
+        {
+            activeMinorConsent = await _context.ConsentimientosHabeasData
+                .AsNoTracking()
+                .Where(c => c.AlumnoId == user.Alumno.UsuarioId
+                            && c.AutorizaServicioEducativo
+                            && c.FechaRevocatoriaUtc == null
+                            && c.VersionPolitica == _privacy.PolicyVersion)
+                .OrderByDescending(c => c.FechaAutorizacionUtc)
+                .FirstOrDefaultAsync();
+        }
+
+        var hasActiveMinorConsent = !isStudent
+            || activeMinorConsent != null
+            || (user.DataPolicyAccepted
+                && string.Equals(user.DataPolicyVersion, _privacy.PolicyVersion, StringComparison.Ordinal)
+                && !await _context.ConsentimientosHabeasData.AnyAsync(c => c.AlumnoId == user.Id && c.FechaRevocatoriaUtc != null));
+
+        return Ok(new
+        {
+            policyAccepted = user.DataPolicyAccepted,
+            policyVersion = user.DataPolicyVersion,
+            currentPolicyVersion = _privacy.PolicyVersion,
+            isStudent,
+            hasActiveMinorConsent,
+            consentDetails = activeMinorConsent == null ? null : new
+            {
+                activeMinorConsent.Id,
+                activeMinorConsent.AcudienteNombre,
+                activeMinorConsent.TipoDocumento,
+                activeMinorConsent.VersionPolitica,
+                activeMinorConsent.HashTextoPolitica,
+                activeMinorConsent.AutorizaServicioEducativo,
+                activeMinorConsent.AutorizaDatosOpcionales,
+                activeMinorConsent.AutorizaTransmisionInternacional,
+                activeMinorConsent.FechaAutorizacionUtc
+            }
+        });
+    }
+
+    /// <summary>
+    /// Revoca el consentimiento de Habeas Data otorgado por el representante legal (Art. 8 y 9 Ley 1581 de 2012)
+    /// y radica automáticamente una Solicitud ARCO de revocatoria (15 días hábiles).
+    /// </summary>
+    [HttpPost("consent/revoke")]
+    [Authorize]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> RevokeConsent([FromBody] RevokeGuardianConsentDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await GetCurrentUserAsync(includeStudent: true);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        var now = DateTime.UtcNow;
+        if (user.Alumno != null)
+        {
+            var activeConsents = await _context.ConsentimientosHabeasData
+                .Where(c => c.AlumnoId == user.Alumno.UsuarioId && c.FechaRevocatoriaUtc == null)
+                .ToListAsync();
+
+            foreach (var c in activeConsents)
+            {
+                c.FechaRevocatoriaUtc = now;
+            }
+        }
+
+        user.DataPolicyAccepted = false;
+        user.SessionToken = null;
+
+        var solicitudArco = new SolicitudArco
+        {
+            UsuarioId = user.Id,
+            AlumnoId = user.Alumno?.UsuarioId,
+            SolicitanteNombre = user.FullName,
+            SolicitanteDocumento = ConsentService.MaskDocument(user.Username),
+            TipoSolicitud = "REVOCAR",
+            Descripcion = dto.Motivo.Trim(),
+            Estado = "RADICADA",
+            FechaSolicitudUtc = now,
+            FechaLimiteLegalUtc = SolicitudArco.CalcularFechaLimiteLegalColombia(now, "REVOCAR"),
+            IpOrigen = ClientIp ?? "0.0.0.0"
+        };
+
+        _context.SolicitudesArco.Add(solicitudArco);
+        await _context.SaveChangesAsync();
+
+        await AuditAsync(user, "Privacidad: Revocatoria de consentimiento Habeas Data",
+            $"Solicitud ARCO #{solicitudArco.Id} radicada con fecha límite {solicitudArco.FechaLimiteLegalUtc:yyyy-MM-dd}.");
+
+        return Ok(new
+        {
+            message = "El consentimiento fue revocado y la sesión del menor ha sido bloqueada conforme a la Ley 1581 de 2012.",
+            revokedAtUtc = now,
+            solicitudArcoId = solicitudArco.Id,
+            fechaLimiteLegalUtc = solicitudArco.FechaLimiteLegalUtc
+        });
+    }
+
+    /// <summary>
+    /// Radica una solicitud de ejercicio de derechos ARCO (Conocer, Actualizar, Rectificar, Suprimir)
+    /// calculando automáticamente el término legal en Colombia:
+    /// 10 días hábiles para Consultas (Art. 14 Ley 1581) y 15 días hábiles para Reclamos/Supresión (Art. 15 Ley 1581).
+    /// </summary>
+    [HttpPost("arco")]
+    [Authorize]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> CreateSolicitudArco([FromBody] SolicitudArcoCreateDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await GetCurrentUserAsync(includeStudent: true);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        var allowedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "CONSULTA", "CONOCER", "ACCESO", "ACTUALIZAR", "RECTIFICAR", "SUPRIMIR", "REVOCAR", "RECLAMO" };
+
+        var normalizedType = (dto.TipoSolicitud ?? string.Empty).Trim().ToUpperInvariant();
+        if (!allowedTypes.Contains(normalizedType))
+        {
+            return BadRequest(new { message = "Tipo de solicitud ARCO no válido. Valores permitidos: CONOCER, ACTUALIZAR, RECTIFICAR, SUPRIMIR, REVOCAR." });
+        }
+
+        var now = DateTime.UtcNow;
+        var diasHabiles = SolicitudArco.ObtenerTerminoDiasHabiles(normalizedType);
+        var fechaLimiteUtc = SolicitudArco.CalcularFechaLimiteLegalColombia(now, normalizedType);
+
+        var solicitud = new SolicitudArco
+        {
+            UsuarioId = user.Id,
+            AlumnoId = user.Alumno?.UsuarioId,
+            SolicitanteNombre = string.IsNullOrWhiteSpace(dto.SolicitanteNombre) ? user.FullName : dto.SolicitanteNombre.Trim(),
+            SolicitanteDocumento = ConsentService.MaskDocument(string.IsNullOrWhiteSpace(dto.SolicitanteDocumento) ? user.Username : dto.SolicitanteDocumento),
+            TipoSolicitud = normalizedType,
+            Descripcion = dto.Descripcion.Trim(),
+            Estado = "RADICADA",
+            FechaSolicitudUtc = now,
+            FechaLimiteLegalUtc = fechaLimiteUtc,
+            IpOrigen = ClientIp ?? "0.0.0.0"
+        };
+
+        _context.SolicitudesArco.Add(solicitud);
+        await _context.SaveChangesAsync();
+
+        await AuditAsync(user, $"Privacidad: Radicación Solicitud ARCO ({normalizedType})",
+            $"Solicitud #{solicitud.Id} - Término legal: {diasHabiles} días hábiles (vence {fechaLimiteUtc:yyyy-MM-dd}).");
+
+        return Ok(new
+        {
+            id = solicitud.Id,
+            tipoSolicitud = solicitud.TipoSolicitud,
+            estado = solicitud.Estado,
+            terminoDiasHabiles = diasHabiles,
+            fechaSolicitudUtc = solicitud.FechaSolicitudUtc,
+            fechaLimiteLegalUtc = solicitud.FechaLimiteLegalUtc,
+            message = $"Solicitud ARCO ({normalizedType}) radicada exitosamente. Plazo máximo legal de respuesta: {diasHabiles} días hábiles (Ley 1581 de 2012)."
+        });
+    }
+
+    /// <summary>
+    /// Lista las solicitudes ARCO radicadas por el titular autenticado.
+    /// </summary>
+    [HttpGet("arco")]
+    [Authorize]
+    public async Task<IActionResult> GetMySolicitudesArco()
+    {
+        var user = await GetCurrentUserAsync(includeStudent: false);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        var items = await _context.SolicitudesArco
+            .AsNoTracking()
+            .Where(s => s.UsuarioId == user.Id || s.AlumnoId == user.Id)
+            .OrderByDescending(s => s.FechaSolicitudUtc)
+            .Select(s => new
+            {
+                s.Id,
+                s.TipoSolicitud,
+                s.Descripcion,
+                s.Estado,
+                s.FechaSolicitudUtc,
+                s.FechaLimiteLegalUtc,
+                s.FechaRespuestaUtc,
+                s.Respuesta,
+                terminoDiasHabiles = SolicitudArco.ObtenerTerminoDiasHabiles(s.TipoSolicitud)
+            })
+            .ToListAsync();
+
+        return Ok(items);
     }
 
     /// <summary>

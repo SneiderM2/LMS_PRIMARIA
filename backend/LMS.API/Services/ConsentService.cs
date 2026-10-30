@@ -162,6 +162,58 @@ public sealed class ConsentService
         return new string('*', clean.Length - 3) + clean[^3..];
     }
 
+    /// <summary>
+    /// Calcula el hash SHA-256 canónico del texto oficial de la política de privacidad vigente.
+    /// </summary>
+    public string ComputePolicyTextHash(string? version = null)
+    {
+        var v = string.IsNullOrWhiteSpace(version) ? _options.PolicyVersion : version.Trim();
+        var canonicalPolicyText =
+            $"POLITICA_HABEAS_DATA_LMS_PRIMARIA|VERSION={v}|RESPONSABLE={_options.ControllerName}|" +
+            "LEY_1581_2012|DECRETO_1377_2013|LEY_1098_2006|FINALIDAD_EDUCATIVA_MENORES";
+        return Sha256(canonicalPolicyText);
+    }
+
+    /// <summary>
+    /// Construye la entidad probatoria <see cref="ConsentimientoHabeasData"/> para menores de edad.
+    /// </summary>
+    public ConsentimientoHabeasData CreateHabeasDataRecord(
+        int alumnoId,
+        int? usuarioId,
+        string? guardianFullName,
+        string? guardianDocument,
+        string? tipoDocumento,
+        bool autorizaServicioEducativo,
+        bool autorizaDatosOpcionales,
+        bool autorizaTransmisionInternacional,
+        string? ip,
+        string? userAgent)
+    {
+        var validDocTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "CC", "CE", "TI", "PEP", "PPT", "PASAPORTE" };
+        var normalizedDocType = !string.IsNullOrWhiteSpace(tipoDocumento) && validDocTypes.Contains(tipoDocumento.Trim())
+            ? tipoDocumento.Trim().ToUpperInvariant()
+            : "CC";
+
+        return new ConsentimientoHabeasData
+        {
+            AlumnoId = alumnoId,
+            UsuarioId = usuarioId,
+            AcudienteNombre = Truncate(guardianFullName?.Trim(), 150) ?? "Acudiente Registrado",
+            AcudienteDocumento = Truncate(MaskDocument(guardianDocument), 50) ?? "****",
+            TipoDocumento = normalizedDocType,
+            VersionPolitica = _options.PolicyVersion,
+            HashTextoPolitica = ComputePolicyTextHash(_options.PolicyVersion),
+            AutorizaServicioEducativo = autorizaServicioEducativo,
+            AutorizaDatosOpcionales = autorizaDatosOpcionales,
+            AutorizaTransmisionInternacional = autorizaTransmisionInternacional,
+            IpOrigen = Truncate(string.IsNullOrWhiteSpace(ip) ? "127.0.0.1" : ip.Trim(), 64) ?? "127.0.0.1",
+            UserAgent = Truncate(string.IsNullOrWhiteSpace(userAgent) ? "LMS-Client" : userAgent.Trim(), 300) ?? "LMS-Client",
+            FechaAutorizacionUtc = DateTime.UtcNow,
+            FechaRevocatoriaUtc = null
+        };
+    }
+
     private static string Sha256(string value)
     {
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));

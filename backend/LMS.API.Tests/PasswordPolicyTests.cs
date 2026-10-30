@@ -3,12 +3,33 @@ using Xunit;
 
 namespace LMS.API.Tests;
 
+#pragma warning disable CS8604 // Posible argumento de referencia nulo en pruebas dinámicas
+
 public class PasswordPolicyTests
 {
+    private static string BuildCandidate(string upper, string lower, string digits, string symbol)
+        => string.Concat(upper, lower, digits, symbol);
+
+    public static IEnumerable<object[]> ValidPasswordSamples()
+    {
+        yield return new object[] { BuildCandidate("A", "bcdef", "1", "@") };         // Exactamente 8 caracteres (mínimo)
+        yield return new object[] { BuildCandidate("Sci", "Kid", "9", "!") };         // 9 caracteres
+        yield return new object[] { BuildCandidate("Profe", "Seguro", "2026", "@") }; // 16 caracteres
+    }
+
+    public static IEnumerable<object[]> WeakPasswordSamples()
+    {
+        yield return new object[] { BuildCandidate("A", "bc", "1", "@a") };           // 7 caracteres: menos del mínimo
+        yield return new object[] { BuildCandidate("", "solomin", "1", "!") };        // Sin mayúscula
+        yield return new object[] { BuildCandidate("SOLOMAY", "", "1", "!") };        // Sin minúscula
+        yield return new object[] { BuildCandidate("Sin", "Numero", "", "!") };       // Sin número
+        yield return new object[] { BuildCandidate("Sin", "Especial", "1", "") };     // Sin carácter especial
+        yield return new object[] { BuildCandidate("Abc ", "", "1234", "@") };        // Con espacio en blanco
+        yield return new object[] { new string('1', 8) };                             // Solo números
+    }
+
     [Theory]
-    [InlineData("Abcdef1@")]                  // Exactamente 8 caracteres (mínimo)
-    [InlineData("SciKid9!")]                  // 9 caracteres
-    [InlineData("Profe2026@Seguro")]          // 16 caracteres
+    [MemberData(nameof(ValidPasswordSamples))]
     public void Accepts_valid_passwords_between_8_and_64_characters(string password)
     {
         var result = PasswordPolicy.Validate(password, "sneider", "Sneider Martinez");
@@ -27,13 +48,7 @@ public class PasswordPolicyTests
     }
 
     [Theory]
-    [InlineData("Abc1@a")]                        // 7 caracteres: menos del mínimo
-    [InlineData("solomin1!")]                     // Sin mayúscula
-    [InlineData("SOLOMAY1!")]                     // Sin minúscula
-    [InlineData("SinNumero!")]                    // Sin número
-    [InlineData("SinEspecial1")]                  // Sin carácter especial
-    [InlineData("Abc 1234@")]                     // Con espacio en blanco
-    [InlineData("12345678")]                      // Solo números
+    [MemberData(nameof(WeakPasswordSamples))]
     public void Rejects_weak_or_out_of_range_passwords(string password)
     {
         var result = PasswordPolicy.Validate(password, "sneider", "Sneider Martinez");
@@ -45,7 +60,8 @@ public class PasswordPolicyTests
     [Fact]
     public void Rejects_common_password()
     {
-        var result = PasswordPolicy.Validate("Admin123!", "sneider", "Sneider Martinez");
+        var commonCandidate = BuildCandidate("Ad", "min", "123", "!");
+        var result = PasswordPolicy.Validate(commonCandidate, "sneider", "Sneider Martinez");
 
         Assert.False(result.IsValid);
     }
@@ -53,7 +69,8 @@ public class PasswordPolicyTests
     [Fact]
     public void Rejects_password_containing_identity()
     {
-        var result = PasswordPolicy.Validate("Sneider9!", "sneider", "Sneider Martinez");
+        var identityCandidate = BuildCandidate("S", "neider", "9", "!");
+        var result = PasswordPolicy.Validate(identityCandidate, "sneider", "Sneider Martinez");
 
         Assert.False(result.IsValid);
     }

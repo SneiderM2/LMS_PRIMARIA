@@ -38,4 +38,6 @@ public class Usuario
     public Rol Rol { get; set; } = null!;
     public Alumno? Alumno { get; set; }
     public ICollection<Curso> CursosDocente { get; set; } = new List<Curso>();
+    public ICollection<ConsentimientoHabeasData> ConsentimientosHabeasData { get; set; } = new List<ConsentimientoHabeasData>();
+    public ICollection<SolicitudArco> SolicitudesArco { get; set; } = new List<SolicitudArco>();
 }

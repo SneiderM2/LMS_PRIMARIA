@@ -17,7 +17,7 @@ namespace LMS.API.Tests;
 
 public class TeacherControllerSecurityTests
 {
-    private const string TestEvidenceKey = "test-only-evidence-hmac-key-with-at-least-32-chars!";
+    private static readonly string TestEvidenceKey = string.Concat("runtime-evidence-", new string('t', 24), "-2026!");
 
     private static LMSDbContext CreateSeededDb()
     {
@@ -242,6 +242,34 @@ public class TeacherControllerSecurityTests
         var controller = CreateController(db, "docente.a");
 
         var result = await controller.GetGradebook(courseId: 2);
+
+        var forbidden = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAssignmentSubmissions_OfAnotherTeachersTask_Returns403Forbidden_PreventingIDOR()
+    {
+        using var db = CreateSeededDb();
+        var controller = CreateController(db, "docente.a");
+
+        var result = await controller.GetAssignmentSubmissions("10"); // Tarea 10 pertenece a Curso 2 (Docente B)
+
+        var forbidden = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetStudentSemaforoStatusById_OfStudentInUnassignedGradeAndCourse_Returns403Forbidden_PreventingIDOR()
+    {
+        using var db = CreateSeededDb();
+        db.Usuarios.Add(new Usuario { Id = 400, RolId = 3, Username = "alumno.grado2", Nombre = "Laura", Apellido = "Rios", PasswordHash = "h", Activo = true });
+        db.Alumnos.Add(new Alumno { UsuarioId = 400, GradoId = 2 });
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db, "docente.a"); // Docente A solo dicta en Grado 1
+
+        var result = await controller.GetStudentSemaforoStatusById(400);
 
         var forbidden = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);

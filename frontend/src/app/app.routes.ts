@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
+import { minorConsentGuard } from './core/guards/minor-consent.guard';
 
 export const routes: Routes = [
   {
@@ -18,7 +19,7 @@ export const routes: Routes = [
   {
     path: 'dashboard/student',
     loadComponent: () => import('./features/student/student-dashboard.component').then(m => m.StudentDashboardComponent),
-    canActivate: [authGuard, roleGuard],
+    canActivate: [authGuard, roleGuard, minorConsentGuard],
     data: { roles: ['Student'] },
     title: 'Mis Misiones · SciKids'
   },

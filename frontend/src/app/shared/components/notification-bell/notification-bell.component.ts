@@ -86,13 +86,12 @@ export class NotificationBellComponent implements OnInit {
   }
 
   private get storageKey(): string {
-    const userId = this.authService.currentUser()?.id || 'anon';
-    return `scikids_read_notifications_${userId}`;
+    return 'scikids_read_notifications_session';
   }
 
   private loadReadIds(): void {
     try {
-      const stored = localStorage.getItem(this.storageKey);
+      const stored = sessionStorage.getItem(this.storageKey);
       if (stored) {
         this.readIds = new Set<string>(JSON.parse(stored));
       }
@@ -103,7 +102,7 @@ export class NotificationBellComponent implements OnInit {
 
   private saveReadIds(): void {
     try {
-      localStorage.setItem(this.storageKey, JSON.stringify(Array.from(this.readIds)));
+      sessionStorage.setItem(this.storageKey, JSON.stringify(Array.from(this.readIds)));
     } catch {
       // Ignore storage errors
     }

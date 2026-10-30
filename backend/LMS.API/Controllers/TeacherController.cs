@@ -249,6 +249,23 @@ public class TeacherController : ControllerBase
         };
         _context.Alumnos.Add(alumno);
 
+        if (hasGuardianConsent)
+        {
+            var consentRecord = _consent.CreateHabeasDataRecord(
+                alumnoId: nuevoUsuario.Id,
+                usuarioId: nuevoUsuario.Id,
+                guardianFullName: dto.GuardianFullName,
+                guardianDocument: dto.GuardianDocument,
+                tipoDocumento: "CC",
+                autorizaServicioEducativo: true,
+                autorizaDatosOpcionales: false,
+                autorizaTransmisionInternacional: true,
+                ip: HttpContext?.Connection?.RemoteIpAddress?.ToString(),
+                userAgent: HttpContext?.Request?.Headers.UserAgent.ToString());
+
+            _context.ConsentimientosHabeasData.Add(consentRecord);
+        }
+
         await _context.SaveChangesAsync();
 
         var creator = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Docente";
@@ -492,13 +509,26 @@ public class TeacherController : ControllerBase
     }
 
     /// <summary>
-    /// Retorna la lista de estudiantes con su cálculo de estado de semáforo (Verde, Amarillo, Rojo)
+    /// Retorna la lista de estudiantes con su cálculo de estado de semáforo (Verde, Amarillo, Rojo).
+    /// Aplica control anti-IDOR: un docente solo consulta el SemaforoStatus de estudiantes de sus cursos/grados.
     /// </summary>
     [HttpGet("students-status")]
     [ProducesResponseType(typeof(List<StudentStatusDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetStudentsStatus([FromQuery] string? gradeLevel = null)
+    public async Task<IActionResult> GetStudentsStatus([FromQuery] string? gradeLevel = null, [FromQuery] int? courseId = null)
     {
-        var cacheKey = $"semaforo_status_{gradeLevel ?? "ALL"}";
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null) return Unauthorized();
+
+        var isAdmin = IsAdmin(currentUser.Rol?.Nombre);
+        if (courseId.HasValue && !await CanManageCourseAsync(courseId.Value))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "No tienes autorización para consultar el semáforo de un curso asignado a otro docente."
+            });
+        }
+
+        var cacheKey = $"semaforo_status_{currentUser.Id}_{courseId?.ToString() ?? "ALL"}_{gradeLevel ?? "ALL"}";
         if (_cache.TryGetValue(cacheKey, out List<StudentStatusDto>? cached) && cached != null)
         {
             return Ok(cached);
@@ -515,6 +545,29 @@ public class TeacherController : ControllerBase
                 .ThenInclude(a => a!.Inscripciones)
             .Where(u => u.Rol.Nombre == "ALUMNO" && u.Activo)
             .AsQueryable();
+
+        if (!isAdmin)
+        {
+            var teacherCourses = await _context.Cursos
+                .AsNoTracking()
+                .Where(c => c.DocenteId == currentUser.Id && c.Activo)
+                .Select(c => new { c.Id, c.GradoId })
+                .ToListAsync();
+
+            var allowedCourseIds = teacherCourses.Select(c => c.Id).ToList();
+            var allowedGradeIds = teacherCourses.Select(c => c.GradoId).Distinct().ToList();
+
+            query = query.Where(u => u.Alumno != null && (
+                allowedGradeIds.Contains(u.Alumno.GradoId) ||
+                u.Alumno.Inscripciones.Any(i => i.Estado == "ACTIVA" && allowedCourseIds.Contains(i.CursoId))));
+        }
+
+        if (courseId.HasValue)
+        {
+            var targetCourseId = courseId.Value;
+            query = query.Where(u => u.Alumno != null &&
+                u.Alumno.Inscripciones.Any(i => i.CursoId == targetCourseId && i.Estado == "ACTIVA"));
+        }
 
         if (!string.IsNullOrWhiteSpace(gradeLevel))
         {
@@ -544,6 +597,64 @@ public class TeacherController : ControllerBase
         await FileLogger.LogAsync("AUDIT",
             $"[Ley 1581 / Ley 1098] Consulta de semáforo escolar y seguimiento de actividad de menores ({statusList.Count} estudiantes, grado='{gradeLevel ?? "TODOS"}') por {accessor}.");
         return Ok(statusList);
+    }
+
+    /// <summary>
+    /// Consulta el estado de semáforo de un estudiante específico validando permisos sobre SemaforoStatusId / AlumnoId.
+    /// GET: /api/teacher/students-status/{semaforoStatusId:int}
+    /// </summary>
+    [HttpGet("students-status/{semaforoStatusId:int}")]
+    [ProducesResponseType(typeof(StudentStatusDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetStudentSemaforoStatusById(int semaforoStatusId)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null) return Unauthorized();
+
+        var studentUser = await _context.Usuarios
+            .AsNoTracking()
+            .Include(u => u.Rol)
+            .Include(u => u.Alumno)
+                .ThenInclude(a => a!.Grado)
+            .Include(u => u.Alumno)
+                .ThenInclude(a => a!.Entregas)
+            .Include(u => u.Alumno)
+                .ThenInclude(a => a!.Inscripciones)
+            .FirstOrDefaultAsync(u => u.Id == semaforoStatusId && u.Alumno != null);
+
+        if (studentUser == null || studentUser.Alumno == null)
+        {
+            return NotFound(new { message = "Registro de semáforo del estudiante no encontrado." });
+        }
+
+        if (!IsAdmin(currentUser.Rol?.Nombre))
+        {
+            var hasPermission = await _context.Cursos
+                .AsNoTracking()
+                .AnyAsync(c => c.DocenteId == currentUser.Id && c.Activo && (
+                    c.GradoId == studentUser.Alumno.GradoId ||
+                    c.Inscripciones.Any(i => i.AlumnoId == studentUser.Id && i.Estado == "ACTIVA")));
+
+            if (!hasPermission)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    code = "IDOR_SEMAFORO_FORBIDDEN",
+                    message = "No tienes permisos sobre el SemaforoStatusId / AlumnoId solicitado."
+                });
+            }
+        }
+
+        var maxEntrega = studentUser.Alumno.Entregas.OrderByDescending(e => e.FechaEntrega).FirstOrDefault()?.FechaEntrega;
+        var maxInscripcion = studentUser.Alumno.Inscripciones.OrderByDescending(i => i.FechaRegistro).FirstOrDefault()?.FechaRegistro;
+        var activityMap = new Dictionary<int, DateTime?>
+        {
+            [studentUser.Id] = maxEntrega ?? maxInscripcion ?? studentUser.FechaCreacion
+        };
+
+        var status = _semaforoService.CalculateStatusList(new List<Usuario> { studentUser }, activityMap).FirstOrDefault();
+        return Ok(status);
     }
 
     /// <summary>
@@ -852,6 +963,25 @@ public class TeacherController : ControllerBase
             return BadRequest(new { message = "Identificador de tarea no válido." });
         }
 
+        var tarea = await _context.Tareas
+            .AsNoTracking()
+            .Include(t => t.Curso)
+            .FirstOrDefaultAsync(t => t.Id == taskId);
+
+        if (tarea == null)
+        {
+            return NotFound(new { message = "La tarea solicitada no existe." });
+        }
+
+        if (!IsAdmin(currentUser.Rol?.Nombre) && tarea.Curso.DocenteId != currentUser.Id)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = "IDOR_TASK_FORBIDDEN",
+                message = "No tienes autorización para consultar entregas de una tarea que pertenece a otro docente."
+            });
+        }
+
         var query = _context.Entregas
             .Include(e => e.Alumno)
                 .ThenInclude(a => a.Usuario)
@@ -860,12 +990,6 @@ public class TeacherController : ControllerBase
                 .ThenInclude(t => t.Curso)
             .Where(e => e.TareaId == taskId)
             .AsQueryable();
-
-        if (!IsAdmin(currentUser.Rol?.Nombre))
-        {
-            // Un docente solo puede consultar entregas de sus propios cursos.
-            query = query.Where(e => e.Tarea.Curso.DocenteId == currentUser.Id);
-        }
 
         var rawSubmissions = await query
             .OrderByDescending(e => e.FechaEntrega)
@@ -1466,12 +1590,40 @@ public class TeacherController : ControllerBase
     /// </summary>
     [HttpGet("students/{studentId:int}/progress")]
     [ProducesResponseType(typeof(List<StudentProgressItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStudentProgress(int studentId)
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null) return Unauthorized();
 
+        var alumno = await _context.Alumnos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.UsuarioId == studentId);
+
+        if (alumno == null)
+        {
+            return NotFound(new { message = "Estudiante no encontrado." });
+        }
+
         var isAdmin = IsAdmin(currentUser.Rol?.Nombre);
+        if (!isAdmin)
+        {
+            var canAccessStudent = await _context.Cursos
+                .AsNoTracking()
+                .AnyAsync(c => c.DocenteId == currentUser.Id && c.Activo && (
+                    c.GradoId == alumno.GradoId ||
+                    c.Inscripciones.Any(i => i.AlumnoId == studentId && i.Estado == "ACTIVA")));
+
+            if (!canAccessStudent)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    code = "IDOR_STUDENT_FORBIDDEN",
+                    message = "No tienes permisos sobre el AlumnoId solicitado."
+                });
+            }
+        }
 
         var query = _context.Entregas
             .AsNoTracking()

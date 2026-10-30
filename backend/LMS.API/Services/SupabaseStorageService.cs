@@ -51,15 +51,19 @@ public sealed class SupabaseStorageService : IFileStorageService
         _logger = logger;
         _localFallback = new LocalFileStorageService(environment, options);
 
-        var url = !string.IsNullOrWhiteSpace(_options.Supabase.Url)
+        static bool IsValidConfig(string? val) =>
+            !string.IsNullOrWhiteSpace(val) &&
+            !(val.Trim().StartsWith("__ENV_", StringComparison.OrdinalIgnoreCase) && val.Trim().EndsWith("__", StringComparison.OrdinalIgnoreCase));
+
+        var url = IsValidConfig(_options.Supabase.Url)
             ? _options.Supabase.Url
             : Environment.GetEnvironmentVariable("SUPABASE_URL") ?? string.Empty;
 
-        var key = !string.IsNullOrWhiteSpace(_options.Supabase.ServiceRoleKey)
+        var key = IsValidConfig(_options.Supabase.ServiceRoleKey)
             ? _options.Supabase.ServiceRoleKey
             : Environment.GetEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY") ?? string.Empty;
 
-        var bucket = !string.IsNullOrWhiteSpace(_options.Supabase.Bucket)
+        var bucket = IsValidConfig(_options.Supabase.Bucket)
             ? _options.Supabase.Bucket
             : Environment.GetEnvironmentVariable("SUPABASE_STORAGE_BUCKET") ?? "lms-uploads";
 

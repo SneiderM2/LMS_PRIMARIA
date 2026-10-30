@@ -234,6 +234,20 @@ public class AuthController : ControllerBase
                     UsuarioId = nuevoUsuario.Id,
                     GradoId = grado.Id
                 });
+
+                var consentRecord = _consent.CreateHabeasDataRecord(
+                    alumnoId: nuevoUsuario.Id,
+                    usuarioId: nuevoUsuario.Id,
+                    guardianFullName: request.GuardianFullName,
+                    guardianDocument: request.GuardianDocument,
+                    tipoDocumento: request.GuardianDocumentType,
+                    autorizaServicioEducativo: request.AutorizaServicioEducativo && request.GuardianAuthorization,
+                    autorizaDatosOpcionales: request.AutorizaDatosOpcionales,
+                    autorizaTransmisionInternacional: request.AutorizaTransmisionInternacional,
+                    ip: clientIp,
+                    userAgent: Request.Headers.UserAgent.ToString());
+
+                _context.ConsentimientosHabeasData.Add(consentRecord);
             }
 
             await _context.SaveChangesAsync();
@@ -284,6 +298,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     {
         if (!string.IsNullOrEmpty(request.HoneypotTrap))
@@ -388,7 +403,11 @@ public class AuthController : ControllerBase
             var (token, expiration) = _tokenService.GenerateToken(user, fullName, roleName, gradeName, avatar);
 
             var roleStr = TokenService.NormalizeRole(roleName);
-            var requiresPolicy = !_consent.IsCurrent(user);
+            var hasRevokedMinorConsent = roleStr == "Student" && await _context.ConsentimientosHabeasData
+                .AnyAsync(c => c.AlumnoId == user.Id && c.FechaRevocatoriaUtc != null)
+                && !await _context.ConsentimientosHabeasData
+                .AnyAsync(c => c.AlumnoId == user.Id && c.AutorizaServicioEducativo && c.FechaRevocatoriaUtc == null);
+            var requiresPolicy = !_consent.IsCurrent(user) || hasRevokedMinorConsent;
 
             await AuditAsync(user, "Autenticación: Inicio de sesión exitoso",
                 $"Rol: {roleName}; requiere aceptación de política: {requiresPolicy}.");
@@ -408,9 +427,10 @@ public class AuthController : ControllerBase
                     GradeLevel = gradeName,
                     LastLoginDate = DateTime.UtcNow,
                     AvatarUrl = avatar,
-                    DataPolicyAccepted = user.DataPolicyAccepted,
+                    DataPolicyAccepted = user.DataPolicyAccepted && !hasRevokedMinorConsent,
                     DataPolicyVersion = user.DataPolicyVersion,
-                    RequiresPolicyAcceptance = requiresPolicy
+                    RequiresPolicyAcceptance = requiresPolicy,
+                    HasActiveMinorConsent = !requiresPolicy
                 }
             });
         }
@@ -520,6 +540,32 @@ public class AuthController : ControllerBase
             dto.GuardianFullName,
             dto.GuardianDocument);
 
+        if (isStudent && user.Alumno != null)
+        {
+            var previousConsents = await _context.ConsentimientosHabeasData
+                .Where(c => c.AlumnoId == user.Alumno.UsuarioId && c.FechaRevocatoriaUtc == null)
+                .ToListAsync();
+
+            foreach (var prev in previousConsents)
+            {
+                prev.FechaRevocatoriaUtc = DateTime.UtcNow;
+            }
+
+            var consentRecord = _consent.CreateHabeasDataRecord(
+                alumnoId: user.Alumno.UsuarioId,
+                usuarioId: user.Id,
+                guardianFullName: dto.GuardianFullName,
+                guardianDocument: dto.GuardianDocument,
+                tipoDocumento: dto.GuardianDocumentType,
+                autorizaServicioEducativo: dto.AutorizaServicioEducativo,
+                autorizaDatosOpcionales: dto.AutorizaDatosOpcionales,
+                autorizaTransmisionInternacional: dto.AutorizaTransmisionInternacional,
+                ip: ClientIp,
+                userAgent: Request.Headers.UserAgent.ToString());
+
+            _context.ConsentimientosHabeasData.Add(consentRecord);
+        }
+
         await _context.SaveChangesAsync();
 
         await AuditAsync(user, "Privacidad: Aceptación de política de tratamiento de datos",
@@ -539,6 +585,7 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpPost("google-login")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginDto dto)
     {
         if (!string.IsNullOrEmpty(dto.HoneypotTrap))
@@ -664,7 +711,11 @@ public class AuthController : ControllerBase
         }
 
         var roleStr = TokenService.NormalizeRole(user.Rol?.Nombre);
-        var requiresPolicy = !_consent.IsCurrent(user);
+        var hasRevokedMinorConsent = roleStr == "Student" && await _context.ConsentimientosHabeasData
+            .AnyAsync(c => c.AlumnoId == user.Id && c.FechaRevocatoriaUtc != null)
+            && !await _context.ConsentimientosHabeasData
+            .AnyAsync(c => c.AlumnoId == user.Id && c.AutorizaServicioEducativo && c.FechaRevocatoriaUtc == null);
+        var requiresPolicy = !_consent.IsCurrent(user) || hasRevokedMinorConsent;
 
         return Ok(new UserDto
         {
@@ -675,9 +726,10 @@ public class AuthController : ControllerBase
             GradeLevel = user.Alumno?.Grado?.Nombre,
             LastLoginDate = user.LastLoginAt,
             AvatarUrl = user.AvatarUrl ?? $"https://api.dicebear.com/7.x/bottts/svg?seed={Uri.EscapeDataString(user.Username)}",
-            DataPolicyAccepted = user.DataPolicyAccepted,
+            DataPolicyAccepted = user.DataPolicyAccepted && !hasRevokedMinorConsent,
             DataPolicyVersion = user.DataPolicyVersion,
-            RequiresPolicyAcceptance = requiresPolicy
+            RequiresPolicyAcceptance = requiresPolicy,
+            HasActiveMinorConsent = !requiresPolicy
         });
     }
 
@@ -811,6 +863,25 @@ public class AuthController : ControllerBase
             message = "Tu contraseña ha sido actualizada exitosamente.",
             token = newToken,
             expiration = newExpiration
+        });
+    }
+
+    /// <summary>
+    /// Endpoint de solicitud de recuperación de contraseña protegido por RateLimiter ("auth")
+    /// y respuesta uniforme contra enumeración de cuentas de menores.
+    /// </summary>
+    [HttpPost("recover-password")]
+    [AllowAnonymous]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> RecoverPassword([FromBody] LoginRequestDto? dto)
+    {
+        var requestedId = dto?.Id?.Trim() ?? "N/A";
+        await AuditAsync(null, "Autenticación: Solicitud de recuperación de contraseña",
+            $"Solicitud registrada para identificador: {ConsentService.MaskDocument(requestedId)}", "AUDIT");
+
+        return Ok(new
+        {
+            message = "Si la cuenta existe, el docente titular o el administrador institucional recibirá la solicitud de restablecimiento verificando la identidad del acudiente."
         });
     }
 

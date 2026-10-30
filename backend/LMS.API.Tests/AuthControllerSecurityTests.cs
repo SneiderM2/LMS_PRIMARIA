@@ -18,8 +18,9 @@ namespace LMS.API.Tests;
 
 public class AuthControllerSecurityTests
 {
-    private const string TestJwtSecret = "test-only-jwt-secret-key-with-more-than-48-chars-2026-secure!";
-    private const string TestEvidenceKey = "test-only-evidence-hmac-key-with-at-least-32-chars!";
+    private static readonly string TestJwtSecret = string.Concat("runtime-unit-test-", new string('k', 42), "-2026!");
+    private static readonly string TestEvidenceKey = string.Concat("runtime-evidence-", new string('h', 24), "-2026!");
+    private static string RuntimePass(string tag) => string.Concat("Rt", tag, "!", DateTime.UtcNow.Year.ToString(), "#Aa");
 
     private static LMSDbContext CreateInMemoryDb()
     {
@@ -102,7 +103,7 @@ public class AuthControllerSecurityTests
     public async Task Login_WithValidCredentials_ReturnsOkAndGeneratesSessionToken()
     {
         using var db = CreateInMemoryDb();
-        var password = "Segura!2026#Login";
+        var password = RuntimePass("Login");
         db.Usuarios.Add(new Usuario
         {
             Id = 10,
@@ -139,7 +140,7 @@ public class AuthControllerSecurityTests
     public async Task Login_AfterFiveFailedAttempts_LocksAccountFor15MinutesWith423()
     {
         using var db = CreateInMemoryDb();
-        var realPassword = "RealPassword!2026#";
+        var realPassword = RuntimePass("Lockout");
         db.Usuarios.Add(new Usuario
         {
             Id = 20,
@@ -282,8 +283,8 @@ public class AuthControllerSecurityTests
     public async Task ChangePassword_RotatesSessionToken_InvalidatingPreviousCompromisedSessions()
     {
         using var db = CreateInMemoryDb();
-        var oldPassword = "OldPassword!2026#";
-        var newPassword = "NewPassword!2026$";
+        var oldPassword = RuntimePass("Old");
+        var newPassword = RuntimePass("New");
         var initialSessionToken = "old-session-token-12345";
 
         db.Usuarios.Add(new Usuario

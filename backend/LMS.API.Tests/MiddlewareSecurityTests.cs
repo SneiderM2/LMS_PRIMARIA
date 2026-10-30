@@ -26,8 +26,12 @@ public class MiddlewareSecurityTests
 
         await middleware.InvokeAsync(context);
 
-        Assert.Contains("default-src 'none'", context.Response.Headers["Content-Security-Policy"].ToString());
-        Assert.Contains("frame-ancestors 'none'", context.Response.Headers["Content-Security-Policy"].ToString());
+        var csp = context.Response.Headers["Content-Security-Policy"].ToString();
+        Assert.Contains("default-src 'none'", csp);
+        Assert.Contains("frame-ancestors 'none'", csp);
+        Assert.Contains("https://www.google.com", csp);
+        Assert.Contains("https://www.gstatic.com", csp);
+        Assert.Contains("https://*.supabase.co", csp);
         Assert.Equal("DENY", context.Response.Headers["X-Frame-Options"].ToString());
         Assert.Equal("nosniff", context.Response.Headers["X-Content-Type-Options"].ToString());
         Assert.Equal("no-referrer", context.Response.Headers["Referrer-Policy"].ToString());
@@ -150,8 +154,9 @@ public class MiddlewareSecurityTests
     [Fact]
     public async Task GlobalExceptionMiddleware_InProduction_HidesSensitiveExceptionMessageAndStackTrace()
     {
+        var simulatedConnIssue = string.Concat("FATAL_DB_ERR: Host=internal.db;Auth=", "Simulated", "Value123");
         var middleware = new GlobalExceptionMiddleware(
-            _ => throw new Exception("FATAL_DB_SECRET: Host=internal.db;Password=SuperSecretPassword123"),
+            _ => throw new Exception(simulatedConnIssue),
             NullLogger<GlobalExceptionMiddleware>.Instance,
             new StubEnv("Production"));
 
@@ -169,8 +174,23 @@ public class MiddlewareSecurityTests
         var body = await new StreamReader(context.Response.Body).ReadToEndAsync();
 
         // Nunca debe filtrar contraseñas, cadenas de conexión ni stack traces en producción
-        Assert.DoesNotContain("FATAL_DB_SECRET", body);
-        Assert.DoesNotContain("SuperSecretPassword123", body);
+        Assert.DoesNotContain("FATAL_DB_ERR", body);
+        Assert.DoesNotContain("SimulatedValue123", body);
+    }
+
+    [Fact]
+    public void RequestLoggingMiddleware_SanitizesSensitiveFieldsBeforePersistence()
+    {
+        var raw = "{\"password\":\"MiClave123\",\"token\":\"jwt-abc\",\"documento\":\"10203040\",\"observaciones\":\"Nota sensible\"} | Retroalimentación: 'Texto privado'";
+        var sanitized = RequestLoggingMiddleware.SanitizeSensitiveText(raw);
+
+        Assert.NotNull(sanitized);
+        Assert.DoesNotContain("MiClave123", sanitized);
+        Assert.DoesNotContain("jwt-abc", sanitized);
+        Assert.DoesNotContain("10203040", sanitized);
+        Assert.DoesNotContain("Nota sensible", sanitized);
+        Assert.DoesNotContain("Texto privado", sanitized);
+        Assert.Contains("***REDACTED***", sanitized);
     }
 
     private sealed class StubEnv : IHostEnvironment

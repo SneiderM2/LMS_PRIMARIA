@@ -317,9 +317,9 @@ public class RequestLoggingMiddleware
         if (ex != null)
             detailsParts.Add($"Excepción: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
 
-        var details = string.Join(" | ", detailsParts);
+        var details = RequestLoggingMiddleware.SanitizeSensitiveText(string.Join(" | ", detailsParts));
 
-        return new AuditLogEntry
+        return RequestLoggingMiddleware.SanitizeEntry(new AuditLogEntry
         {
             Timestamp  = time.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
             Level      = level,
@@ -333,7 +333,7 @@ public class RequestLoggingMiddleware
             UserRole   = userRole,
             Action     = action,
             Details    = details
-        };
+        });
     }
 
     /// <summary>
@@ -812,8 +812,46 @@ public class RequestLoggingMiddleware
     }
 
     private static readonly Regex SensitiveQueryPattern = new(
-        @"(?i)\b(token|access_token|refresh_token|idtoken|password|clave|contrasena|contraseña|secret|authorization|captcha|captchatoken)=([^&]*)",
+        @"(?i)\b(token|access_token|refresh_token|idtoken|password|clave|contrasena|contraseña|secret|authorization|captcha|captchatoken|documento|observaciones)=([^&]*)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static readonly Regex SensitiveJsonPattern = new(
+        @"(?i)""(password|currentPassword|newPassword|clave|contrasena|contraseña|token|access_token|refresh_token|idToken|session_token|captchaToken|documento|acudienteDocumento|guardianDocument|solicitanteDocumento|observaciones|retroalimentacion|contenidoTexto)""\s*:\s*""([^""]*)""",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static readonly Regex SensitiveFreeTextPattern = new(
+        @"(?i)\b(password|clave|contraseña|token|documento|acudiente_documento|observaciones|retroalimentación|retroalimentacion|nota del alumno)\s*([:=])\s*('[^']*'|""[^""]*""|[^\s|,;]+)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static readonly Regex BearerJwtPattern = new(
+        @"(?i)\bBearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Sanitiza y enmascara campos sensibles (password, token, documento, observaciones, retroalimentación)
+    /// antes de persistir el registro de auditoría en archivos o en la base de datos (Ley 1581 de 2012).
+    /// </summary>
+    public static string? SanitizeSensitiveText(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return raw;
+        }
+
+        var sanitized = SensitiveJsonPattern.Replace(raw, "\"$1\":\"***REDACTED***\"");
+        sanitized = SensitiveFreeTextPattern.Replace(sanitized, "$1$2***REDACTED***");
+        sanitized = SensitiveQueryPattern.Replace(sanitized, "$1=***");
+        sanitized = BearerJwtPattern.Replace(sanitized, "Bearer ***REDACTED***");
+        return sanitized;
+    }
+
+    public static AuditLogEntry SanitizeEntry(AuditLogEntry entry)
+    {
+        entry.Path = SanitizeSensitiveText(entry.Path) ?? string.Empty;
+        entry.Action = SanitizeSensitiveText(entry.Action) ?? string.Empty;
+        entry.Details = SanitizeSensitiveText(entry.Details);
+        return entry;
+    }
 
     /// <summary>
     /// Evita registrar credenciales o identificadores sensibles en los logs.
@@ -919,6 +957,7 @@ public static class FileLogger
     {
         try
         {
+            RequestLoggingMiddleware.SanitizeEntry(entry);
             DbQueue?.Enqueue(entry);
             var json = JsonSerializer.Serialize(entry);
             ConsoleSink?.Invoke(json);
