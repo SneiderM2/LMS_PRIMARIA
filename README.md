@@ -35,7 +35,118 @@ Sistema de Gestión de Aprendizaje (LMS) diseñado con arquitectura limpia en **
 
 ---
 
-## 🛡️ Seguridad y cumplimiento normativo
+## 🛡️ Arquitectura de Seguridad y Cumplimiento Normativo Colombiano
+
+La arquitectura de **LMS Primaria** implementa controles técnicos de privacidad desde el diseño (*Privacy by Design*) y seguridad por defecto (*Security by Default*) en cumplimiento estricto de la legislación colombiana: **Ley Estatutaria 1581 de 2012** (Régimen General de Protección de Datos Personales), **Decreto Reglamentario 1377 de 2013** (incorporado en el Decreto Único 1074 de 2015), **Ley 1098 de 2006** (Código de la Infancia y la Adolescencia — Art. 7 y 33) y la **Circular Externa 002 de 2015 de la Superintendencia de Industria y Comercio (SIC)**.
+
+### 1. Cumplimiento de Habeas Data y Protección de Menores (Ley 1581 de 2012, Decreto 1377 de 2013 y Ley 1098 de 2006)
+
+#### Modelo de Evidencia Probatoria (`ConsentimientoHabeasData`)
+Conforme al principio de **Responsabilidad Demostrada (*Accountability*)** exigido por los artículos 9 y 12 de la Ley 1581 de 2012 y el artículo 12 del Decreto 1377 de 2013, el tratamiento de datos personales de niños, niñas y adolescentes (NNA) se respalda en la entidad relacional `ConsentimientoHabeasData` (`consentimientos_habeas_data`), vinculada a `Alumno` y `Usuario`:
+
+| Campo | Propósito Legal y Técnico |
+| :--- | :--- |
+| `Id` / `AlumnoId` / `UsuarioId` | Identificador único del consentimiento y trazabilidad con el estudiante menor de edad y la cuenta asociada. |
+| `AcudienteNombre` / `TipoDocumento` / `AcudienteDocumento` | Identificación del padre, madre o representante legal que otorga la autorización. El documento se almacena enmascarado (`ConsentService.MaskDocument`) para minimizar exposición de PII. |
+| `VersionPolitica` / `HashTextoPolitica` | Versión normativa aceptada y huella criptográfica **SHA-256** del texto íntegro de la política vigente, garantizando no repudio e integridad probatoria ante auditorías de la SIC. |
+| `AutorizaServicioEducativo` (`bool`, obligatorio) | Finalidad **esencial**: gestión académica, matrícula en cursos, entrega/calificación de tareas y seguimiento pedagógico (Semáforo Escolar). |
+| `AutorizaDatosOpcionales` (`bool`, opcional) | Finalidades **no esenciales** separadas explícitamente: actividades extracurriculares, reconocimientos y comunicaciones no académicas (prohibición de consentimientos en bloque). |
+| `AutorizaTransmisionInternacional` (`bool`) | Autorización expresa para la transmisión internacional de datos (Art. 26 Ley 1581 de 2012 y Art. 24-25 Decreto 1377 de 2013) hacia encargados tecnológicos cloud (**Render**, **Supabase Cloud** y **GitHub Pages**). |
+| `IpOrigen` / `UserAgent` | Metadatos forenses del dispositivo desde el cual el representante legal suscribió la autorización. |
+| `FechaAutorizacionUtc` / `FechaRevocatoriaUtc` | Marca de tiempo UTC de otorgamiento y de revocatoria (cuando aplica). La propiedad calculada `EstaVigente` verifica que `AutorizaServicioEducativo == true` y `FechaRevocatoriaUtc == null`. |
+
+#### Bloqueo Preventivo de Perfiles de Menores sin Consentimiento Vigente
+Ningún perfil con rol `Student` (`ALUMNO`) puede operar en la plataforma sin contar con un registro activo y vigente en `ConsentimientoHabeasData` firmado por su representante legal:
+
+- **Backend (.NET 8):**
+  - **`MinorConsentActionFilter`** (registrado sobre `StudentController`) y **`SingleSessionMiddleware`** verifican en cada petición autenticada que el alumno posea un registro en `ConsentimientosHabeasData` con `FechaRevocatoriaUtc == null`, `AutorizaServicioEducativo == true` y `VersionPolitica` igual a la versión institucional vigente.
+  - En caso de ausencia o revocatoria del consentimiento, el backend interrumpe la ejecución y responde con estado HTTP **`403 Forbidden`** y código de error estructurado **`MINOR_CONSENT_REQUIRED`**.
+- **Frontend (Angular 18):**
+  - El guard funcional **`minorConsentGuard`** (`frontend/src/app/core/guards/minor-consent.guard.ts`) protege todas las rutas de estudiante (`/student/**`), redirigiendo automáticamente a `/login?reason=minor_consent_required` y abriendo el componente standalone **`GuardianConsentNoticeComponent`** (Aviso de Privacidad en lenguaje claro conforme a la guía de la SIC) si `hasActiveGuardianConsent` o `dataPolicyAccepted` son `false`.
+
+---
+
+### 2. Gestión de Derechos ARCO y SLA Legal de la SIC (Art. 14 y 15 Ley 1581 de 2012)
+
+El controlador `PrivacyController` (`backend/LMS.API/Controllers/PrivacyController.cs`) y la entidad `SolicitudArco` (`solicitudes_arco`) gestionan formalmente el ciclo de vida de los derechos de **Conocer, Actualizar, Rectificar y Suprimir (ARCO)** y la revocatoria de autorización:
+
+| Método | Endpoint | Descripción Legal y Funcional |
+| :--- | :--- | :--- |
+| `POST` | `/api/privacy/arco` | Radica una solicitud formal ARCO (`CONOCER`, `ACTUALIZAR`, `RECTIFICAR`, `SUPRIMIR` o `REVOCAR`), enmascara el documento del solicitante y calcula automáticamente la fecha límite legal (`FechaLimiteLegalUtc`). |
+| `GET` | `/api/privacy/arco` | Consulta el historial de solicitudes ARCO radicadas por el titular o representante legal autenticado, incluyendo su estado (`RADICADA`, `EN_TRAMITE`, `RESUELTA`) y vencimiento legal. |
+| `POST` | `/api/privacy/consent/revoke` | Revoca inmediatamente el consentimiento vigente en `ConsentimientoHabeasData` (`FechaRevocatoriaUtc = DateTime.UtcNow`) y desmarca `DataPolicyAccepted`. |
+
+#### Motor de Cálculo de Días Hábiles Colombianos (`SolicitudArco.CalcularFechaLimiteLegalColombia`)
+Para garantizar el cumplimiento de los términos legales perentorios de la SIC sin depender de listas estáticas anuales, `SolicitudArco` implementa un motor de calendario laboral colombiano para cualquier año:
+- **Consultas (`CONOCER` / `ACCESO` — Art. 14 Ley 1581 de 2012):** **10 días hábiles** contados a partir del día hábil siguiente a la fecha de radicación.
+- **Reclamos (`ACTUALIZAR`, `RECTIFICAR`, `SUPRIMIR`, `REVOCAR` — Art. 15 Ley 1581 de 2012):** **15 días hábiles** contados a partir del día hábil siguiente a la fecha de radicación.
+- **Exclusión automática de fines de semana y los 18 festivos nacionales de Colombia (`ObtenerFestivosColombia(int year)`):**
+  1. **Festivos de fecha fija:** Año Nuevo (1 ene), Día del Trabajo (1 may), Día de la Independencia (20 jul), Batalla de Boyacá (7 ago), Inmaculada Concepción (8 dic) y Navidad (25 dic).
+  2. **Festivos trasladables al lunes siguiente (Ley 51 de 1983 — *Ley Emiliani*):** Reyes Magos (6 ene), San José (19 mar), San Pedro y San Pablo (29 jun), Asunción de la Virgen (15 ago), Día de la Raza (12 oct), Todos los Santos (1 nov) e Independencia de Cartagena (11 nov), calculados mediante `TrasladarALunesEmiliani(DateTime fecha)`.
+  3. **Festivos litúrgicos móviles basados en Pascua dinámica:** cálculo exacto del Domingo de Pascua para cualquier año mediante el **algoritmo astronómico de Meeus/Jones/Butcher (`CalcularDomingoPascua`)**, derivando Jueves Santo ($-3$ días), Viernes Santo ($-2$ días) y trasladando por Ley Emiliani la Ascensión del Señor ($+39$ días), Corpus Christi ($+60$ días) y Sagrado Corazón de Jesús ($+68$ días).
+
+---
+
+### 3. Seguridad Aplicativa (OWASP / Circular Externa 002 de 2015 SIC)
+
+#### Controles Anti-IDOR / BOLA (OWASP API1:2023)
+- **`TeacherController`:** Validación estricta del `UserId` extraído de los claims firmados del JWT frente a la propiedad del recurso antes de permitir cualquier operación de lectura o escritura:
+  - `CreateContent`, `EnrollStudent`, `GetGradebook`: verifican que el `CursoId` pertenezca a `DocenteId == teacher.Id`.
+  - `GetAssignmentSubmissions`, `UpdateActivity`, `GradeSubmission`: validan que la `Tarea` o `Entrega` pertenezca a un curso asignado al docente autenticado.
+  - `GetStudentProgressHistory`, `GetStudentSemaforoStatusById`: comprueban que el `AlumnoId` esté inscrito en un curso o grado asignado al docente antes de exponer calificaciones o el estado del semáforo escolar (`SemaforoStatus`).
+- **`StudentController`:**
+  - `GetStudentDashboard`, `EnrollInCourse`, `WithdrawFromCourse`, `UploadAssignment`: resuelven la identidad del estudiante exclusivamente desde el token JWT (`ClaimTypes.NameIdentifier`), bloquean matrículas o entregas cruzadas entre grados distintos (`403 Forbidden`) y verifican el consentimiento vigente del representante legal.
+
+#### Sanitización y Enmascaramiento de Logs de Auditoría
+- **`RequestLoggingMiddleware.SanitizeSensitiveText` y `AuditLogDbBackgroundService`:** Antes de escribir en disco o persistir en la tabla `audit_logs` de PostgreSQL, un sanitizador basado en expresiones regulares redacta y reemplaza por `***REDACTED***` cualquier campo sensible en JSON, querystrings o texto libre: `password`, `currentPassword`, `newPassword`, `token`, `accessToken`, `sessionToken`, `captchaToken`, `secret`, `documento`, `guardianDocument`, `acudienteDocumento`, `solicitanteDocumento`, `observaciones`, `feedback` y `retroalimentacion`.
+
+#### Rate Limiting, CORS Estricto y Security Headers
+- **`RateLimiter` nativo de .NET 8 (`Program.cs`):**
+  - Política `"auth"` aplicada mediante `[EnableRateLimiting("auth")]` a los endpoints críticos de `AuthController` (`login`, `google-login`, `register`, `change-password`), limitando ráfagas de fuerza bruta y credential stuffing por dirección IP con respuesta `429 Too Many Requests`.
+- **Normalización estricta de orígenes CORS (`CORS_ALLOWED_ORIGINS`):**
+  - `Program.cs` parsea la variable de entorno `CORS_ALLOWED_ORIGINS` separando por `,` o `;` y aplicando `.Trim().TrimEnd('/')` a cada URL configurada, evitando rechazos de preflight (`OPTIONS`) cuando el navegador envía el encabezado `Origin` sin barra diagonal final desde **GitHub Pages** (`https://sneiderm2.github.io`).
+- **`SecurityHeadersMiddleware`:**
+  - Inyecta en todas las respuestas `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Strict-Transport-Security: max-age=31536000; includeSubDomains` y una política **`Content-Security-Policy` (CSP)** endurecida que autoriza únicamente los dominios requeridos por **Google reCAPTCHA** (`https://www.google.com`, `https://www.gstatic.com`) y **Supabase** (`https://*.supabase.co`) en `connect-src`, `script-src` y `frame-src`.
+
+#### Privacidad en Equipos Compartidos (Angular 18 PWA)
+Pensado para salas de cómputo escolares y dispositivos compartidos en básica primaria:
+- **Cero PII en `localStorage`:** Los datos personales del estudiante (`currentUser`) residen en un `signal<User | null>` en memoria RAM dentro de `AuthService`. Las preferencias de notificaciones se aíslan bajo una clave anónima con hash (`lms_ReadNotifs_h_<hash>`).
+- **Rehidratación segura al recargar (`F5`):** Al recargar el navegador, `AuthService.ensureUserHydrated$()` restaura el estado de sesión desde `sessionStorage` (`lms_session_user`) o consulta `/api/auth/me` con el JWT activo antes de que `minorConsentGuard` evalúe la ruta, evitando cierres de sesión accidentales sin exponer PII en almacenamiento persistente.
+- **Purga automática tras 15 minutos de inactividad (`SessionTimeoutService`):** Monitorea eventos de interacción del usuario y, al cumplirse **15 minutos de inactividad** (o al cerrar sesión), ejecuta `AuthService.clearAllSensitiveStorage()`, limpiando `localStorage`, `sessionStorage` y todas las cachés del Service Worker (`caches.keys()`).
+
+---
+
+### 4. Guía de Variables de Entorno y Despliegue Seguro (CI/CD)
+
+El repositorio no almacena credenciales ni claves reales. La plantilla [`.env.example`](.env.example) documenta todas las variables requeridas utilizando exclusivamente el marcador `<REEMPLAZAR_EN_RENDER>`, y [`.gitguardian.yaml`](.gitguardian.yaml) protege el pipeline CI/CD frente a falsos positivos en pruebas unitarias.
+
+#### Variables de Entorno Principales (`.env.example`)
+
+| Variable de Entorno | Propósito y Requisitos de Seguridad |
+| :--- | :--- |
+| `DATABASE_URL` / `ConnectionStrings__DefaultConnection` | Cadena de conexión PostgreSQL hacia **Supabase Session Pooler** (puerto `5432`, IPv4 compatible con Render) con `SSL Mode=Require`. |
+| `SUPABASE_URL` | URL base del proyecto en Supabase (`https://<PROJECT_REF>.supabase.co`). |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clave privada `service_role` de Supabase para operaciones autenticadas del backend sobre el bucket privado `lms-uploads`. |
+| `Jwt__SecretKey` | Clave simétrica de alta entropía (**mínimo 48 caracteres**, recomendado 64 bytes en Base64) para firma de tokens JWT (`HS256`). |
+| `EVIDENCE_HMAC_KEY` / `Privacy__EvidenceHmacKey` | Clave criptográfica dedicada (**mínimo 32 caracteres**, distinta de `Jwt__SecretKey`) para firmar con `HMAC-SHA256` las evidencias de consentimiento de Habeas Data. |
+| `RECAPTCHA_SECRET_KEY` / `Recaptcha__SecretKey` | Clave secreta del servidor para validación *fail-closed* de tokens Google reCAPTCHA en login y registro público. |
+| `CORS_ALLOWED_ORIGINS` | Lista de orígenes autorizados separados por coma (ej. `https://sneiderm2.github.io`); normalizados automáticamente con `.TrimEnd('/')`. |
+| `SEED_DEFAULT_PASSWORD` | Credencial inicial leída por `DbInitializer` cuando se habilita el sembrado controlado (`Seed:Enabled=true`). En desarrollo, si no se define, se genera dinámicamente en tiempo de ejecución. |
+
+#### Comandos de Verificación (Suite de 125 Pruebas de Seguridad y Build de Producción)
+
+```powershell
+# 1. Ejecutar las 125 pruebas unitarias y de seguridad del backend (.NET 8 + xUnit)
+dotnet test backend/LMS.API.Tests/LMS.API.Tests.csproj --configuration Release
+
+# 2. Compilar el bundle de producción del frontend (Angular 18 PWA)
+cd frontend
+npx ng build --configuration production
+```
+
+---
+
+## 🛡️ Resumen de Controles y Documentación Normativa
 
 La plataforma incorpora controles alineados con la **Ley 1581 de 2012**, el **Decreto 1074 de 2015**,
 los lineamientos de la **SIC**, el **MSPI** de MinTIC, **ISO/IEC 27001**, **ISO/IEC 25010** y **NTC 5854**.
@@ -224,7 +335,7 @@ push a `main` (solo cuando cambian archivos de `frontend/`).
 ### PASO 5 — Pruebas y verificación
 
 ```powershell
-# Pruebas unitarias del backend (55)
+# Pruebas unitarias del backend (125)
 dotnet test backend\LMS.API.Tests\LMS.API.Tests.csproj -c Release
 
 # Pruebas unitarias del frontend (6, ChromeHeadless)
@@ -265,6 +376,9 @@ powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
 | :--- | :--- | :--- |
 | `GET` | `/api/privacy/policy` | Política y aviso de privacidad (público) |
 | `POST` | `/api/privacy/consent` | Registra consentimiento firmado y autorización de acudiente |
+| `POST` | `/api/privacy/consent/revoke` | Revoca la autorización vigente en `ConsentimientoHabeasData` |
+| `POST` | `/api/privacy/arco` | Radica solicitud formal ARCO con cálculo automático de SLA legal (10 o 15 días hábiles en Colombia) |
+| `GET` | `/api/privacy/arco` | Lista las solicitudes ARCO del usuario/acudiente autenticado |
 | `GET` | `/api/privacy/my-data` | Acceso y portabilidad (JSON descargable) |
 | `PUT` | `/api/privacy/my-data` | Rectificación de nombres y apellidos |
 | `POST` | `/api/privacy/delete-account` | Supresión con anonimización y eliminación de archivos |
