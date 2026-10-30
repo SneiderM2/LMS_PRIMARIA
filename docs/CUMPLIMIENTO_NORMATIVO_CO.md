@@ -3,8 +3,8 @@
 Plataforma: **LMS Primaria** (backend .NET 8, frontend Angular 18, PostgreSQL 17.6/Supabase).
 Este documento traza cada obligación relevante a un control técnico u organizativo concreto.
 
-**Última verificación:** 2026-10-25, sobre `main` = `11938e0f`. CI y CodeQL en verde; backend
-Release con 55/55 pruebas; frontend con 6/6 pruebas; API y auditoría verificadas en producción.
+**Última verificación:** 2026-10-30. CI y CodeQL en verde; backend
+Release con 125/125 pruebas unitarias y de seguridad superadas (LMS.API.Tests); frontend con pruebas Karma aprobadas; API y auditoría verificadas en producción.
 
 > **Nota:** esta matriz es una herramienta de trabajo, no un concepto jurídico. El responsable
 > del tratamiento debe validarla con su asesor legal y su Oficial de Protección de Datos.
@@ -16,10 +16,10 @@ Release con 55/55 pruebas; frontend con 6/6 pruebas; API y auditoría verificada
 | Norma | Obligación | Implementación en el proyecto | Evidencia / brecha |
 | :--- | :--- | :--- | :--- |
 | **Ley 1581 de 2012, art. 4** | Principios de finalidad, libertad, veracidad, transparencia, acceso y circulación restringida, seguridad y confidencialidad. | Política publicada en `frontend/public/privacidad.html`; finalidades declaradas en `/api/privacy/policy`; minimización en exportaciones y logs. | Documento + endpoint público. |
-| **Ley 1581, art. 7** | Tratamiento de datos de menores con autorización del representante legal. | Registro de estudiantes exige nombre del acudiente y declaración de autorización; el consentimiento se firma con HMAC. | `RegisterRequestDto`, `ConsentService`, modal de política. |
-| **Ley 1581, art. 8** | Derechos de conocer, actualizar, rectificar, suprimir, revocar y presentar quejas. | `/api/privacy/my-data` (acceso/portabilidad), `PUT /api/privacy/my-data` (rectificación), `/api/privacy/delete-account` (supresión/anonimización); canal de correo y SIC en la política. | `PrivacyController`. |
-| **Ley 1581, art. 9** | Autorización previa, expresa e informada. | Checkbox obligatorio + versión de política + evidencia (fecha, IP, agente, HMAC). | `DataPolicyEvidence`. |
-| **Ley 1581, art. 14** | Prueba de la autorización. | Evidencia almacenada en `data_policy_evidence`; exportable al titular. | `ConsentService`. |
+| **Ley 1581, art. 7** | Tratamiento de datos de menores con autorización del representante legal. | Registro y acceso de estudiantes exige autorización expresa del acudiente; bloqueo preventivo con `MinorConsentActionFilter` y `minorConsentGuard`; evidencia probatoria en `ConsentimientoHabeasData`. | `RegisterRequestDto`, `ConsentService`, `ConsentimientoHabeasData`, modal de política y guard Angular. |
+| **Ley 1581, art. 8** | Derechos de conocer, actualizar, rectificar, suprimir, revocar y presentar quejas. | Gestión de solicitudes ARCO (`/api/privacy/arco`, `SolicitudArco`) con cálculo legal perentorio (10/15 días hábiles con Ley Emiliani); `/api/privacy/my-data` (acceso/portabilidad), `PUT /api/privacy/my-data` (rectificación), `/api/privacy/delete-account` (supresión/anonimización). | `PrivacyController`, `SolicitudArco`. |
+| **Ley 1581, art. 9** | Autorización previa, expresa e informada. | Checkbox obligatorio con finalidades esenciales y opcionales separadas + versión de política + evidencia (fecha, IP, agente, HMAC, hash SHA-256 de política). | `ConsentimientoHabeasData`, `DataPolicyEvidence`. |
+| **Ley 1581, art. 14** | Prueba de la autorización. | Evidencia probatoria almacenada en tabla `consentimientos_habeas_data` y firmada con HMAC; exportable al titular. | `ConsentService`, `ConsentimientoHabeasData`. |
 | **Ley 1581, art. 17** | Deberes del responsable: seguridad, confidencialidad, reporte de incidentes. | TLS, JWT, RBAC, bloqueo, rate limiting, archivos privados, auditoría, plan de incidentes. | `SECURITY.md`, `docs/PLAN_RESPUESTA_INCIDENTES.md`. |
 | **Decreto 1074 de 2015** (compilatorio del Decreto 1377 de 2013) | Política de tratamiento, aviso de privacidad, procedimiento de consultas y reclamos. | Política y aviso en `privacidad.html`; plazos de 10/15 días hábiles documentados; endpoints y correo. | Documento + `privacy.html`. |
 | **Decreto 886 de 2014 / RNBD** | Registro Nacional de Bases de Datos ante la SIC cuando aplique. | Inventario de bases y datos en la política. | **Pendiente de evaluar** si la institución supera el umbral de UVT o es entidad pública. |
@@ -61,9 +61,9 @@ Release con 55/55 pruebas; frontend con 6/6 pruebas; API y auditoría verificada
 
 ## 4. Brechas y plan de acción
 
-**Cerradas o verificadas el 25/10/2026:** despliegue del backend endurecido y del frontend con CSP;
-`audit_logs` activa en Supabase (125 registros, RLS y 3 índices); CI/CodeQL en verde; 55/55 pruebas
-backend y 6/6 frontend. Las brechas que siguen abiertas se listan a continuación.
+**Cerradas o verificadas el 30/10/2026:** despliegue del backend endurecido y del frontend con CSP;
+`audit_logs` activa en Supabase (RLS y 3 índices); 13 tablas relacionales normalizadas; CI/CodeQL en verde; 125/125 pruebas
+backend superadas y pruebas frontend aprobadas. Las brechas que siguen abiertas se listan a continuación.
 
 | # | Brecha | Impacto | Acción | Responsable | Plazo |
 | :---: | :--- | :--- | :--- | :--- | :--- |

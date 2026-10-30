@@ -3,7 +3,7 @@
 **Marco de referencia:** Decreto 1078 de 2015 (sector TIC), MSPI de MinTIC, ISO/IEC 27001:2022,
 ISO/IEC 27002:2022, NIST SP 800-63B, OWASP ASVS 4.0.3 y OWASP Top 10 2021.
 
-**Última verificación:** 2026-10-28. Backend Release con 0 errores y 119/119 pruebas superadas; Frontend con 23/23 pruebas unitarias y de accesibilidad. Producción responde con
+**Última verificación:** 2026-10-30. Backend Release con 0 errores y 125/125 pruebas unitarias y de penetración superadas (LMS.API.Tests); Frontend con pruebas unitarias y de accesibilidad. Producción responde con
 `database: Healthy`; `audit_logs` está activa; pipeline de penetración DAST OWASP ZAP integrado.
 
 ---

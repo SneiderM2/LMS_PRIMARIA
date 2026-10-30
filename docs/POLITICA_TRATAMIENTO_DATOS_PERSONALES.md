@@ -77,30 +77,28 @@ La evidencia se conserva mientras exista la relación académica y durante el t�
 prescripción de las obligaciones (mínimo 5 años). El acceso está restringido al DPO y al
 administrador del sistema.
 
-### 4.4 Estado verificado (25/10/2026)
+### 4.4 Estado verificado (30/10/2026)
 
-- 18 usuarios registrados; **10 con consentimiento vigente (55,6 %)**, por debajo de la meta del 95 %.
-- La evidencia se almacena en la columna `usuarios.data_policy_evidence` (texto JSON) y se firma
-  con HMAC-SHA256; la tabla `audit_logs` registra los eventos asociados.
-- La página pública `privacidad.html` **todavía dice «12 caracteres»** y conserva «Por definir» en
-  NIT, dirección, teléfono y DPO. La implementación real usa 8–64; la página debe corregirse y los
-  datos institucionales completarse antes de una auditoría legal.
+- Evidencias probatorias de consentimiento de menores formalizadas en la tabla relacional `consentimientos_habeas_data` (con firma HMAC, versión, hash de política y autorización de transmisión internacional).
+- Bloqueo preventivo de perfiles de menores sin consentimiento vigente activo mediante `MinorConsentActionFilter` (`403 MINOR_CONSENT_REQUIRED`) y `minorConsentGuard` en Angular.
+- Radicación y trazabilidad formal de derechos ARCO a través de `solicitudes_arco` y endpoint `/api/privacy/arco`, con cálculo automatizado de días hábiles colombianos (Ley Emiliani).
+- La página pública `privacidad.html` conserva «Por definir» en NIT, dirección, teléfono y DPO; los datos institucionales deben completarse antes de una auditoría legal.
 
 ---
 
 ## 5. Procedimiento de consultas, reclamos y derechos (ARCO)
 
-| Etapa | Responsable | Plazo | Registro |
+| Etapa | Responsable | Plazo Legal | Registro Técnico |
 | :--- | :--- | :--- | :--- |
-| Recepción | DPO / secretaría | Día 0 | Correo o formulario con radicado |
-| Verificación de identidad | DPO | 1 día hábil | Documento del titular o poder del acudiente |
-| Consulta (acceso) | DPO + TI | 10 días hábiles | Respuesta escrita con datos y finalidades |
-| Reclamo (rectificación, supresión, revocatoria) | DPO + TI | 15 días hábiles | Decisión motivada y constancia de ejecución |
-| Escalamiento | Titular | — | Queja ante la SIC |
+| Radicación | DPO / Sistema | Día 0 | Endpoint `/api/privacy/arco` y persistencia en `solicitudes_arco` |
+| Verificación de identidad | DPO | 1 día hábil | Documento del titular o validación de acudiente |
+| Consulta (acceso/conocer) | DPO + TI | 10 días hábiles | Cálculo automático de fecha límite perentoria (excluye festivos colombianos) |
+| Reclamo (rectificación, supresión, revocatoria) | DPO + TI | 15 días hábiles | Cálculo automático de fecha límite perentoria (excluye festivos colombianos) |
+| Escalamiento | Titular | — | Queja formal ante la Superintendencia de Industria y Comercio (SIC) |
 
 Canales:
 
-- **En la aplicación:** «Descargar mis datos» y «Eliminar mi cuenta».
+- **En la aplicación:** Gestión de solicitudes ARCO (`/api/privacy/arco`), revocatoria directa de consentimiento (`/api/privacy/consent/revoke`), «Descargar mis datos» y «Eliminar mi cuenta».
 - **Correo:** `privacidad@lmsprimaria.edu.co`.
 - **Presencial:** ventanilla única de la institución.
 - **Autoridad:** Superintendencia de Industria y Comercio (SIC).
