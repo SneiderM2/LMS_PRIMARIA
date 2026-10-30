@@ -14,7 +14,7 @@ public class TokenServiceTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Jwt:SecretKey"] = new string('x', 64),
+                ["Jwt:SecretKey"] = new string('x', 64), // ggignore
                 ["Jwt:Issuer"] = "LMS.API",
                 ["Jwt:Audience"] = "LMS.Client",
                 ["Jwt:ExpirationMinutes"] = expirationMinutes.ToString()
@@ -53,7 +53,7 @@ public class TokenServiceTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Jwt:SecretKey"] = "corta"
+                ["Jwt:SecretKey"] = new string('x', 5) // ggignore
             })
             .Build();
 

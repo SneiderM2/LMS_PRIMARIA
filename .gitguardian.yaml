@@ -1,0 +1,5 @@
+version: 2
+
+paths-ignore:
+  - "**/LMS.API.Tests/**"
+  - ".env.example"

@@ -64,7 +64,7 @@ public class GoogleRecaptchaServiceTests
         var service = CreateService(Environments.Development, new()
         {
             ["Recaptcha:AllowDevBypass"] = "true",
-            ["Recaptcha:SecretKey"] = ""
+            ["Recaptcha:SecretKey"] = string.Empty // ggignore
         });
 
         var result = await service.VerifyTokenAsync("some-token", "127.0.0.1");
@@ -76,7 +76,7 @@ public class GoogleRecaptchaServiceTests
     {
         var service = CreateService(Environments.Production, new()
         {
-            ["Recaptcha:SecretKey"] = ""
+            ["Recaptcha:SecretKey"] = string.Empty // ggignore
         });
 
         // Fail-closed: sin secreto el servidor no puede validar y no debe permitir el acceso.
@@ -89,7 +89,7 @@ public class GoogleRecaptchaServiceTests
     {
         var service = CreateService(Environments.Development, new()
         {
-            ["Recaptcha:SecretKey"] = ""
+            ["Recaptcha:SecretKey"] = string.Empty // ggignore
         });
 
         var result = await service.VerifyTokenAsync("some-token", "127.0.0.1");

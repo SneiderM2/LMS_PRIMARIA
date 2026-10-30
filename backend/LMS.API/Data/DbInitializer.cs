@@ -9,9 +9,9 @@ namespace LMS.API.Data;
 /// Inicialización controlada de la base de datos.
 ///
 /// Cambios de seguridad:
-///  - Ya NO se crean cuentas con contraseñas conocidas (admin123, docente123…) de forma automática.
-///    El sembrado de cuentas demo requiere Seed:Enabled=true y contraseñas explícitas que cumplan
-///    la política institucional.
+///  - Ya NO se crean cuentas con credenciales conocidas de forma automática.
+///    El sembrado de cuentas demo requiere Seed:Enabled=true y credenciales explícitas leídas
+///    desde variables de entorno (SEED_DEFAULT_PASSWORD) o generadas dinámicamente en desarrollo.
 ///  - Ya NO se reactivan ni se desbloquean cuentas en cada arranque.
 ///  - Ya NO se marca DataPolicyAccepted=true sin consentimiento real del titular.
 ///
@@ -110,14 +110,18 @@ public class DbInitializer
             return;
         }
 
+        var adminCredential = ResolveSeedCredential("Seed:AdminPassword");
+        var teacherCredential = ResolveSeedCredential("Seed:TeacherPassword");
+        var studentCredential = ResolveSeedCredential("Seed:StudentPassword");
+
         await EnsureDemoUserAsync("admin", "Administrador", "General", adminRole.Id,
-            _configuration["Seed:AdminPassword"], "Administrador General");
+            adminCredential, "Administrador General");
 
         await EnsureDemoUserAsync("docente", "Profesor", "Primaria", teacherRole.Id,
-            _configuration["Seed:TeacherPassword"], "Profesor Primaria");
+            teacherCredential, "Profesor Primaria");
 
         var student = await EnsureDemoUserAsync("estudiante", "Estudiante", "Primaria", studentRole.Id,
-            _configuration["Seed:StudentPassword"], "Estudiante Primaria");
+            studentCredential, "Estudiante Primaria");
 
         if (student != null && student.Alumno == null)
         {
@@ -132,28 +136,61 @@ public class DbInitializer
         }
     }
 
+    private string? ResolveSeedCredential(string configPath)
+    {
+        var fromGlobalEnv = Environment.GetEnvironmentVariable("SEED_DEFAULT_PASSWORD");
+        if (IsUsableSeedValue(fromGlobalEnv))
+        {
+            return fromGlobalEnv;
+        }
+
+        var fromConfig = _configuration[configPath];
+        if (IsUsableSeedValue(fromConfig))
+        {
+            return fromConfig;
+        }
+
+        if (_environment.IsDevelopment())
+        {
+            return PasswordPolicy.GenerateTemporaryPassword();
+        }
+
+        return null;
+    }
+
+    private static bool IsUsableSeedValue(string? candidate)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return false;
+        }
+
+        var trimmed = candidate.Trim();
+        return !trimmed.StartsWith("__ENV_", StringComparison.OrdinalIgnoreCase)
+            && !trimmed.StartsWith('<');
+    }
+
     private async Task<Usuario?> EnsureDemoUserAsync(
         string username,
         string nombre,
         string apellido,
         int roleId,
-        string? password,
+        string? credentialValue,
         string fullNameForValidation)
     {
-        if (string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(credentialValue))
         {
             _logger.LogInformation(
-                "Cuenta demo '{Username}' omitida: configure Seed:{Key}Password con una contraseña fuerte.",
-                username,
-                char.ToUpperInvariant(username[0]) + username[1..]);
+                "Cuenta demo '{Username}' omitida: configure SEED_DEFAULT_PASSWORD con una credencial válida.",
+                username);
             return null;
         }
 
-        var validation = PasswordPolicy.Validate(password, username, fullNameForValidation);
+        var validation = PasswordPolicy.Validate(credentialValue, username, fullNameForValidation);
         if (!validation.IsValid)
         {
             _logger.LogWarning(
-                "Cuenta demo '{Username}' omitida: la contraseña configurada no cumple la política ({Reason}).",
+                "Cuenta demo '{Username}' omitida: la credencial configurada no cumple la política ({Reason}).",
                 username,
                 validation.Message);
             return null;
@@ -165,7 +202,7 @@ public class DbInitializer
 
         if (existing != null)
         {
-            // No se reactiva, desbloquea ni cambia la contraseña de cuentas existentes.
+            // No se reactiva, desbloquea ni cambia la credencial de cuentas existentes.
             return existing;
         }
 
@@ -173,7 +210,7 @@ public class DbInitializer
         {
             Username = username,
             RolId = roleId,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(credentialValue, workFactor: 12), // ggignore
             Nombre = nombre,
             Apellido = apellido,
             AvatarUrl = $"https://api.dicebear.com/7.x/bottts/svg?seed={Uri.EscapeDataString(username)}",

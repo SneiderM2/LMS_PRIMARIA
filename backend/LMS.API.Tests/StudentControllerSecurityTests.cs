@@ -34,8 +34,8 @@ public class StudentControllerSecurityTests
         );
 
         db.Usuarios.AddRange(
-            new Usuario { Id = 10, RolId = 2, Username = "profe.ciencias", Nombre = "Mario", Apellido = "Vargas", PasswordHash = "h", Activo = true },
-            new Usuario { Id = 50, RolId = 3, Username = "alumno.primero", Nombre = "Sofia", Apellido = "Castro", PasswordHash = "h", Activo = true, DataPolicyAccepted = true, DataPolicyVersion = "2026-10-19" }
+            new Usuario { Id = 10, RolId = 2, Username = "profe.ciencias", Nombre = "Mario", Apellido = "Vargas", PasswordHash = new string('h', 4), Activo = true }, // ggignore
+            new Usuario { Id = 50, RolId = 3, Username = "alumno.primero", Nombre = "Sofia", Apellido = "Castro", PasswordHash = new string('h', 4), Activo = true, DataPolicyAccepted = true, DataPolicyVersion = "2026-10-19" } // ggignore
         );
         db.Alumnos.Add(new Alumno { UsuarioId = 50, GradoId = 1 });
         db.ConsentimientosHabeasData.Add(new ConsentimientoHabeasData

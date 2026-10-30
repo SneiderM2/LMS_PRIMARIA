@@ -13,7 +13,7 @@ public class ConsentServiceTests
         var options = Options.Create(new PrivacyOptions
         {
             PolicyVersion = policyVersion,
-            EvidenceHmacKey = new string('k', 64)
+            EvidenceHmacKey = new string('k', 64) // ggignore
         });
 
         return new ConsentService(options);
