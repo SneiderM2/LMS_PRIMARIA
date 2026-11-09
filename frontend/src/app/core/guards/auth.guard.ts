@@ -33,7 +33,7 @@ export const authGuard: CanActivateFn = (route, state) => {
       // 2.1. Sesión rechazada por el backend (401: expirada o duplicada en otro dispositivo)
       if (error.status === 401) {
         const isDuplicate = error.error?.code === 'DUPLICATE_SESSION';
-        authService.clearSessionData();
+        authService.clearSessionData(isDuplicate);
 
         if (isDuplicate) {
           window.dispatchEvent(new CustomEvent('lms:duplicate-session', {

@@ -381,6 +381,33 @@ public class DbInitializer
 
     private async Task EnsureAuditLogsTableAsync(System.Data.Common.DbConnection conn)
     {
+        // 1. Asegurar clave primaria en 'alumnos(usuario_id)' para soportar las foreign keys hacia Alumno
+        try
+        {
+            using var pkCmd = conn.CreateCommand();
+            pkCmd.CommandText = @"
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'alumnos') THEN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint 
+                        WHERE conrelid = 'alumnos'::regclass 
+                          AND contype = 'p' 
+                          AND pg_get_constraintdef(oid) = 'PRIMARY KEY (usuario_id)'
+                    ) THEN
+                        ALTER TABLE alumnos DROP CONSTRAINT IF EXISTS alumnos_pkey;
+                        ALTER TABLE alumnos ADD CONSTRAINT alumnos_pkey PRIMARY KEY (usuario_id);
+                    END IF;
+                END IF;
+            END $$;";
+            await pkCmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception exPk)
+        {
+            _logger.LogWarning(exPk, "No fue posible verificar o ajustar la clave primaria de 'alumnos'.");
+        }
+
+        // 2. Asegurar tabla audit_logs
         try
         {
             using var auditCmd = conn.CreateCommand();
@@ -401,8 +428,30 @@ public class DbInitializer
                 details TEXT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);
-            CREATE INDEX IF NOT EXISTS idx_audit_logs_level ON audit_logs (level);
+            CREATE INDEX IF NOT EXISTS idx_audit_logs_level ON audit_logs (level);";
+            await auditCmd.ExecuteNonQueryAsync();
 
+            try
+            {
+                using var rlsCmd = conn.CreateCommand();
+                rlsCmd.CommandText = "ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;";
+                await rlsCmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception exRls)
+            {
+                _logger.LogWarning(exRls, "No fue posible habilitar RLS en audit_logs. Revise el propietario de la tabla.");
+            }
+        }
+        catch (Exception exAudit)
+        {
+            _logger.LogError(exAudit, "No se pudo crear la tabla audit_logs.");
+        }
+
+        // 3. Asegurar tabla consentimientos_habeas_data
+        try
+        {
+            using var consentCmd = conn.CreateCommand();
+            consentCmd.CommandText = @"
             CREATE TABLE IF NOT EXISTS consentimientos_habeas_data (
                 id SERIAL PRIMARY KEY,
                 alumno_id INT NOT NULL REFERENCES alumnos(usuario_id) ON DELETE CASCADE,
@@ -421,8 +470,19 @@ public class DbInitializer
                 fecha_revocatoria_utc TIMESTAMPTZ NULL
             );
             CREATE INDEX IF NOT EXISTS idx_consentimiento_alumno ON consentimientos_habeas_data (alumno_id);
-            CREATE INDEX IF NOT EXISTS idx_consentimiento_alumno_vigente ON consentimientos_habeas_data (alumno_id, fecha_revocatoria_utc);
+            CREATE INDEX IF NOT EXISTS idx_consentimiento_alumno_vigente ON consentimientos_habeas_data (alumno_id, fecha_revocatoria_utc);";
+            await consentCmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception exConsent)
+        {
+            _logger.LogError(exConsent, "No se pudo crear la tabla consentimientos_habeas_data.");
+        }
 
+        // 4. Asegurar tabla solicitudes_arco
+        try
+        {
+            using var arcoCmd = conn.CreateCommand();
+            arcoCmd.CommandText = @"
             CREATE TABLE IF NOT EXISTS solicitudes_arco (
                 id SERIAL PRIMARY KEY,
                 usuario_id INT NULL REFERENCES usuarios(id) ON DELETE SET NULL,
@@ -440,25 +500,11 @@ public class DbInitializer
             );
             CREATE INDEX IF NOT EXISTS idx_solicitudes_arco_usuario ON solicitudes_arco (usuario_id);
             CREATE INDEX IF NOT EXISTS idx_solicitudes_arco_estado_limite ON solicitudes_arco (estado, fecha_limite_legal_utc);";
-            await auditCmd.ExecuteNonQueryAsync();
-
-            // La tabla no debe quedar expuesta por la Data API a roles anónimos.
-            // El propietario de la tabla (usuario de la API) sigue pudiendo escribir.
-            try
-            {
-                using var rlsCmd = conn.CreateCommand();
-                rlsCmd.CommandText = "ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;";
-                await rlsCmd.ExecuteNonQueryAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "No fue posible habilitar RLS en audit_logs. Revise el propietario de la tabla.");
-            }
+            await arcoCmd.ExecuteNonQueryAsync();
         }
-        catch (Exception ex)
+        catch (Exception exArco)
         {
-            // La auditoría es un control de seguridad: un fallo no debe pasar inadvertido.
-            _logger.LogError(ex, "No se pudo crear la tabla audit_logs. Revise permisos y esquema en PostgreSQL.");
+            _logger.LogError(exArco, "No se pudo crear la tabla solicitudes_arco.");
         }
     }
 

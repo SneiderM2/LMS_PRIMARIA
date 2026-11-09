@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { SessionTimeoutService } from '../../../core/services/session-timeout.service';
@@ -16,12 +16,16 @@ export class SessionWarningModalComponent implements OnInit, OnDestroy {
   public remainingSeconds = 150;
   private sub?: Subscription;
 
-  constructor(private sessionTimeoutService: SessionTimeoutService) {}
+  constructor(
+    private sessionTimeoutService: SessionTimeoutService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit(): void {
     this.sub = this.sessionTimeoutService.sessionWarning$.subscribe(status => {
       this.visible = status.show;
       this.remainingSeconds = status.remainingSeconds;
+      this.cdr.detectChanges();
     });
   }
 

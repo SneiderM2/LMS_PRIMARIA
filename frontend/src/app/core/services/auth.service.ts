@@ -18,6 +18,7 @@ export interface ActiveSessionInfo {
 export class AuthService {
   private readonly apiUrl = environment.apiUrl;
   private readonly TOKEN_KEY = 'lms_auth_token';
+  private readonly TAB_TOKEN_KEY = 'lms_tab_auth_token';
   private readonly USER_KEY = 'lms_current_user';
   private readonly SESSION_META_KEY = 'lms_session_meta';
 
@@ -112,6 +113,11 @@ export class AuthService {
       tap((res) => {
         if (res?.token) {
           localStorage.setItem(this.TOKEN_KEY, res.token);
+          try {
+            sessionStorage.setItem(this.TAB_TOKEN_KEY, res.token);
+          } catch {
+            // Ignorar errores de cuota en modo privado
+          }
         }
       })
     );
@@ -128,18 +134,32 @@ export class AuthService {
     return this.http.get<{ valid: boolean }>(`${this.apiUrl}/auth/validate-session`, { headers });
   }
 
-  public clearSessionData(): void {
+  /**
+   * Limpia los artefactos de sesión.
+   * Si preserveSharedToken = true (cierre por sesión duplicada en otra pestaña del mismo navegador),
+   * conserva el nuevo token en localStorage si pertenece a la nueva pestaña activa.
+   */
+  public clearSessionData(preserveSharedToken = false): void {
     const savedTheme = localStorage.getItem('scikids_theme');
     const savedLang = localStorage.getItem('scikids_lang');
+    const sharedToken = localStorage.getItem(this.TOKEN_KEY);
+    const tabToken = sessionStorage.getItem(this.TAB_TOKEN_KEY);
+    const keepNewerSharedToken = preserveSharedToken && !!sharedToken && !!tabToken && sharedToken !== tabToken;
 
-    localStorage.clear();
-    sessionStorage.clear();
+    if (keepNewerSharedToken) {
+      localStorage.removeItem(this.USER_KEY);
+      localStorage.removeItem('user');
+      sessionStorage.clear();
+    } else {
+      localStorage.clear();
+      sessionStorage.clear();
 
-    if (savedTheme) {
-      localStorage.setItem('scikids_theme', savedTheme);
-    }
-    if (savedLang) {
-      localStorage.setItem('scikids_lang', savedLang);
+      if (savedTheme) {
+        localStorage.setItem('scikids_theme', savedTheme);
+      }
+      if (savedLang) {
+        localStorage.setItem('scikids_lang', savedLang);
+      }
     }
 
     // Limpieza de cachés de datos sensibles de PWA / Service Worker (aulas compartidas)
@@ -157,22 +177,43 @@ export class AuthService {
     this.requiresPolicyAcceptance.set(false);
   }
 
-  public logout(): void {
+  public logout(queryParams?: { [key: string]: any }): void {
     const token = this.getToken();
-    if (token) {
-      this.http.post(`${this.apiUrl}/auth/logout`, {}).subscribe({ error: () => {} });
-    }
     this.clearSessionData();
-    this.router.navigate(['/login']);
+    if (token) {
+      this.http.post(`${this.apiUrl}/auth/logout`, {}, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Skip-Interceptor-Redirect': 'true'
+        }
+      }).subscribe({ error: () => {} });
+    }
+    if (queryParams) {
+      this.router.navigate(['/login'], { queryParams });
+    } else {
+      this.router.navigate(['/login']);
+    }
+  }
+
+  /**
+   * Devuelve el token específico de esta pestaña si existe en sessionStorage.
+   */
+  public getTabToken(): string | null {
+    return sessionStorage.getItem(this.TAB_TOKEN_KEY);
   }
 
   /**
    * Devuelve el token solo si existe y no ha expirado. Un token vencido se descarta.
+   * Prioriza el token aislado de la pestaña (sessionStorage) para detectar sesiones desplazadas
+   * cuando otra pestaña del mismo navegador inicia una nueva sesión.
    */
   public getToken(): string | null {
-    const token = localStorage.getItem(this.TOKEN_KEY)
+    const tabToken = sessionStorage.getItem(this.TAB_TOKEN_KEY);
+    const sharedToken = localStorage.getItem(this.TOKEN_KEY)
       || localStorage.getItem('token')
       || localStorage.getItem('access_token');
+
+    const token = tabToken || sharedToken;
 
     if (!token) {
       return null;
@@ -181,6 +222,14 @@ export class AuthService {
     if (this.isTokenExpired(token)) {
       this.clearSessionData();
       return null;
+    }
+
+    if (!tabToken && sharedToken) {
+      try {
+        sessionStorage.setItem(this.TAB_TOKEN_KEY, sharedToken);
+      } catch {
+        // Ignorar errores de cuota en modo privado
+      }
     }
 
     return token;
@@ -286,6 +335,11 @@ export class AuthService {
 
   private saveAuthData(token: string, user: User): void {
     localStorage.setItem(this.TOKEN_KEY, token);
+    try {
+      sessionStorage.setItem(this.TAB_TOKEN_KEY, token);
+    } catch {
+      // Ignorar errores de cuota en modo privado
+    }
     // Cumplimiento Ley 1581 / Ley 1098: NO guardar PII de menores en texto plano en localStorage
     localStorage.removeItem(this.USER_KEY);
     this.saveNonPiiSessionMeta(user);
@@ -308,9 +362,19 @@ export class AuthService {
   private getStoredUser(): User | null {
     // Nunca leer PII en texto plano desde localStorage; reconstruir en memoria RAM desde el JWT vigente
     localStorage.removeItem(this.USER_KEY);
-    const token = localStorage.getItem(this.TOKEN_KEY);
+    const tabToken = sessionStorage.getItem(this.TAB_TOKEN_KEY);
+    const sharedToken = localStorage.getItem(this.TOKEN_KEY);
+    const token = tabToken || sharedToken;
     if (!token || this.isTokenExpired(token)) {
       return null;
+    }
+
+    if (!tabToken && sharedToken) {
+      try {
+        sessionStorage.setItem(this.TAB_TOKEN_KEY, sharedToken);
+      } catch {
+        // Ignorar errores de cuota en modo privado
+      }
     }
 
     try {

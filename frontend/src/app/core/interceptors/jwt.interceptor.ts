@@ -50,7 +50,7 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
     headers = headers.delete('X-Skip-Interceptor-Redirect');
   }
 
-  if (token && isApiUrl) {
+  if (token && isApiUrl && !headers.has('Authorization')) {
     headers = headers.set('Authorization', `Bearer ${token}`);
   }
 
@@ -91,7 +91,8 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
         const isAuthEndpoint =
           req.url.includes('/auth/login') ||
           req.url.includes('/auth/register') ||
-          req.url.includes('/auth/google-login');
+          req.url.includes('/auth/google-login') ||
+          req.url.includes('/auth/logout');
 
         if (!isAuthEndpoint) {
           // Si el guard solicitó gestionar la redirección vía UrlTree, se delega al guard
@@ -101,8 +102,8 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
 
           const isDuplicateSession = error.error?.code === 'DUPLICATE_SESSION';
 
-          // Limpiar todas las credenciales de almacenamiento local y de sesión
-          authService.clearSessionData();
+          // Limpiar todas las credenciales de almacenamiento local y de sesión (conservando token compartido si fue reemplazado por otra pestaña del mismo navegador)
+          authService.clearSessionData(isDuplicateSession);
 
           if (isDuplicateSession) {
             window.dispatchEvent(new CustomEvent('lms:duplicate-session', {

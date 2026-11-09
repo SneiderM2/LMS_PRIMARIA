@@ -215,42 +215,53 @@ public class AuthController : ControllerBase
                 SessionToken = Guid.NewGuid().ToString("N")
             };
 
-            _context.Usuarios.Add(nuevoUsuario);
-            await _context.SaveChangesAsync();
-
-            // La evidencia se firma una vez asignado el Id interno.
-            nuevoUsuario.DataPolicyEvidence = _consent.BuildEvidence(
-                nuevoUsuario,
-                "registration",
-                clientIp,
-                Request.Headers.UserAgent.ToString(),
-                request.GuardianFullName,
-                request.GuardianDocument);
-
-            if (targetRoleName == "ALUMNO" && grado != null)
+            using var tx = await _context.Database.BeginTransactionAsync();
+            try
             {
-                _context.Alumnos.Add(new Alumno
+                _context.Usuarios.Add(nuevoUsuario);
+                await _context.SaveChangesAsync();
+
+                // La evidencia se firma una vez asignado el Id interno.
+                nuevoUsuario.DataPolicyEvidence = _consent.BuildEvidence(
+                    nuevoUsuario,
+                    "registration",
+                    clientIp,
+                    Request.Headers.UserAgent.ToString(),
+                    request.GuardianFullName,
+                    request.GuardianDocument);
+
+                if (targetRoleName == "ALUMNO" && grado != null)
                 {
-                    UsuarioId = nuevoUsuario.Id,
-                    GradoId = grado.Id
-                });
+                    _context.Alumnos.Add(new Alumno
+                    {
+                        UsuarioId = nuevoUsuario.Id,
+                        GradoId = grado.Id
+                    });
 
-                var consentRecord = _consent.CreateHabeasDataRecord(
-                    alumnoId: nuevoUsuario.Id,
-                    usuarioId: nuevoUsuario.Id,
-                    guardianFullName: request.GuardianFullName,
-                    guardianDocument: request.GuardianDocument,
-                    tipoDocumento: request.GuardianDocumentType,
-                    autorizaServicioEducativo: request.AutorizaServicioEducativo && request.GuardianAuthorization,
-                    autorizaDatosOpcionales: request.AutorizaDatosOpcionales,
-                    autorizaTransmisionInternacional: request.AutorizaTransmisionInternacional,
-                    ip: clientIp,
-                    userAgent: Request.Headers.UserAgent.ToString());
+                    var consentRecord = _consent.CreateHabeasDataRecord(
+                        alumnoId: nuevoUsuario.Id,
+                        usuarioId: nuevoUsuario.Id,
+                        guardianFullName: request.GuardianFullName,
+                        guardianDocument: request.GuardianDocument,
+                        tipoDocumento: request.GuardianDocumentType,
+                        autorizaServicioEducativo: request.AutorizaServicioEducativo && request.GuardianAuthorization,
+                        autorizaDatosOpcionales: request.AutorizaDatosOpcionales,
+                        autorizaTransmisionInternacional: request.AutorizaTransmisionInternacional,
+                        ip: clientIp,
+                        userAgent: Request.Headers.UserAgent.ToString());
 
-                _context.ConsentimientosHabeasData.Add(consentRecord);
+                    _context.ConsentimientosHabeasData.Add(consentRecord);
+                }
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
             }
 
-            await _context.SaveChangesAsync();
             nuevoUsuario.Rol = rol;
 
             var (token, expiration) = _tokenService.GenerateToken(
@@ -363,7 +374,31 @@ public class AuthController : ControllerBase
                 });
             }
 
-            if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            bool passwordValid = false;
+            try
+            {
+                passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            }
+            catch (BCrypt.Net.SaltParseException)
+            {
+                // Fallback defensivo para contraseñas heredadas o insertadas manualmente en texto plano
+                if (!string.IsNullOrEmpty(user.PasswordHash) && request.Password == user.PasswordHash)
+                {
+                    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12);
+                    passwordValid = true;
+                }
+                else
+                {
+                    passwordValid = false;
+                }
+            }
+            catch (Exception exVerify)
+            {
+                _logger.LogWarning(exVerify, "Error verificando credenciales hash para {Username}", request.Id);
+                passwordValid = false;
+            }
+
+            if (!passwordValid)
             {
                 user.AccessFailedCount++;
 

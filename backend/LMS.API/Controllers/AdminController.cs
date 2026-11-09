@@ -385,24 +385,44 @@ public class AdminController : ControllerBase
         }
 
         // Actualizar grado de alumno si aplica
-        if (usuario.Alumno != null && !string.IsNullOrWhiteSpace(dto.GradeLevel))
+        var currentOrNewRole = !string.IsNullOrWhiteSpace(dto.Role) ? dto.Role.Trim().ToUpperInvariant() : usuario.Rol?.Nombre ?? "";
+        if (currentOrNewRole.Contains("ALUMNO") || currentOrNewRole.Contains("STUDENT"))
         {
-            var rawGrade = dto.GradeLevel.Trim();
-            var gradeKey = rawGrade.Contains('°') ? rawGrade[..(rawGrade.IndexOf('°') + 1)] : rawGrade;
-            var grados = await _context.Grados.ToListAsync();
-            var grado = grados.FirstOrDefault(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
-
-            if (grado == null)
+            if (!string.IsNullOrWhiteSpace(dto.GradeLevel))
             {
-                return BadRequest(new
-                {
-                    code = "INVALID_GRADE",
-                    message = $"El grado '{rawGrade}' no existe. Selecciona uno de los grados registrados.",
-                    validGrades = grados.Select(g => g.Nombre).OrderBy(g => g).ToArray()
-                });
-            }
+                var rawGrade = dto.GradeLevel.Trim();
+                var gradeKey = rawGrade.Contains('°') ? rawGrade[..(rawGrade.IndexOf('°') + 1)] : rawGrade;
+                var grados = await _context.Grados.ToListAsync();
+                var grado = grados.FirstOrDefault(g => g.Nombre == gradeKey || g.Nombre == rawGrade);
 
-            usuario.Alumno.GradoId = grado.Id;
+                if (grado == null)
+                {
+                    return BadRequest(new
+                    {
+                        code = "INVALID_GRADE",
+                        message = $"El grado '{rawGrade}' no existe. Selecciona uno de los grados registrados.",
+                        validGrades = grados.Select(g => g.Nombre).OrderBy(g => g).ToArray()
+                    });
+                }
+
+                if (usuario.Alumno != null)
+                {
+                    usuario.Alumno.GradoId = grado.Id;
+                }
+                else
+                {
+                    _context.Alumnos.Add(new Alumno { UsuarioId = usuario.Id, GradoId = grado.Id });
+                }
+            }
+            else if (usuario.Alumno == null)
+            {
+                // Si es alumno y no tiene perfil Alumno vinculado, asignar grado por defecto (1°)
+                var defaultGrade = await _context.Grados.OrderBy(g => g.Id).FirstOrDefaultAsync();
+                if (defaultGrade != null)
+                {
+                    _context.Alumnos.Add(new Alumno { UsuarioId = usuario.Id, GradoId = defaultGrade.Id });
+                }
+            }
         }
 
         await _context.SaveChangesAsync();
