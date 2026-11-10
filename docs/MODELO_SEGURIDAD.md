@@ -3,8 +3,7 @@
 **Marco de referencia:** Decreto 1078 de 2015 (sector TIC), MSPI de MinTIC, ISO/IEC 27001:2022,
 ISO/IEC 27002:2022, NIST SP 800-63B, OWASP ASVS 4.0.3 y OWASP Top 10 2021.
 
-**Última verificación:** 2026-10-30. Backend Release con 0 errores y 125/125 pruebas unitarias y de penetración superadas (LMS.API.Tests); Frontend con pruebas unitarias y de accesibilidad. Producción responde con
-`database: Healthy`; `audit_logs` está activa; pipeline de penetración DAST OWASP ZAP integrado.
+**Última verificación:** 2026-11-10. Backend Release con 0 errores y **126/126** pruebas unitarias, de concurrencia y penetración superadas (`LMS.API.Tests`); Frontend con build de producción correcto (`ng build`) y **24/24** pruebas Karma/Jasmine aprobadas en ChromeHeadless (incluido aislamiento multi-pestaña). En despliegue productivo previo (`database: Healthy`), `audit_logs` activa y pipeline OWASP ZAP DAST integrado.
 
 ---
 
@@ -69,7 +68,8 @@ administradores solo se crean desde el panel administrativo autenticado.
 - Contraseñas con BCrypt (coste 12), política de 8 a 64 caracteres y bloqueo de contraseñas comunes.
 - Bloqueo temporal de 15 minutos tras 5 fallos y limitación de tasa por IP.
 - JWT firmado con HMAC-SHA256, expiración de 8 horas, `jti`, `iat` y `nbf`.
-- Revocación por sesión única (token de sesión en base de datos).
+- Revocación por sesión única (token de sesión en base de datos), optimizada mediante caché `IMemoryCache` de 15 s en `SingleSessionMiddleware` con invalidación explícita (`InvalidateUserCache`) tras cambios de sesión, consentimiento o administración.
+- Aislamiento multi-pestaña por usuario en frontend (`sessionStorage['lms_tab_auth_token']`, `lms_tab_logged_out` y comparación de identidad JWT en `SessionTimeoutService.handleStorageEvent`) para evitar cierres cruzados entre distintos usuarios en el mismo navegador.
 - Revisión periódica de cuentas y roles; cuentas demo desactivadas en producción.
 
 ### 4.2 Protección de datos y criptografía (A.8/A.10)
@@ -87,8 +87,9 @@ administradores solo se crean desde el panel administrativo autenticado.
 - Prevención de IDOR con validación de pertenencia.
 - CORS con lista blanca; sin `AllowCredentials` innecesario.
 - Cabeceras de seguridad y CSP restrictiva en la API.
-- Rate limiting por política y global.
-- Manejo global de excepciones sin filtrar detalles en producción.
+- Rate limiting por política y global con cola de amortiguación (`QueueProcessingOrder.OldestFirst`): 60/min (`QueueLimit = 15`) en auth, 120/h (`QueueLimit = 15`) en uploads, 1200/min (`QueueLimit = 30`) global y exención para `/api/ping`, `/api/health` y `/api/health/live`.
+- Manejo global de excepciones (`GlobalExceptionMiddleware`) sin exponer trazas `StackTrace` en la respuesta HTTP ni en producción ni en `Development` (mitigación CWE-209/CWE-497).
+- Pool PostgreSQL de 50 conexiones por defecto (`DATABASE_MAX_POOL_SIZE`) y captura de `DbUpdateException` con limpieza de `ChangeTracker` (`409 Conflict` / reintento idempotente) en registro, matrícula y entregas concurrentes.
 - Swagger deshabilitado en producción.
 - Validación de archivos: extensión + firma real + tamaño + nombre saneado.
 

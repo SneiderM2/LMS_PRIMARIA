@@ -46,7 +46,7 @@ análisis de dependencias, resultados de CI/CodeQL y monitoreo de `/api/health`.
 
 ### 3.2 Contención
 
-- Revocar sesiones (`session_token = NULL`) y rotar la clave JWT si hay sospecha.
+- Revocar sesiones (`session_token = NULL` e invalidar caché de sesión en memoria mediante `SingleSessionMiddleware.InvalidateUserCache`, cuyo TTL máximo es 15 s) y rotar la clave JWT si hay sospecha.
 - Deshabilitar cuentas comprometidas.
 - Bloquear IPs o activar modo mantenimiento si es necesario.
 - Aislar el contenedor o restaurar una versión anterior.

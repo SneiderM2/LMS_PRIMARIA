@@ -3,8 +3,7 @@
 **Marcos:** ISO/IEC 25010 (calidad del producto), NTC 5854:2012 (accesibilidad web, WCAG 2.0 AA),
 NTC-ISO 9001:2015 (gestión de la calidad) y buenas prácticas de ingeniería de software.
 
-**Última verificación:** 2026-10-25, sobre `main` = `fix/audit-2026-10` = `11938e0f`.
-CI y CodeQL en `success`; frontend de Pages desplegado desde `d2dad0cf`.
+**Última verificación:** 2026-11-10 (suites locales verificadas tras endurecimiento multi-pestaña, concurrencia y estrés: **126/126** xUnit backend y **24/24** Karma/Jasmine frontend; despliegue productivo e historial CI previos sobre `main` = `11938e0f` / `d2dad0cf` el 25-28/10/2026).
 
 ---
 
@@ -13,22 +12,22 @@ CI y CodeQL en `success`; frontend de Pages desplegado desde `d2dad0cf`.
 | Característica | Subcaracterística | Situación actual | Meta |
 | :--- | :--- | :--- | :--- |
 | Adecuación funcional | Completitud, corrección | Matrícula, cursos, tareas, entregas, notas y reportes implementados | Cobertura funcional ≥ 95 % |
-| Eficiencia de desempeño | Tiempo de respuesta, uso de recursos | Warmup, pool de conexiones, proyecciones EF; sin medición formal de p95 | p95 API < 800 ms |
-| Compatibilidad | Interoperabilidad | API REST/JSON, PostgreSQL, PWA | Contratos versionados |
+| Eficiencia de desempeño | Tiempo de respuesta, uso de recursos | Warmup, pool de conexiones (`50` vía `DATABASE_MAX_POOL_SIZE`), caché `IMemoryCache` (15 s) en `SingleSessionMiddleware`, colas `QueueLimit` en `RateLimiter`, proyecciones EF; sin medición formal de p95 | p95 API < 800 ms |
+| Compatibilidad | Interoperabilidad | API REST/JSON, PostgreSQL, PWA, aislamiento de sesiones multi-usuario por pestaña | Contratos versionados |
 | Usabilidad | Aprendizaje, accesibilidad | Interfaz infantil, 5 idiomas, modo oscuro; accesibilidad parcial | NTC 5854 AA |
-| Fiabilidad | Disponibilidad, tolerancia a fallos | Reintentos EF, health checks, manejo global de errores; hosting gratuito con *cold start* | Disponibilidad ≥ 99 % |
-| Seguridad | Confidencialidad, integridad | JWT, RBAC, TLS, rate limiting, auditoría, archivos privados | Ver `SECURITY.md` |
-| Mantenibilidad | Modularidad, analizabilidad | Arquitectura por capas, DTOs, servicios, 55 pruebas backend y 6 frontend; faltan integración/E2E y medición formal de cobertura | Cobertura ≥ 60 % en servicios críticos |
+| Fiabilidad | Disponibilidad, tolerancia a fallos | Reintentos EF, manejo de `DbUpdateException` concurrente (`ChangeTracker.Clear()`), health checks exentos de rate limit, manejo global de errores sin trazas; hosting gratuito con *cold start* | Disponibilidad ≥ 99 % |
+| Seguridad | Confidencialidad, integridad | JWT, RBAC, TLS, rate limiting con colas, auditoría, archivos privados, cero `StackTrace` (CWE-209) | Ver `SECURITY.md` |
+| Mantenibilidad | Modularidad, analizabilidad | Arquitectura por capas, DTOs, servicios, **126 pruebas backend** y **24 frontend**; faltan integración/E2E y medición formal de cobertura | Cobertura ≥ 60 % en servicios críticos |
 | Portabilidad | Adaptabilidad | Docker, configuración por entorno, Angular multiplataforma | Despliegue reproducible |
 
 ### Métricas de referencia
 
-| Métrica | Valor actual (28/10/2026) | Cómo obtenerla |
+| Métrica | Valor actual (10/11/2026; producción 28/10/2026) | Cómo obtenerla |
 | :--- | :--- | :--- |
 | Compilación backend | Correcta, 0 errores / 0 advertencias | `dotnet build -c Release` |
-| Compilación frontend | Correcta; build de producción con CSP | `npm run build` |
-| Bundle inicial | **165,09 KB**: `main` 105,7 KB + `polyfills` 34,5 KB + `styles` 17,8 KB; `dist` total ~1,99 MB | `ng build --configuration production` |
-| Pruebas automatizadas | **119/119** backend (xUnit) + **23/23** frontend (Karma/Jasmine, ChromeHeadless) | `dotnet test ...` y `npm test` |
+| Compilación frontend | Correcta; build de producción con CSP | `ng build --configuration production` |
+| Bundle inicial | **165,09 KB**: `main` 105,7 KB + `polyfills` 34,5 KB + `styles` 17,8 KB; `dist` total ~1,99 MB _(28/10/2026)_ | `ng build --configuration production` |
+| Pruebas automatizadas | **126/126** backend (xUnit) + **24/24** frontend (Karma/Jasmine, ChromeHeadless) | `dotnet test ...` y `npm test` |
 | CI/CD | CI, CodeQL y OWASP ZAP DAST en verde; Deploy Pages en verde | GitHub Actions |
 | Vulnerabilidades conocidas | Angular 18: 9 (4 moderadas, 5 altas, 0 críticas) en producción; NuGet sin paquetes vulnerables | `dotnet list package --vulnerable`, `npm audit --omit=dev --audit-level=critical` |
 | Producción | `/api/ping`, `/api/health` y `/api/health/live` 200; Swagger 404; `database: Healthy`, `storage: Local` | Verificación HTTP del 28/10/2026 |
@@ -96,10 +95,11 @@ Leyenda: ✅ cumple · ⚠️ parcial · ❌ pendiente.
 
 ## 5. Estrategia de pruebas
 
-### Actual
+### Actual (actualizado al 10/11/2026)
 
-- **55/55** pruebas unitarias backend (`PasswordPolicy`, `FileSignatureValidator`, `ConsentService`, `TokenService`, CAPTCHA, cola de auditoría).
-- **6/6** pruebas unitarias frontend de la política de contraseñas (Karma/Jasmine, ChromeHeadless).
+- **126/126** pruebas unitarias y de seguridad backend (`LMS.API.Tests`: `AuthControllerSecurityTests`, `AdminControllerSecurityTests`, `TeacherControllerSecurityTests`, `StudentControllerSecurityTests`, `ConsentServiceTests`, `MiddlewareSecurityTests` — incluida validación de cero `StackTrace` en Development).
+- **24/24** pruebas unitarias y de accesibilidad frontend en ChromeHeadless (política de contraseñas, `jwt.interceptor.spec.ts`, `login.accessibility.spec.ts` y aislamiento de sesiones multi-pestaña en `auth.service.spec.ts`).
+- `ng build --configuration production` y `dotnet test ... --configuration Release` verificados en verde el **10/11/2026**.
 - Revisión visual manual del login y registro en escritorio (1280 px) y móvil (390 px), tema claro y oscuro: banner de cold start sin solapamiento, banderas SVG locales, estado de warmup con reintentos y formulario de registro apilado en pantallas pequeñas.
 - CI y CodeQL en verde para `11938e0f`; Deploy Angular to GitHub Pages en verde para `d2dad0cf`.
 - Prueba de humo de seguridad (`scripts/security_smoke_test.ps1`) y verificación HTTP de producción: salud, Swagger, CORS y cabeceras.

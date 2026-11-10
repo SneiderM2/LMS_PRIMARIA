@@ -42,13 +42,13 @@ masiva de datos personales.
 > La migración a .NET 10 y a una versión soportada de Angular no se ejecutó en la auditoría
 > 2026-10. Es una deuda de plataforma con fecha límite y debe planificarse antes del EOL de .NET 8.
 
-### 2.1 Estado verificado de producción (28/10/2026)
+### 2.1 Estado verificado (pruebas locales actualizadas el 10/11/2026; producción el 28/10/2026)
 
 | Comprobación | Resultado |
 | :--- | :--- |
-| Repositorio | Rama principal con suites completas de penetración y accesibilidad. |
-| Backend Release | 0 errores, 0 advertencias; **119/119 pruebas xUnit** de seguridad y penetración superadas. |
-| Frontend | Build de producción correcto; **23/23 pruebas Karma/Jasmine** aprobadas en ChromeHeadless. |
+| Repositorio | Rama principal con suites de penetración, concurrencia, aislamiento multi-pestaña y accesibilidad. |
+| Backend Release | Verificado el 10/11/2026: 0 errores, 0 advertencias; **126/126 pruebas xUnit** de seguridad, Middleware y penetración superadas. |
+| Frontend | Verificado el 10/11/2026: build de producción (`ng build`) correcto; **24/24 pruebas Karma/Jasmine** aprobadas en ChromeHeadless (incluido aislamiento multi-pestaña). |
 | DAST CI/CD | Pipeline automatizado con OWASP ZAP Baseline Scan (`.github/workflows/dast-scan.yml`). |
 | Salud de la API | `/api/ping` 200; `/api/health` 200 (`database: Healthy`, `storage: Local`); `/api/health/live` 200. |
 | Swagger | `404` en producción. |
@@ -68,7 +68,14 @@ masiva de datos personales.
 - JWT firmado con HMAC-SHA256; clave de al menos 48 caracteres obligatoria, sin valores por defecto.
 - Expiración configurable (8 h por defecto) y validación estricta de emisor, audiencia, firma y vigencia.
 - Revocación por **sesión única**: cada inicio de sesión invalida el token anterior. El servidor
-  rechaza tokens revocados, nulos, de cuentas inactivas o anonimizadas.
+  rechaza tokens revocados, nulos, de cuentas inactivas o anonimizadas. `SingleSessionMiddleware` emplea
+  caché en memoria (`IMemoryCache`, TTL de 15 s) con invalidación inmediata (`InvalidateUserCache`) tras
+  login, consentimiento, revocación, eliminación de cuenta, cambio de contraseña o cambios administrativos.
+- **Aislamiento multi-pestaña por usuario (frontend):** Cada pestaña mantiene su token en `sessionStorage`
+  (`lms_tab_auth_token`) y marcador `lms_tab_logged_out`; `SessionTimeoutService` compara la identidad
+  del JWT (`extractUserIdFromToken`) para cerrar únicamente sesiones duplicadas del **mismo usuario**,
+  permitiendo operar distintos usuarios en paralelo sin cierres cruzados ni adopción accidental de sesiones
+  al cerrar una pestaña.
 - **Rotación inmediata de sesión en cambio de contraseña:** Al modificar credenciales en `AuthController.ChangePassword`,
   se genera un nuevo identificador de sesión `SessionToken = Guid.NewGuid().ToString("N")`, revocando sesiones abiertas en otros dispositivos y emitiendo un nuevo JWT.
 - Bloqueo temporal de 15 minutos tras 5 intentos fallidos; mensajes de error uniformes.
@@ -110,10 +117,16 @@ masiva de datos personales.
 ### Aplicación y API
 
 - CORS con lista blanca explícita (sin comodines ni credenciales).
-- Limitación de solicitudes: 30/min en autenticación, 60/h en subidas y 600/min global por IP.
+- Limitación de solicitudes con cola de ráfagas (`QueueProcessingOrder.OldestFirst`): **60/min** (`QueueLimit = 15`)
+  en autenticación, **120/h** (`QueueLimit = 15`) en subidas y **1200/min** (`QueueLimit = 30`) global por IP;
+  `/api/ping`, `/api/health` y `/api/health/live` están exentos (`GetNoLimiter`).
 - Cabeceras de seguridad: CSP restrictiva, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP/CORP.
 - HSTS con `max-age` de un año en producción.
-- Errores genéricos en producción; sin trazas ni mensajes internos en las respuestas.
+- Errores genéricos en todo entorno: `GlobalExceptionMiddleware` nunca incluye `StackTrace` en la respuesta HTTP
+  (incluso en `Development`, mitigando CWE-209/CWE-497).
+- **Resistencia a concurrencia y estrés:** Pool PostgreSQL de **50 conexiones** por defecto (`DATABASE_MAX_POOL_SIZE`)
+  y manejo explícito de `DbUpdateException` con limpieza de `ChangeTracker` (`409 Conflict` / reintento
+  idempotente) en registro, matrícula y carga de entregas.
 - Swagger deshabilitado en producción.
 - Validación de modelo y límites de tamaño de archivo y de cuerpo de la petición.
 
@@ -148,7 +161,7 @@ masiva de datos personales.
 | Política pública de privacidad desactualizada | **Acción obligatoria** | `frontend/public/privacidad.html` todavía indica «12 caracteres» y conserva «Por definir»; la implementación real exige 8–64. Corregir el texto antes de una auditoría legal. |
 | Política de privacidad con datos institucionales incompletos | **Acción obligatoria** | Completar NIT, razón social, dirección, teléfono, correo, DPO y encargados antes de una auditoría legal. |
 | Migraciones de esquema en tiempo de ejecución | Deuda técnica | Migrar a EF Core Migrations y aprobar cambios por revisión. |
-| Pruebas automatizadas limitadas | En progreso | Verificado el 25/10/2026: 55/55 pruebas backend (xUnit) y 6/6 frontend (Karma/Jasmine); pendiente integración/E2E y OWASP ZAP. |
+| Pruebas automatizadas limitadas | En progreso | Verificado el 10/11/2026: **126/126** pruebas backend (xUnit) y **24/24** frontend (Karma/Jasmine), más pipeline OWASP ZAP Baseline; pendiente suite E2E (Playwright) y pruebas de carga desplegadas (`k6`). |
 
 ---
 

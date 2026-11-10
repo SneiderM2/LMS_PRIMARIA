@@ -100,19 +100,25 @@ Para garantizar el cumplimiento de los términos legales perentorios de la SIC s
 #### Sanitización y Enmascaramiento de Logs de Auditoría
 - **`RequestLoggingMiddleware.SanitizeSensitiveText` y `AuditLogDbBackgroundService`:** Antes de escribir en disco o persistir en la tabla `audit_logs` de PostgreSQL, un sanitizador basado en expresiones regulares redacta y reemplaza por `***REDACTED***` cualquier campo sensible en JSON, querystrings o texto libre: `password`, `currentPassword`, `newPassword`, `token`, `accessToken`, `sessionToken`, `captchaToken`, `secret`, `documento`, `guardianDocument`, `acudienteDocumento`, `solicitanteDocumento`, `observaciones`, `feedback` y `retroalimentacion`.
 
-#### Rate Limiting, CORS Estricto y Security Headers
+#### Rate Limiting, Concurrencia, CORS Estricto y Security Headers
 - **`RateLimiter` nativo de .NET 8 (`Program.cs`):**
-  - Política `"auth"` aplicada mediante `[EnableRateLimiting("auth")]` a los endpoints críticos de `AuthController` (`login`, `google-login`, `register`, `change-password`), limitando ráfagas de fuerza bruta y credential stuffing por dirección IP con respuesta `429 Too Many Requests`.
+  - Política `"auth"` (`[EnableRateLimiting("auth")]`): **60 req/min** por IP con cola `QueueLimit = 15` (`QueueProcessingOrder.OldestFirst`).
+  - Política `"uploads"`: **120 req/h** por IP con cola `QueueLimit = 15`.
+  - `GlobalLimiter`: **1200 req/min** por IP con cola `QueueLimit = 30`.
+  - Exención explícita (`RateLimitPartition.GetNoLimiter("unlimited_health")`) para `/api/ping`, `/api/health` y `/api/health/live` para evitar falsos `429` en sondeos o *warmup*.
+- **Caché de sesión y resistencia a ráfagas (`SingleSessionMiddleware`):** Validación en memoria (`IMemoryCache`, TTL de **15 s**) con invalidación inmediata (`InvalidateUserCache`) tras login, consentimiento, revocación, eliminación de cuenta, cambio de contraseña o cambios administrativos; reduce 2 consultas PostgreSQL por petición autenticada bajo estrés.
+- **Tolerancia a concurrencia y CWE-209:** `GlobalExceptionMiddleware` nunca concatena `ex.StackTrace` en la respuesta HTTP incluso en modo `Development`, y `AuthController.Register` / `StudentController` (`UploadAssignment`, `EnrollInCourse`, `WithdrawFromCourse`) capturan `DbUpdateException` ante colisiones simultáneas.
 - **Normalización estricta de orígenes CORS (`CORS_ALLOWED_ORIGINS`):**
   - `Program.cs` parsea la variable de entorno `CORS_ALLOWED_ORIGINS` separando por `,` o `;` y aplicando `.Trim().TrimEnd('/')` a cada URL configurada, evitando rechazos de preflight (`OPTIONS`) cuando el navegador envía el encabezado `Origin` sin barra diagonal final desde **GitHub Pages** (`https://sneiderm2.github.io`).
 - **`SecurityHeadersMiddleware`:**
   - Inyecta en todas las respuestas `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Strict-Transport-Security: max-age=31536000; includeSubDomains` y una política **`Content-Security-Policy` (CSP)** endurecida que autoriza únicamente los dominios requeridos por **Google reCAPTCHA** (`https://www.google.com`, `https://www.gstatic.com`) y **Supabase** (`https://*.supabase.co`) en `connect-src`, `script-src` y `frame-src`.
 
-#### Privacidad en Equipos Compartidos (Angular 18 PWA)
-Pensado para salas de cómputo escolares y dispositivos compartidos en básica primaria:
+#### Privacidad en Equipos Compartidos y Aislamiento Multi-Pestaña (Angular 18 PWA)
+Pensado para salas de cómputo escolares, pruebas docentes y dispositivos compartidos:
 - **Cero PII en `localStorage`:** Los datos personales del estudiante (`currentUser`) residen en un `signal<User | null>` en memoria RAM dentro de `AuthService`. Las preferencias de notificaciones se aíslan bajo una clave anónima con hash (`lms_ReadNotifs_h_<hash>`).
-- **Rehidratación segura al recargar (`F5`):** Al recargar el navegador, `AuthService.ensureUserHydrated$()` restaura el estado de sesión desde `sessionStorage` (`lms_session_user`) o consulta `/api/auth/me` con el JWT activo antes de que `minorConsentGuard` evalúe la ruta, evitando cierres de sesión accidentales sin exponer PII en almacenamiento persistente.
-- **Purga automática tras 15 minutos de inactividad (`SessionTimeoutService`):** Monitorea eventos de interacción del usuario y, al cumplirse **15 minutos de inactividad** (o al cerrar sesión), ejecuta `AuthService.clearAllSensitiveStorage()`, limpiando `localStorage`, `sessionStorage` y todas las cachés del Service Worker (`caches.keys()`).
+- **Aislamiento de sesiones distintas por pestaña:** Cada pestaña guarda su JWT propio en `sessionStorage` (`lms_tab_auth_token`) y marcador de cierre (`lms_tab_logged_out`). `SessionTimeoutService.handleStorageEvent` decodifica los claims `nameid`/`sub`/`user_id` mediante `extractUserIdFromToken` y únicamente cierra sesión si otra pestaña inicia sesión con el **mismo usuario**; cuentas diferentes (p. ej. Docente y Estudiante en dos pestañas del mismo navegador) coexisten sin expulsarse mutuamente, y cerrar sesión en una pestaña no borra la sesión de otro usuario en otra pestaña.
+- **Rehidratación segura al recargar (`F5`):** Al recargar el navegador, `AuthService.ensureUserHydrated()` restaura la sesión desde `sessionStorage` (`lms_tab_auth_token` / `lms_session_meta`) o consulta `/api/auth/me` antes de que `minorConsentGuard` evalúe la ruta.
+- **Cierre preventivo por inactividad (`SessionTimeoutService`):** Monitorea eventos de interacción del usuario y, tras **2,5 minutos** emite aviso (`WARNING_MS`) y a los **5 minutos** de inactividad (`LOGOUT_MS`) ejecuta `AuthService.clearSessionData()`, limpiando las credenciales activas de la pestaña.
 
 ---
 
@@ -125,6 +131,7 @@ El repositorio no almacena credenciales ni claves reales. La plantilla [`.env.ex
 | Variable de Entorno | Propósito y Requisitos de Seguridad |
 | :--- | :--- |
 | `DATABASE_URL` / `ConnectionStrings__DefaultConnection` | Cadena de conexión PostgreSQL hacia **Supabase Session Pooler** (puerto `5432`, IPv4 compatible con Render) con `SSL Mode=Require`. |
+| `DATABASE_MAX_POOL_SIZE` / `Database__MaxPoolSize` | Tamaño máximo del pool de conexiones Npgsql (opcional; por defecto **`50`** en `NormalizeConnectionString`). |
 | `SUPABASE_URL` | URL base del proyecto en Supabase (`https://<PROJECT_REF>.supabase.co`). |
 | `SUPABASE_SERVICE_ROLE_KEY` | Clave privada `service_role` de Supabase para operaciones autenticadas del backend sobre el bucket privado `lms-uploads`. |
 | `Jwt__SecretKey` | Clave simétrica de alta entropía (**mínimo 48 caracteres**, recomendado 64 bytes en Base64) para firma de tokens JWT (`HS256`). |
@@ -133,15 +140,16 @@ El repositorio no almacena credenciales ni claves reales. La plantilla [`.env.ex
 | `CORS_ALLOWED_ORIGINS` | Lista de orígenes autorizados separados por coma (ej. `https://sneiderm2.github.io`); normalizados automáticamente con `.TrimEnd('/')`. |
 | `SEED_DEFAULT_PASSWORD` | Credencial inicial leída por `DbInitializer` cuando se habilita el sembrado controlado (`Seed:Enabled=true`). En desarrollo, si no se define, se genera dinámicamente en tiempo de ejecución. |
 
-#### Comandos de Verificación (Suite de 125 Pruebas de Seguridad y Build de Producción)
+#### Comandos de Verificación (Suite de 126 Pruebas Backend + 24 Frontend y Build de Producción)
 
 ```powershell
-# 1. Ejecutar las 125 pruebas unitarias y de seguridad del backend (.NET 8 + xUnit)
+# 1. Ejecutar las 126 pruebas unitarias y de seguridad del backend (.NET 8 + xUnit)
 dotnet test backend/LMS.API.Tests/LMS.API.Tests.csproj --configuration Release
 
-# 2. Compilar el bundle de producción del frontend (Angular 18 PWA)
+# 2. Compilar el bundle de producción y ejecutar las 24 pruebas del frontend (Angular 18 PWA)
 cd frontend
 npx ng build --configuration production
+npm test
 ```
 
 ---
@@ -168,9 +176,13 @@ los lineamientos de la **SIC**, el **MSPI** de MinTIC, **ISO/IEC 27001**, **ISO/
 > reCAPTCHA (estuvieron versionadas), cambie las contraseñas de las cuentas demo y complete los datos
 > del responsable del tratamiento. Ver [SETUP_SECRETS.md](SETUP_SECRETS.md).
 
-### Estado de seguridad (auditoría 2026-10, verificado el 28/10/2026)
+### Estado de seguridad (actualizado el 10/11/2026)
 
-> **Última verificación:** 2026-10-28, 04:30 UTC. Backend Release compilado con **0 errores y 0 advertencias** (**119/119 pruebas xUnit** de seguridad y penetración superadas); frontend con build de producción correcto (**23/23 pruebas Karma/Jasmine** aprobadas en ChromeHeadless). Se incorporó auditoría DAST automatizada mediante [OWASP ZAP Baseline Scan](.github/workflows/dast-scan.yml).
+> **Última verificación:** 2026-11-10. Backend Release compilado con **0 errores y 0 advertencias** (**126/126 pruebas xUnit** de seguridad, Middleware y penetración superadas); frontend compilado con `ng build` limpio (**24/24 pruebas Karma/Jasmine** aprobadas en ChromeHeadless, incluido aislamiento multi-pestaña). En despliegue productivo previo (28/10/2026) se incorporó auditoría DAST automatizada mediante [OWASP ZAP Baseline Scan](.github/workflows/dast-scan.yml).
+
+- **Aislamiento Multi-Pestaña por Usuario:** `SessionTimeoutService` y `AuthService` comparan la identidad del usuario en el JWT (`lms_tab_auth_token` en `sessionStorage` frente a `lms_auth_token` en `localStorage`), permitiendo que usuarios distintos trabajen en paralelo en pestañas del mismo navegador y evitando cierres cruzados al hacer logout.
+- **Endurecimiento ante Estrés y Ráfagas:** Pool Npgsql ampliado a `50` conexiones (`DATABASE_MAX_POOL_SIZE`), caché en `IMemoryCache` (15 s) en `SingleSessionMiddleware` con invalidación explícita (`InvalidateUserCache`), colas `QueueLimit` en `RateLimiter` y exención para `/api/ping`, `/api/health` y `/api/health/live`.
+- **CWE-209 y Condiciones de Carrera:** `GlobalExceptionMiddleware` nunca expone `StackTrace` en respuestas HTTP (incluso en `Development`), y `AuthController.Register` / `StudentController` manejan `DbUpdateException` con limpieza de `ChangeTracker` y `409 Conflict` / reintentos idempotentes.
 
 - **Hardening BOLA/IDOR:** Validación estricta de pertenencia y titularidad docente en `TeacherController.CreateContent` y restricción de grado institucional en `StudentController.EnrollInCourse`.
 - **Rotación de Sesión Inmediata:** Al cambiar la contraseña en `AuthController.ChangePassword`, se genera un nuevo `SessionToken`, invalidando cualquier sesión abierta en otros dispositivos y emitiendo un JWT renovado.
@@ -608,6 +620,18 @@ powershell -ExecutionPolicy Bypass -File scripts\security_smoke_test.ps1
 ---
 
 ## 📝 Changelog Completo
+
+### v7.2.0 — 2026-11-10 _(aislamiento multi-pestaña, estrés y pentesting)_
+
+- 🧩 **Aislamiento multi-usuario en pestañas (`AuthService` & `SessionTimeoutService`):** Token por pestaña en `sessionStorage` (`lms_tab_auth_token`), bandera de cierre aislado `lms_tab_logged_out` y comparación de identidad JWT (`extractUserIdFromToken`) para expulsar únicamente pestañas duplicadas del **mismo usuario** y conservar sesiones de usuarios distintos en el mismo navegador.
+- ⚡ **Tolerancia a pruebas de esfuerzo y solicitudes rápidas:**
+  - Pool máximo Npgsql elevado de `15` a `50` (`DATABASE_MAX_POOL_SIZE` / `Database__MaxPoolSize`).
+  - `SingleSessionMiddleware` equipado con caché en `IMemoryCache` (TTL 15 s) e invalidación inmediata (`InvalidateUserCache`) en `AuthController`, `PrivacyController` y `AdminController`.
+  - `RateLimiter` ajustado con colas de espera (`QueueProcessingOrder.OldestFirst`): `60/min` (`QueueLimit = 15`) en `"auth"`, `120/h` (`QueueLimit = 15`) en `"uploads"`, `1200/min` (`QueueLimit = 30`) global, y exención de límites para `/api/ping`, `/api/health` y `/api/health/live`.
+- 🛡️ **Cero fuga de trazas y control de concurrencia en BD:**
+  - Eliminada la concatenación de `ex.StackTrace` en `GlobalExceptionMiddleware` incluso en `Development` (CWE-209 / CWE-497).
+  - Manejo explícito de `DbUpdateException` con `ChangeTracker.Clear()` en `AuthController.Register` (`409 Conflict` / `USER_ALREADY_EXISTS`) y `StudentController` (`UploadAssignment`, `EnrollInCourse`, `WithdrawFromCourse`).
+- 🧪 **Pruebas actualizadas:** **126/126** xUnit backend (incluyendo `GlobalExceptionMiddleware_InDevelopment_NeverLeaksStackTraceInHttpBody`) y **24/24** Karma/Jasmine frontend (incluyendo aislamiento multi-pestaña en `auth.service.spec.ts`).
 
 ### v7.1.0 — 2026-10-25 _(auditoría de seguridad)_
 

@@ -3,8 +3,7 @@
 Plataforma: **LMS Primaria** (backend .NET 8, frontend Angular 18, PostgreSQL 17.6/Supabase).
 Este documento traza cada obligación relevante a un control técnico u organizativo concreto.
 
-**Última verificación:** 2026-10-30. CI y CodeQL en verde; backend
-Release con 125/125 pruebas unitarias y de seguridad superadas (LMS.API.Tests); frontend con pruebas Karma aprobadas; API y auditoría verificadas en producción.
+**Última verificación:** 2026-11-10. Backend Release con 0 errores y **126/126** pruebas unitarias, de concurrencia y seguridad superadas (`LMS.API.Tests`); frontend con build limpio y **24/24** pruebas Karma/Jasmine aprobadas en ChromeHeadless. Verificación productiva y de CI/CodeQL previa realizada el 25-30/10/2026.
 
 > **Nota:** esta matriz es una herramienta de trabajo, no un concepto jurídico. El responsable
 > del tratamiento debe validarla con su asesor legal y su Oficial de Protección de Datos.
@@ -20,7 +19,7 @@ Release con 125/125 pruebas unitarias y de seguridad superadas (LMS.API.Tests); 
 | **Ley 1581, art. 8** | Derechos de conocer, actualizar, rectificar, suprimir, revocar y presentar quejas. | Gestión de solicitudes ARCO (`/api/privacy/arco`, `SolicitudArco`) con cálculo legal perentorio (10/15 días hábiles con Ley Emiliani); `/api/privacy/my-data` (acceso/portabilidad), `PUT /api/privacy/my-data` (rectificación), `/api/privacy/delete-account` (supresión/anonimización). | `PrivacyController`, `SolicitudArco`. |
 | **Ley 1581, art. 9** | Autorización previa, expresa e informada. | Checkbox obligatorio con finalidades esenciales y opcionales separadas + versión de política + evidencia (fecha, IP, agente, HMAC, hash SHA-256 de política). | `ConsentimientoHabeasData`, `DataPolicyEvidence`. |
 | **Ley 1581, art. 14** | Prueba de la autorización. | Evidencia probatoria almacenada en tabla `consentimientos_habeas_data` y firmada con HMAC; exportable al titular. | `ConsentService`, `ConsentimientoHabeasData`. |
-| **Ley 1581, art. 17** | Deberes del responsable: seguridad, confidencialidad, reporte de incidentes. | TLS, JWT, RBAC, bloqueo, rate limiting, archivos privados, auditoría, plan de incidentes. | `SECURITY.md`, `docs/PLAN_RESPUESTA_INCIDENTES.md`. |
+| **Ley 1581, art. 17** | Deberes del responsable: seguridad, confidencialidad, reporte de incidentes. | TLS, JWT, RBAC, bloqueo, rate limiting con colas (`60/min`, `120/h`, `1200/min`), aislamiento multi-pestaña, cero `StackTrace` (CWE-209), archivos privados, auditoría, plan de incidentes. | `SECURITY.md`, `docs/PLAN_RESPUESTA_INCIDENTES.md`. |
 | **Decreto 1074 de 2015** (compilatorio del Decreto 1377 de 2013) | Política de tratamiento, aviso de privacidad, procedimiento de consultas y reclamos. | Política y aviso en `privacidad.html`; plazos de 10/15 días hábiles documentados; endpoints y correo. | Documento + `privacy.html`. |
 | **Decreto 886 de 2014 / RNBD** | Registro Nacional de Bases de Datos ante la SIC cuando aplique. | Inventario de bases y datos en la política. | **Pendiente de evaluar** si la institución supera el umbral de UVT o es entidad pública. |
 | **Ley 1266 de 2008** | Habeas data financiero. | No se tratan datos crediticios. | No aplica; verificar si se incorporan pagos. |
@@ -61,9 +60,8 @@ Release con 125/125 pruebas unitarias y de seguridad superadas (LMS.API.Tests); 
 
 ## 4. Brechas y plan de acción
 
-**Cerradas o verificadas el 30/10/2026:** despliegue del backend endurecido y del frontend con CSP;
-`audit_logs` activa en Supabase (RLS y 3 índices); 13 tablas relacionales normalizadas; CI/CodeQL en verde; 125/125 pruebas
-backend superadas y pruebas frontend aprobadas. Las brechas que siguen abiertas se listan a continuación.
+**Cerradas o verificadas el 10/11/2026:** despliegue del backend endurecido y del frontend con CSP;
+`audit_logs` activa en Supabase (RLS y 3 índices); 13 tablas relacionales normalizadas; aislamiento multi-pestaña por usuario, pool PostgreSQL a `50`, caché `IMemoryCache` (15 s) en sesión, control `DbUpdateException` y eliminación de `StackTrace` en Development; **126/126** pruebas backend y **24/24** frontend superadas. Las brechas que siguen abiertas se listan a continuación.
 
 | # | Brecha | Impacto | Acción | Responsable | Plazo |
 | :---: | :--- | :--- | :--- | :--- | :--- |
@@ -73,7 +71,7 @@ backend superadas y pruebas frontend aprobadas. Las brechas que siguen abiertas 
 | 4 | Evaluación de RNBD | Medio | Determinar si aplica y registrar la base ante la SIC. | Jurídica | 30 días |
 | 5 | Respaldos y cifrado | Alto | No hay backups automáticos en Supabase Free ni respaldo lógico programado. Implementar `pg_dump` cifrado, retención y prueba de restauración. | TI | 15 días |
 | 6 | Cabeceras del frontend (CSP/HSTS) | Medio | CSP por `<meta>` ya publicada en el build de producción. `frame-ancestors` y HSTS requieren un hosting con cabeceras HTTP; evaluar proxy o migración. | TI | 30 días |
-| 7 | Pruebas de seguridad automatizadas | Medio | CI y CodeQL en verde; 55/55 pruebas backend y 6/6 frontend. Faltan integración/E2E y OWASP ZAP. | Desarrollo | 15 días |
+| 7 | Pruebas de seguridad automatizadas | Medio | **126/126** pruebas backend y **24/24** frontend en verde (10/11/2026); OWASP ZAP Baseline en CI; faltan integración/E2E (Playwright) y carga (`k6`). | Desarrollo | 15 días |
 | 8 | Migraciones EF Core | Bajo | Reemplazar `DbInitializer` por migraciones versionadas. | Desarrollo | 60 días |
 | 9 | Accesibilidad AA completa | Medio | Auditoría NTC 5854 y corrección de hallazgos. | Desarrollo | 45 días |
 | 10 | Política de retención aprobada | Medio | Aprobar tabla de retención y aplicación automatizada. | Jurídica / TI | 30 días |

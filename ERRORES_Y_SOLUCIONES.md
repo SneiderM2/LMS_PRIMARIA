@@ -33,6 +33,9 @@ Registro histórico de errores, bugs y problemas técnicos encontrados durante e
 | 23 | Backend / Sesión | Persistencia de sesiones previas activas tras cambio de contraseña | ✅ Resuelto |
 | 24 | Frontend / Seguridad | Fuga potencial de credenciales JWT hacia recursos de terceros (CWE-200) | ✅ Resuelto |
 | 25 | Frontend / UI & A11y | Desbalance de contraste en Modo Oscuro, colisión de controles y enlaces `javascript:` | ✅ Resuelto |
+| 26 | Frontend / Sesión | Cierre cruzado de sesión en múltiples pestañas con usuarios distintos | ✅ Resuelto |
+| 27 | Backend / Rendimiento | Agotamiento de pool BD (15), exceso de queries por request y colas de Rate Limiter en 0 ante estrés | ✅ Resuelto |
+| 28 | Backend / Seguridad | Fuga de `StackTrace` en Development (CWE-209) y condiciones de carrera (`DbUpdateException` / 503) | ✅ Resuelto |
 
 ---
 
@@ -960,6 +963,86 @@ Falta de variables semánticas en plantillas HTML y falta de sincronización del
 
 ---
 
+### #26 — Cierre cruzado de sesión en múltiples pestañas con usuarios distintos
+
+- **Categoría:** Frontend / Sesión & Seguridad
+- **Fecha:** 2026-11-10
+- **Gravedad:** 🔴 Alta
+
+**Síntoma:**
+Al abrir dos pestañas del mismo navegador con usuarios distintos (por ejemplo, Docente en la pestaña 1 y Estudiante en la pestaña 2), la pestaña que inició sesión primero se cerraba automáticamente al detectar el cambio de sesión en la segunda pestaña, y al cerrar sesión en una pestaña podía adoptarse el token compartido de la otra.
+
+**Causa:**
+1. `SessionTimeoutService.handleStorageEvent` reaccionaba a cualquier evento `storage` sobre `lms_auth_token` en `localStorage` sin comparar si el nuevo JWT pertenecía al mismo usuario que el token de la pestaña actual (`sessionStorage['lms_tab_auth_token']`).
+2. `AuthService.clearSessionData()` borraba siempre `localStorage['lms_auth_token']`, afectando a otras pestañas con usuarios distintos, y faltaba un marcador de cierre por pestaña que impidiera reutilizar un token compartido ajeno.
+
+**Solución aplicada:**
+- En `SessionTimeoutService`, se implementó `extractUserIdFromToken()` para inspeccionar los claims `nameid` / `sub` / `user_id` de `lms_tab_auth_token` y del nuevo valor en `localStorage`: solo se cierra la pestaña si ambos tokens corresponden al **mismo usuario** (`currentUserId.toLowerCase() === newUserId.toLowerCase()`) o si se limpió el token compartido cuando la pestaña ya carece de token propio.
+- En `AuthService`, se introdujo `TAB_LOGGED_OUT_KEY = 'lms_tab_logged_out'` en `sessionStorage` y la comprobación `isDifferentSharedSession` en `clearSessionData()`: al cerrar sesión en una pestaña cuando `localStorage` contiene un token diferente de otra pestaña, se conserva `localStorage` para la otra sesión y `getToken()` / `getStoredUser()` ignoran el token compartido hasta un nuevo `saveAuthData()`.
+- Se añadió prueba unitaria de aislamiento multi-pestaña en `auth.service.spec.ts` (**24/24 pruebas frontend en verde**).
+
+**Archivos afectados:**
+- `frontend/src/app/core/services/session-timeout.service.ts`
+- `frontend/src/app/core/services/auth.service.ts`
+- `frontend/src/app/core/services/auth.service.spec.ts`
+
+---
+
+### #27 — Agotamiento de pool BD, exceso de queries por request y colas Rate Limiter en 0 ante pruebas de estrés
+
+- **Categoría:** Backend / Rendimiento & Estabilidad
+- **Fecha:** 2026-11-10
+- **Gravedad:** 🟠 Media-Alta
+
+**Síntoma:**
+Bajo pruebas de esfuerzo, ráfagas de solicitudes concurrentes y tests de penetración rápidos:
+1. Cada petición autenticada disparaba 2 consultas PostgreSQL en `SingleSessionMiddleware` (`Usuarios` + `ConsentimientosHabeasData`).
+2. El pool de Npgsql estaba fijado en un máximo de `15` conexiones.
+3. El Rate Limiter no tenía cola (`QueueLimit = 0`) y también limitaba endpoints de salud/warmup (`/api/ping`, `/api/health`, `/api/health/live`).
+
+**Causa:**
+Configuración conservadora previa pensada para baja concurrencia sin amortiguación de ráfagas (`QueueLimit`) ni caché en memoria de corta duración para la validación de sesión.
+
+**Solución aplicada:**
+- **`Program.cs` (`NormalizeConnectionString`):** Pool máximo por defecto elevado de `15` a **`50`**, configurable mediante `DATABASE_MAX_POOL_SIZE` o `Database:MaxPoolSize`.
+- **`Program.cs` (`AddRateLimiter`):** Política `"auth"` ampliada a `60` req/min con `QueueLimit = 15`, `"uploads"` a `120` req/h con `QueueLimit = 15`, `GlobalLimiter` a `1200` req/min con `QueueLimit = 30` (`QueueProcessingOrder.OldestFirst`), y exención explícita (`RateLimitPartition.GetNoLimiter("unlimited_health")`) para `/api/ping`, `/api/health` y `/api/health/live`.
+- **`SingleSessionMiddleware.cs`:** Caché en `IMemoryCache` (`SessionValidationCacheEntry`, TTL de **15 segundos**, clave `sess_val_{username}`) e invalidación inmediata (`SingleSessionMiddleware.InvalidateUserCache`) tras cambios de estado en `AuthController` (`Login`, `AcceptDataPolicy`, `GoogleLogin`, `Logout`, `ChangePassword`), `PrivacyController` (`Consent`, `RevokeConsent`, `DeleteAccount`) y `AdminController` (`CreateUser`, `UpdateUser`, `ToggleUserStatus`).
+
+**Archivos afectados:**
+- `backend/LMS.API/Program.cs`
+- `backend/LMS.API/Middleware/SingleSessionMiddleware.cs`
+- `backend/LMS.API/Controllers/AuthController.cs`
+- `backend/LMS.API/Controllers/PrivacyController.cs`
+- `backend/LMS.API/Controllers/AdminController.cs`
+
+---
+
+### #28 — Fuga potencial de `StackTrace` en Development (CWE-209) y condiciones de carrera con `503` en BD
+
+- **Categoría:** Backend / Seguridad & Concurrencia
+- **Fecha:** 2026-11-10
+- **Gravedad:** 🔴 Alta
+
+**Síntoma:**
+1. En entorno `Development`, `GlobalExceptionMiddleware` concatenaba `ex.StackTrace` dentro del campo `Detail` de `ErrorResponse`, exponiendo trazas internas del servidor y rutas de código fuente (CWE-209 / CWE-497).
+2. Bajo peticiones paralelas simultáneas (registro duplicado, creación concurrente de entregas/archivos, inscripción o retiro concurrente de matrícula), `SaveChangesAsync` lanzaba `DbUpdateException` no capturada que devolvía `503 Service Unavailable`.
+
+**Causa:**
+Exposición condicional de `ex.StackTrace` cuando `env.IsDevelopment()` estaba activo y ausencia de captura específica de `DbUpdateException` / limpieza del `ChangeTracker` frente a colisiones concurrentes de índices únicos o llaves compuestas.
+
+**Solución aplicada:**
+- **`GlobalExceptionMiddleware.cs`:** Se eliminó la concatenación de `ex.StackTrace` en `Detail` incluso en modo `Development` (`Detail = userMessage`). Añadido test automatizado `GlobalExceptionMiddleware_InDevelopment_NeverLeaksStackTraceInHttpBody` en `MiddlewareSecurityTests.cs` (**126/126 pruebas backend en verde**).
+- **`AuthController.cs` (`Register`):** Captura `DbUpdateException` previa al manejador genérico y devuelve `409 Conflict` (`code = "USER_ALREADY_EXISTS"`).
+- **`StudentController.cs` (`UploadAssignment`, `EnrollInCourse`, `WithdrawFromCourse`):** Captura `DbUpdateException`, ejecuta `_context.ChangeTracker.Clear()` y reconsulta o responde de manera idempotente ante escrituras concurrentes simultáneas.
+
+**Archivos afectados:**
+- `backend/LMS.API/Middleware/GlobalExceptionMiddleware.cs`
+- `backend/LMS.API/Controllers/AuthController.cs`
+- `backend/LMS.API/Controllers/StudentController.cs`
+- `backend/LMS.API.Tests/MiddlewareSecurityTests.cs`
+
+---
+
 | Categoría | Total de Errores |
 |:---|:---:|
 | 🔴 Backend / Base de Datos | 2 |
@@ -979,7 +1062,10 @@ Falta de variables semánticas en plantillas HTML y falta de sincronización del
 | 🔴 Backend / Autorización & IDOR | 1 |
 | 🟠 Frontend / Seguridad HTTP & Tokens | 1 |
 | 🟡 Frontend / Accesibilidad & Dark Mode | 1 |
-| **Total** | **26** |
+| 🔴 Frontend / Sesión Multi-Pestaña | 1 |
+| 🟠 Backend / Rendimiento, Pool BD & Rate Limit | 1 |
+| 🔴 Backend / Seguridad CWE-209 & Concurrencia BD | 1 |
+| **Total** | **29** |
 
 ---
 

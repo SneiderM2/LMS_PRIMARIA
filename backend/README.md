@@ -7,8 +7,9 @@ Servicio backend de alto rendimiento para la plataforma educativa **LMS Primaria
 ## 🏛️ Arquitectura del Servicio
 
 - **Framework:** .NET 8 Web API (`net8.0`)
-- **ORM & Driver:** Entity Framework Core 8 + Npgsql
+- **ORM & Driver:** Entity Framework Core 8 + Npgsql (`Maximum Pool Size = 50` por defecto vía `DATABASE_MAX_POOL_SIZE` / `Database__MaxPoolSize`)
 - **Persistencia:** PostgreSQL 17.6 administrado en Supabase Cloud con Connection Pooling en Session Mode (Puerto 5432).
+- **Resiliencia a Estrés y Concurrencia:** `RateLimiter` con colas (`60/min` auth + cola 15, `120/h` uploads + cola 15, `1200/min` global + cola 30, exención `/api/ping` y `/api/health*`), `SingleSessionMiddleware` con `IMemoryCache` (15 s) + `InvalidateUserCache`, cero `StackTrace` en `GlobalExceptionMiddleware` (CWE-209) y captura de `DbUpdateException` en `AuthController.Register` y `StudentController`.
 - **Autenticación:** JWT Bearer tokens con firma simétrica HMAC-SHA256 y Google OAuth 2.0 (Google Identity Services).
 - **Control de Acceso:** Rol-based Access Control (RBAC) con roles canónicos: `Admin`, `Teacher`, `Student`.
 - **Criptografía de Contraseñas:** BCrypt.Net-Next (work factor 12).
@@ -60,14 +61,14 @@ El filtro de acción **`MinorConsentActionFilter`** intercepta las solicitudes e
 
 La suite de pruebas automatizadas garantiza la robustez, mitigación contra IDOR/BOLA, sanitización de auditoría y cálculo de días hábiles legales:
 
-- **Estado de Pruebas:** **125 pruebas unitarias y de integración superadas (LMS.API.Tests)**.
+- **Estado de Pruebas:** **126 pruebas unitarias y de seguridad superadas (LMS.API.Tests)**.
 - **Cobertura de la Suite:**
   - `AuthControllerSecurityTests`: Pruebas de fuerza bruta (bloqueo por 5 intentos fallidos), honeypots, validación fail-closed de reCAPTCHA y rotación de sesión.
   - `AdminControllerSecurityTests`: Prevención de auto-bloqueo del último admin y bloqueo de comandos SQL peligrosos en restauración.
   - `TeacherControllerSecurityTests`: Protección contra IDOR (un docente no puede modificar cursos, actividades o calificaciones de otro docente).
   - `StudentControllerSecurityTests`: Protección contra BOLA (un estudiante no puede inscribirse en cursos de otros grados ni entregar tareas ajenas).
   - `ConsentServiceTests`: Cálculo de 10 y 15 días hábiles colombianos con Ley Emiliani (Ley 51 de 1983) y algoritmo de Pascua dinámico (Meeus/Jones/Butcher), enmascaramiento de documentos y verificación HMAC.
-  - `MiddlewareSecurityTests`: Cabeceras CSP, X-Frame-Options, detección de sesiones simultáneas y sanitización de PII en logs.
+  - `MiddlewareSecurityTests`: Cabeceras CSP, `X-Frame-Options`, detección de sesiones simultáneas, no exposición de `StackTrace` incluso en `Development` y sanitización de PII en logs.
 
 ### Ejecución de Pruebas:
 ```bash
@@ -88,6 +89,7 @@ PORT=8080
 # Base de Datos PostgreSQL Supabase (Pooler IPv4)
 ConnectionStrings__DefaultConnection=Host=aws-0-us-east-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.<REEMPLAZAR_EN_RENDER>;Password=<REEMPLAZAR_EN_RENDER>;SSL Mode=Require;Trust Server Certificate=false;
 DATABASE_URL=<REEMPLAZAR_EN_RENDER>
+DATABASE_MAX_POOL_SIZE=50
 SUPABASE_PROJECT_REF=<REEMPLAZAR_EN_RENDER>
 
 # Almacenamiento Supabase Storage (Bucket Privado)

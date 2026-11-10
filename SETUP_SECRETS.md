@@ -35,6 +35,7 @@ ASP.NET Core lee las variables con doble guion bajo (`__`) para navegar la confi
 | `Storage__AllowLocalFallback` | No | `false` por defecto. No habilitar en producción con disco efímero. |
 | `Storage__RootPath` | No | Ruta privada para almacenamiento local; por defecto `App_Data/uploads` |
 | `Database__TrustServerCertificate` | No | `false` por defecto. No habilitar salvo diagnóstico controlado. |
+| `DATABASE_MAX_POOL_SIZE` o `Database__MaxPoolSize` | No | `50` por defecto en `NormalizeConnectionString`. Controla el máximo de conexiones concurrentes Npgsql. |
 | `Seed__Enabled` | No | `false` (nunca `true` en producción salvo instalación inicial) |
 | `Features__EnableDatabaseRestore` | No | `false` |
 | `Features__AllowRestoreInProduction` | No | `false` |

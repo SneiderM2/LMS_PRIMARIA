@@ -25,19 +25,18 @@ En las salas de sistemas escolares, múltiples niños utilizan el mismo computad
   ```
 - **Cero PII en `localStorage`:** Los datos sensibles del alumno (nombres, rol, grado, documento) jamás se persisten en `localStorage` en texto plano.
 
-### 2. Rehidratación Silenciosa al Recargar (`F5`)
-- Para evitar que la recarga de página desconecte al estudiante o active falsos bloqueos de guardias:
-  1. Durante la sesión se mantiene un respaldo de corta duración en `sessionStorage` (`lms_session_user`).
-  2. Si el usuario presiona `F5`, el método `AuthService.ensureUserHydrated$()` rehidrata de inmediato el signal desde `sessionStorage` o consulta silenciosamente al endpoint `/api/auth/me` enviando el token JWT.
-  3. Los guards de ruta esperan la finalización de esta rehidratación antes de tomar decisiones de redirección.
+### 2. Rehidratación Silenciosa al Recargar (`F5`) y Aislamiento Multi-Pestaña
+- Para permitir que dos usuarios distintos (ej. Docente y Estudiante) trabajen simultáneamente en pestañas diferentes del mismo navegador sin expulsarse mutuamente ni re-adoptar tokens ajenos al cerrar sesión:
+  1. Cada pestaña mantiene su JWT aislado en `sessionStorage` (`lms_tab_auth_token`) y metadatos mínimos en `lms_session_meta`.
+  2. Si el usuario presiona `F5`, `AuthService.ensureUserHydrated()` rehidrata la sesión de la pestaña desde `sessionStorage` o consultando `/api/auth/me` con el JWT correspondiente.
+  3. Los guards de ruta esperan la finalización de esta rehidratación antes de decidir redirecciones.
+  4. `SessionTimeoutService.handleStorageEvent` decodifica los claims `nameid`/`sub`/`user_id` mediante `extractUserIdFromToken` y únicamente cierra sesión cuando otra pestaña autentica al **mismo usuario**.
+  5. Al cerrar sesión (`clearSessionData()`), si `localStorage['lms_auth_token']` pertenece a otra pestaña con distinto token, se conserva `localStorage` intacto para la otra sesión y se marca `sessionStorage['lms_tab_logged_out'] = 'true'` hasta el próximo `saveAuthData()`.
 
-### 3. Cierre Preventivo por Inactividad (15 Minutos)
-- El servicio [`SessionTimeoutService`](src/app/core/services/session-timeout.service.ts) registra los eventos de interacción del estudiante (clics, pulsaciones de teclas, desplazamientos, toques táctiles).
-- Tras **15 minutos de inactividad continua**, el sistema activa una purga forzosa mediante `AuthService.clearAllSensitiveStorage()`:
-  - Destruye la sesión activa y el token JWT.
-  - Elimina las entradas de `sessionStorage` y `localStorage`.
-  - Purga las cachés del navegador (`caches.keys()`).
-  - Redirige al alumno a la pantalla de inicio de sesión con advertencia de seguridad.
+### 3. Cierre Preventivo por Inactividad (5 Minutos)
+- El servicio [`SessionTimeoutService`](src/app/core/services/session-timeout.service.ts) registra los eventos de interacción del usuario (clics, teclado, desplazamientos, toques).
+- Tras **2,5 minutos** sin actividad muestra el modal preventivo de advertencia (`WARNING_MS`) y, al cumplirse **5 minutos de inactividad** (`LOGOUT_MS`), ejecuta `AuthService.clearSessionData()`:
+  - Revoca y limpia el estado/token de sesión de la pestaña y redirige a inicio de sesión con advertencia de inactividad.
 
 ---
 
@@ -86,4 +85,4 @@ Los artefactos de salida se ubicarán en `dist/lms/browser` listos para ser desp
 ```bash
 npm test
 ```
-Ejecuta las pruebas unitarias y de accesibilidad en entorno ChromeHeadless.
+Ejecuta las **24 pruebas** unitarias, de aislamiento multi-pestaña y de accesibilidad (Karma/Jasmine) en entorno `ChromeHeadless`.
