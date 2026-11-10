@@ -280,6 +280,7 @@ public class AdminController : ControllerBase
         _context.Usuarios.Add(usuario);
         await _context.SaveChangesAsync();
         InvalidateAdminCache();
+        SingleSessionMiddleware.InvalidateUserCache(HttpContext, usuario.Username);
 
         if (targetRoleName == "ALUMNO" && grado != null)
         {
@@ -427,6 +428,7 @@ public class AdminController : ControllerBase
 
         await _context.SaveChangesAsync();
         InvalidateAdminCache();
+        SingleSessionMiddleware.InvalidateUserCache(HttpContext, usuario.Username);
         _logger.LogInformation("Usuario ID {Id} actualizado por administrador {Admin}", id, User.Identity?.Name);
         await AuditAsync("Administración: Actualización de usuario",
             $"Usuario {usuario.Username} (ID {usuario.Id}) actualizado. Cambio de contraseña: {!string.IsNullOrWhiteSpace(dto.Password)}.");
@@ -478,6 +480,7 @@ public class AdminController : ControllerBase
 
         await _context.SaveChangesAsync();
         InvalidateAdminCache();
+        SingleSessionMiddleware.InvalidateUserCache(HttpContext, usuario.Username);
 
         var statusText = usuario.Activo ? "habilitada" : "suspendida";
         _logger.LogInformation("[AUDIT] El Administrador {Admin} cambió el estado de la cuenta {Username} a {StatusText}",

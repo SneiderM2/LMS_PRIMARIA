@@ -183,6 +183,7 @@ public class PrivacyController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+        SingleSessionMiddleware.InvalidateUserCache(HttpContext, user.Username);
 
         await AuditAsync(user, "Privacidad: Aceptación de política de tratamiento de datos",
             $"Versión {_privacy.PolicyVersion}; evidencia firmada con HMAC-SHA256.");
@@ -305,6 +306,7 @@ public class PrivacyController : ControllerBase
 
         _context.SolicitudesArco.Add(solicitudArco);
         await _context.SaveChangesAsync();
+        SingleSessionMiddleware.InvalidateUserCache(HttpContext, user.Username);
 
         await AuditAsync(user, "Privacidad: Revocatoria de consentimiento Habeas Data",
             $"Solicitud ARCO #{solicitudArco.Id} radicada con fecha límite {solicitudArco.FechaLimiteLegalUtc:yyyy-MM-dd}.");
@@ -624,6 +626,7 @@ public class PrivacyController : ControllerBase
             entrega.ContenidoTexto = null;
         }
 
+        var originalUsername = user.Username;
         user.Username = $"suprimido-{user.Id}-{Guid.NewGuid():N}";
         user.Nombre = "Titular";
         user.Apellido = "Suprimido";
@@ -646,6 +649,7 @@ public class PrivacyController : ControllerBase
         user.AnonymizedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+        SingleSessionMiddleware.InvalidateUserCache(HttpContext, originalUsername);
 
         await AuditAsync(user, "Privacidad: Supresión y anonimización de cuenta",
             $"Archivos eliminados: {archivos.Count}. Evidencia de consentimiento eliminada.");

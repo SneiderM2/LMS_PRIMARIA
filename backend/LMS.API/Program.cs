@@ -326,31 +326,44 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("auth", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(ClientKey(httpContext), _ => new FixedWindowRateLimiterOptions
         {
-            // Compartido por la red de la institución (NAT): suficiente para varias aulas,
-            // mientras el bloqueo por cuenta frena la fuerza bruta dirigida.
-            PermitLimit = 30,
+            // Compartido por la red de la institución (NAT): suficiente para varias aulas y pruebas automatizadas
+            PermitLimit = 60,
             Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0,
+            QueueLimit = 15,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             AutoReplenishment = true
         }));
 
     options.AddPolicy("uploads", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(ClientKey(httpContext), _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 60,
+            PermitLimit = 120,
             Window = TimeSpan.FromHours(1),
-            QueueLimit = 0,
+            QueueLimit = 15,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             AutoReplenishment = true
         }));
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(ClientKey(httpContext), _ => new FixedWindowRateLimiterOptions
+    {
+        var path = httpContext.Request.Path.Value ?? string.Empty;
+        // Endpoints de salud / ping nunca deben ser rechazados en monitoreos de estrés o pings continuos
+        if (path.Equals("/api/ping", StringComparison.OrdinalIgnoreCase)
+            || path.Equals("/api/health", StringComparison.OrdinalIgnoreCase)
+            || path.Equals("/api/health/live", StringComparison.OrdinalIgnoreCase))
         {
-            PermitLimit = 600,
+            return RateLimitPartition.GetNoLimiter("unlimited_health");
+        }
+
+        return RateLimitPartition.GetFixedWindowLimiter(ClientKey(httpContext), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 1200, // Alto rendimiento para pruebas de esfuerzo y tráfico concurrente
             Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0,
+            QueueLimit = 30,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             AutoReplenishment = true
-        }));
+        });
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -564,9 +577,13 @@ static string NormalizeConnectionString(string raw, IConfiguration configuration
             }
         }
 
+        var maxPoolSize = int.TryParse(Environment.GetEnvironmentVariable("DATABASE_MAX_POOL_SIZE"), out var mp) && mp > 0
+            ? mp
+            : (configuration.GetValue<int?>("Database:MaxPoolSize") ?? 50);
+
         return $"Host={host};Port={port};Database={database};Username={user};Password={password};" +
                $"SSL Mode=Require;Trust Server Certificate={trustCertificate.ToString().ToLowerInvariant()};" +
-               "Pooling=true;Minimum Pool Size=2;Maximum Pool Size=15;Connection Idle Lifetime=300;" +
+               $"Pooling=true;Minimum Pool Size=2;Maximum Pool Size={maxPoolSize};Connection Idle Lifetime=300;" +
                "Keepalive=30;Tcp Keepalive=true;";
     }
 

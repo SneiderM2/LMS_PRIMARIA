@@ -19,6 +19,7 @@ export class AuthService {
   private readonly apiUrl = environment.apiUrl;
   private readonly TOKEN_KEY = 'lms_auth_token';
   private readonly TAB_TOKEN_KEY = 'lms_tab_auth_token';
+  private readonly TAB_LOGGED_OUT_KEY = 'lms_tab_logged_out';
   private readonly USER_KEY = 'lms_current_user';
   private readonly SESSION_META_KEY = 'lms_session_meta';
 
@@ -145,11 +146,17 @@ export class AuthService {
     const sharedToken = localStorage.getItem(this.TOKEN_KEY);
     const tabToken = sessionStorage.getItem(this.TAB_TOKEN_KEY);
     const keepNewerSharedToken = preserveSharedToken && !!sharedToken && !!tabToken && sharedToken !== tabToken;
+    const isDifferentSharedSession = !!sharedToken && !!tabToken && sharedToken !== tabToken;
 
-    if (keepNewerSharedToken) {
+    if (keepNewerSharedToken || isDifferentSharedSession) {
       localStorage.removeItem(this.USER_KEY);
       localStorage.removeItem('user');
       sessionStorage.clear();
+      try {
+        sessionStorage.setItem(this.TAB_LOGGED_OUT_KEY, 'true');
+      } catch {
+        // Ignorar errores de cuota en modo privado
+      }
     } else {
       localStorage.clear();
       sessionStorage.clear();
@@ -209,6 +216,10 @@ export class AuthService {
    */
   public getToken(): string | null {
     const tabToken = sessionStorage.getItem(this.TAB_TOKEN_KEY);
+    if (!tabToken && sessionStorage.getItem(this.TAB_LOGGED_OUT_KEY) === 'true') {
+      return null;
+    }
+
     const sharedToken = localStorage.getItem(this.TOKEN_KEY)
       || localStorage.getItem('token')
       || localStorage.getItem('access_token');
@@ -336,6 +347,7 @@ export class AuthService {
   private saveAuthData(token: string, user: User): void {
     localStorage.setItem(this.TOKEN_KEY, token);
     try {
+      sessionStorage.removeItem(this.TAB_LOGGED_OUT_KEY);
       sessionStorage.setItem(this.TAB_TOKEN_KEY, token);
     } catch {
       // Ignorar errores de cuota en modo privado
@@ -363,6 +375,9 @@ export class AuthService {
     // Nunca leer PII en texto plano desde localStorage; reconstruir en memoria RAM desde el JWT vigente
     localStorage.removeItem(this.USER_KEY);
     const tabToken = sessionStorage.getItem(this.TAB_TOKEN_KEY);
+    if (!tabToken && sessionStorage.getItem(this.TAB_LOGGED_OUT_KEY) === 'true') {
+      return null;
+    }
     const sharedToken = localStorage.getItem(this.TOKEN_KEY);
     const token = tabToken || sharedToken;
     if (!token || this.isTokenExpired(token)) {

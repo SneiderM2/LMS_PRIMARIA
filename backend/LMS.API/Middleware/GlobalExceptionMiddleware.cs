@@ -78,7 +78,7 @@ public class GlobalExceptionMiddleware
             Type = problemType,
             Title = title,
             Status = (int)statusCode,
-            Detail = _env.IsDevelopment() ? $"{ex.Message} | {ex.StackTrace}" : userMessage,
+            Detail = userMessage,
             Instance = context.Request.Path.Value ?? "/",
             Message = userMessage,
             Timestamp = DateTime.UtcNow,

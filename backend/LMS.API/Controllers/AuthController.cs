@@ -297,6 +297,15 @@ public class AuthController : ControllerBase
                 DataPolicyVersion = _privacy.PolicyVersion
             });
         }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogWarning(ex, "Colisión de concurrencia al registrar usuario {Username}", request.Id);
+            return Conflict(new
+            {
+                code = "USER_ALREADY_EXISTS",
+                message = "El documento o carnet escolar ya fue registrado por otro proceso concurrente."
+            });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error al registrar usuario.");
@@ -429,6 +438,7 @@ public class AuthController : ControllerBase
             user.SessionToken = Guid.NewGuid().ToString("N");
             user.LastLoginAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+            SingleSessionMiddleware.InvalidateUserCache(HttpContext, user.Username);
 
             var fullName = string.IsNullOrWhiteSpace(user.FullName) ? user.Username : user.FullName;
             var gradeName = user.Alumno?.Grado?.Nombre;
@@ -602,6 +612,7 @@ public class AuthController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+        SingleSessionMiddleware.InvalidateUserCache(HttpContext, user.Username);
 
         await AuditAsync(user, "Privacidad: Aceptación de política de tratamiento de datos",
             $"Versión {_privacy.PolicyVersion}.");
@@ -698,6 +709,7 @@ public class AuthController : ControllerBase
         user.AccessFailedCount = 0;
         user.LockoutEnd = null;
         await _context.SaveChangesAsync();
+        SingleSessionMiddleware.InvalidateUserCache(HttpContext, user.Username);
 
         var (token, expiration) = _tokenService.GenerateToken(
             user,
@@ -778,6 +790,7 @@ public class AuthController : ControllerBase
             user.SessionToken = null;
             user.LastLoginAt = null;
             await _context.SaveChangesAsync();
+            SingleSessionMiddleware.InvalidateUserCache(HttpContext, user.Username);
             await AuditAsync(user, "Autenticación: Cierre de sesión");
         }
 
@@ -882,6 +895,7 @@ public class AuthController : ControllerBase
         user.AccessFailedCount = 0;
         user.LockoutEnd = null;
         await _context.SaveChangesAsync();
+        SingleSessionMiddleware.InvalidateUserCache(HttpContext, user.Username);
 
         var (newToken, newExpiration) = _tokenService.GenerateToken(
             user,

@@ -179,6 +179,29 @@ public class MiddlewareSecurityTests
     }
 
     [Fact]
+    public async Task GlobalExceptionMiddleware_InDevelopment_NeverLeaksStackTraceInHttpBody()
+    {
+        var middleware = new GlobalExceptionMiddleware(
+            _ => throw new InvalidOperationException("Error controlado de prueba"),
+            NullLogger<GlobalExceptionMiddleware>.Instance,
+            new StubEnv("Development"));
+
+        var context = new DefaultHttpContext();
+        context.Request.Method = "POST";
+        context.Request.Path = "/api/student/enroll";
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context);
+
+        Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
+        context.Response.Body.Seek(0, SeekOrigin.Begin);
+        var body = await new StreamReader(context.Response.Body).ReadToEndAsync();
+
+        Assert.DoesNotContain("MiddlewareSecurityTests", body);
+        Assert.DoesNotContain("at LMS.API", body);
+    }
+
+    [Fact]
     public void RequestLoggingMiddleware_SanitizesSensitiveFieldsBeforePersistence()
     {
         var fieldA = new string(new[] { 'p', 'a', 's', 's', 'w', 'o', 'r', 'd' }); // ggignore

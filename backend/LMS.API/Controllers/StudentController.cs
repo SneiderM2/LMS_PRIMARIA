@@ -317,7 +317,23 @@ public class StudentController : ControllerBase
                 Estado = "ENVIADA"
             };
             _context.Entregas.Add(entrega);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // Manejo de condición de carrera: otra petición concurrente creó la entrega simultáneamente
+                _context.ChangeTracker.Clear();
+                entrega = await _context.Entregas
+                    .Include(e => e.Archivos)
+                    .FirstOrDefaultAsync(e => e.TareaId == tarea.Id && e.AlumnoId == student.UsuarioId);
+
+                if (entrega == null) throw;
+
+                entrega.FechaEntrega = DateTime.UtcNow;
+                if (trimmedComment != null) entrega.ContenidoTexto = trimmedComment;
+            }
         }
         else
         {
@@ -343,7 +359,15 @@ public class StudentController : ControllerBase
             FechaSubida = DateTime.UtcNow
         };
         _context.ArchivosEntrega.Add(archivo);
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Carrera concurrente en matriculación: la inscripción ya fue registrada
+            _context.ChangeTracker.Clear();
+        }
 
         var isLate = entrega.FechaEntrega > tarea.FechaLimite;
         var auditSummary = $"Alumno: {studentFullName} ({student.Usuario.Username}, ID:{student.UsuarioId}) | Tarea #{tarea.Id}: '{tarea.Titulo}' (Curso: {tarea.Curso.Nombre}) | Archivo: '{stored.OriginalName}' ({stored.Size / 1024.0:F1} KB) | Puntualidad: {(isLate ? "Entrega Tardía" : "A Tiempo")}" +
@@ -581,7 +605,15 @@ public class StudentController : ControllerBase
             _context.Inscripciones.Add(newEnrollment);
         }
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Carrera concurrente en matriculación: la inscripción ya fue registrada
+            _context.ChangeTracker.Clear();
+        }
         RequestLoggingMiddleware.SetAuditContext(
             HttpContext,
             action: "Estudiante: Inscripción Voluntaria en Curso",
@@ -619,7 +651,15 @@ public class StudentController : ControllerBase
 
         // Desactivar lógicamente para preservar historial
         enrollment.Estado = "INACTIVA";
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Carrera concurrente en matriculación: la inscripción ya fue registrada
+            _context.ChangeTracker.Clear();
+        }
 
         RequestLoggingMiddleware.SetAuditContext(
             HttpContext,

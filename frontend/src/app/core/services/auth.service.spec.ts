@@ -86,4 +86,18 @@ describe('AuthService Security & Session Tests', () => {
     expect(service.currentUser()).toBeNull();
     expect(service.isAuthenticated()).toBeFalse();
   });
+
+  it('conserva el token aislado de la pestaña en sessionStorage cuando otra pestaña inicia sesión con un usuario distinto', () => {
+    const tab1Token = createFakeJwt(3600);
+    const tab2Token = createFakeJwt(7200);
+    sessionStorage.setItem('lms_tab_auth_token', tab1Token);
+    localStorage.setItem('lms_auth_token', tab2Token);
+
+    expect(service.getToken()).toBe(tab1Token);
+
+    // Si la pestaña 1 cierra sesión, no debe borrar el token compartido de la pestaña 2 ni adoptarlo
+    service.clearSessionData();
+    expect(localStorage.getItem('lms_auth_token')).toBe(tab2Token);
+    expect(service.getToken()).toBeNull();
+  });
 });

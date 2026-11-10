@@ -160,6 +160,8 @@ export class SessionTimeoutService implements OnDestroy {
 
   /**
    * Detecta cambios de token en otras pestañas del mismo navegador en tiempo real.
+   * Si la otra pestaña pertenece a un usuario diferente, permite la coexistencia multi-pestaña.
+   * Solo expulsa si se detecta inicio de sesión con el MISMO usuario en otra pestaña.
    */
   private handleStorageEvent(event: StorageEvent): void {
     if (!this.authService.isAuthenticated()) return;
@@ -169,25 +171,52 @@ export class SessionTimeoutService implements OnDestroy {
       const currentTabToken = this.authService.getTabToken();
 
       if (!newSharedToken) {
-        // Otra pestaña cerró la sesión manualmente o expiró
-        this.ngZone.run(() => {
-          this.stopMonitoring();
-          this.authService.clearSessionData();
-          this.router.navigate(['/login'], { queryParams: { sessionExpired: 'true' } });
-        });
-      } else if (currentTabToken && newSharedToken !== currentTabToken) {
-        // Otra pestaña inició una nueva sesión desplazando a esta pestaña
-        this.ngZone.run(() => {
-          this.stopMonitoring();
-          this.authService.clearSessionData(true);
-          window.dispatchEvent(new CustomEvent('lms:duplicate-session', {
-            detail: {
-              message: 'Tu sesión fue cerrada porque se inició sesión en otro dispositivo o pestaña.'
-            }
-          }));
-          this.router.navigate(['/login'], { queryParams: { duplicateSession: 'true' } });
-        });
+        // Solo cerrar si esta pestaña dependía del token compartido y no tiene su propio tabToken
+        if (!currentTabToken) {
+          this.ngZone.run(() => {
+            this.stopMonitoring();
+            this.authService.clearSessionData();
+            this.router.navigate(['/login'], { queryParams: { sessionExpired: 'true' } });
+          });
+        }
+        return;
       }
+
+      if (currentTabToken && newSharedToken !== currentTabToken) {
+        const currentUserId = this.extractUserIdFromToken(currentTabToken);
+        const newUserId = this.extractUserIdFromToken(newSharedToken);
+
+        // Solo se cierra si la nueva sesión es DEL MISMO USUARIO (evitar sesiones duplicadas de la misma cuenta)
+        if (currentUserId && newUserId && currentUserId.toLowerCase() === newUserId.toLowerCase()) {
+          this.ngZone.run(() => {
+            this.stopMonitoring();
+            this.authService.clearSessionData(true);
+            window.dispatchEvent(new CustomEvent('lms:duplicate-session', {
+              detail: {
+                message: 'Tu sesión fue cerrada porque se inició sesión en otra pestaña con tu misma cuenta.'
+              }
+            }));
+            this.router.navigate(['/login'], { queryParams: { duplicateSession: 'true' } });
+          });
+        }
+        // Si newUserId !== currentUserId, son usuarios diferentes: cada pestaña mantiene su propio token aislado en sessionStorage
+      }
+    }
+  }
+
+  private extractUserIdFromToken(token: string): string | null {
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) return null;
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+      const payload = JSON.parse(atob(padded));
+      return payload.nameid
+        || payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier']
+        || payload.sub
+        || (payload.user_id ? String(payload.user_id) : null);
+    } catch {
+      return null;
     }
   }
 
