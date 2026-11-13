@@ -268,7 +268,7 @@
       <h2>9. Medidas de seguridad</h2>
       <ul>
         <li>Autenticación con JWT firmado, expiración de sesión y revocación por sesión única.</li>
-        <li>Contraseñas almacenadas con BCrypt (factor de trabajo 12) y política mínima de 12 caracteres.</li>
+        <li>Contraseñas almacenadas con BCrypt (factor de trabajo 12) y política de 8 a 64 caracteres con requisitos de complejidad.</li>
         <li>Bloqueo temporal tras cinco intentos fallidos, limitación de solicitudes y CAPTCHA.</li>
         <li>Cifrado en tránsito (TLS) y verificación de certificados en la base de datos.</li>
         <li>Descarga de archivos autenticada y autorizada; validación de firma binaria y almacenamiento privado.</li>

@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using LMS.API.Data;
 using LMS.API.DTOs;
+using LMS.API.Filters;
+using LMS.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +12,7 @@ namespace LMS.API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
+[ServiceFilter(typeof(MinorConsentActionFilter))]
 public class ContentsController : ControllerBase
 {
     private readonly LMSDbContext _context;
@@ -32,8 +35,10 @@ public class ContentsController : ControllerBase
 
         int? studentGradeId = null;
         List<int>? enrolledCourseIds = null;
+        string? teacherUsernameLower = null;
 
-        if (string.Equals(role, "Student", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(role, "Student", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(role, "ALUMNO", StringComparison.OrdinalIgnoreCase))
         {
             if (string.IsNullOrWhiteSpace(username))
             {
@@ -55,6 +60,16 @@ public class ContentsController : ControllerBase
                 .Select(i => i.CursoId)
                 .ToList();
         }
+        else if (string.Equals(role, "Teacher", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(role, "DOCENTE", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                return Unauthorized();
+            }
+
+            teacherUsernameLower = username.ToLowerInvariant();
+        }
 
         // 1. Tareas
         var tareasQuery = _context.Tareas
@@ -71,6 +86,10 @@ public class ContentsController : ControllerBase
                 t.Curso.GradoId == studentGradeId.Value
                 || (enrolledCourseIds != null && enrolledCourseIds.Contains(t.CursoId)));
         }
+        else if (!string.IsNullOrEmpty(teacherUsernameLower))
+        {
+            tareasQuery = tareasQuery.Where(t => t.Curso.Docente.Username.ToLower() == teacherUsernameLower);
+        }
 
         if (!string.IsNullOrWhiteSpace(gradeLevel))
         {
@@ -84,15 +103,17 @@ public class ContentsController : ControllerBase
             var teacherName = !string.IsNullOrWhiteSpace(t.Curso.Docente.FullName) 
                 ? t.Curso.Docente.FullName 
                 : t.Curso.Docente.Username;
+            var (cleanDesc, attachmentUrl) = TaskDescriptionMetadata.Unpack(t.Descripcion);
 
             result.Add(new ContentDto
             {
                 Id = t.Id.ToString(),
                 RealId = t.Id,
                 Title = t.Titulo,
-                Description = t.Descripcion ?? string.Empty,
+                Description = cleanDesc,
                 Type = "Assignment",
                 Subject = t.Curso.Nombre,
+                FileUrl = attachmentUrl,
                 DueDate = t.FechaLimite,
                 GradeLevel = t.Curso.Grado.Nombre,
                 CreatedByUserId = t.Curso.Docente.Username,
@@ -115,6 +136,10 @@ public class ContentsController : ControllerBase
             materialesQuery = materialesQuery.Where(m =>
                 m.Curso.GradoId == studentGradeId.Value
                 || (enrolledCourseIds != null && enrolledCourseIds.Contains(m.CursoId)));
+        }
+        else if (!string.IsNullOrEmpty(teacherUsernameLower))
+        {
+            materialesQuery = materialesQuery.Where(m => m.Curso.Docente.Username.ToLower() == teacherUsernameLower);
         }
 
         if (!string.IsNullOrWhiteSpace(gradeLevel))

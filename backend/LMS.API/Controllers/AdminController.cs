@@ -627,8 +627,15 @@ public class AdminController : ControllerBase
 
         if (dto.DocenteId.HasValue && dto.DocenteId.Value > 0)
         {
-            var docente = await _context.Usuarios.FindAsync(dto.DocenteId.Value);
-            if (docente != null) curso.DocenteId = docente.Id;
+            var docente = await _context.Usuarios
+                .Include(u => u.Rol)
+                .FirstOrDefaultAsync(u => u.Id == dto.DocenteId.Value && u.Activo &&
+                    (u.Rol.Nombre == "DOCENTE" || u.Rol.Nombre == "ADMINISTRADOR"));
+            if (docente == null)
+            {
+                return BadRequest(new { message = "El usuario seleccionado como docente no existe, está inactivo o no posee rol de Docente." });
+            }
+            curso.DocenteId = docente.Id;
         }
 
         if (!string.IsNullOrWhiteSpace(dto.Grado))

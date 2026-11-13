@@ -179,6 +179,28 @@ public class AdminControllerSecurityTests
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
+    [Fact]
+    public async Task UpdateAdminCourse_AssigningStudentAsTeacher_Returns400BadRequest()
+    {
+        using var db = CreateSeededDb();
+        db.Usuarios.Add(new Usuario { Id = 3, RolId = 3, Username = "alumno.uno", Nombre = "Pepito", Apellido = "Perez", PasswordHash = new string('h', 4), Activo = true }); // ggignore
+        db.Cursos.Add(new Curso { Id = 10, Nombre = "Ciencias", GradoId = 1, Grupo = "A", DocenteId = 2, Activo = true });
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db, "admin.principal");
+
+        var result = await controller.UpdateAdminCourse(10, new UpdateAdminCourseDto
+        {
+            Nombre = "Ciencias",
+            Grupo = "A",
+            DocenteId = 3 // Rol ALUMNO
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        var curso = await db.Cursos.FindAsync(10);
+        Assert.Equal(2, curso!.DocenteId);
+    }
+
     private sealed class StubWebEnv : IWebHostEnvironment
     {
         public StubWebEnv(string envName) => EnvironmentName = envName;

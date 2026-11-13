@@ -20,6 +20,13 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
+RUN groupadd --system lms && \
+    useradd --system --gid lms --home-dir /app --shell /usr/sbin/nologin lmsapp && \
+    mkdir -p /app/logs /app/App_Data/uploads && \
+    chown -R lmsapp:lms /app
+
+USER lmsapp
+
 # Exponer y configurar puerto 8080 para Render
 ENV ASPNETCORE_HTTP_PORTS=8080
 ENV ASPNETCORE_URLS=http://+:8080

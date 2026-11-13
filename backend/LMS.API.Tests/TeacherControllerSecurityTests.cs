@@ -275,6 +275,65 @@ public class TeacherControllerSecurityTests
         Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);
     }
 
+    [Fact]
+    public async Task GetMetrics_AsTeacher_ScopesMetricsToAssignedGradesAndCourses()
+    {
+        using var db = CreateSeededDb();
+        db.Usuarios.Add(new Usuario { Id = 400, RolId = 3, Username = "alumno.grado2", Nombre = "Laura", Apellido = "Rios", PasswordHash = new string('h', 4), Activo = true }); // ggignore
+        db.Alumnos.Add(new Alumno { UsuarioId = 400, GradoId = 2 });
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db, "docente.a"); // Docente A solo dicta en Grado 1
+
+        var result = await controller.GetMetrics();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var metrics = Assert.IsType<SemaforoSummaryMetricsDto>(ok.Value);
+        Assert.Equal(1, metrics.TotalStudents);
+    }
+
+    [Fact]
+    public async Task ContentsController_GetContents_UnpacksAttachmentMetadataAndScopesToTeacher()
+    {
+        using var db = CreateSeededDb();
+        var tareaConAdjunto = new Tarea
+        {
+            Id = 20,
+            CursoId = 1, // Pertenece a Docente A
+            Titulo = "Guia de Ciencias",
+            Descripcion = TaskDescriptionMetadata.Pack("Leer la guia adjunta", "/api/files/resources/guia.pdf"),
+            FechaLimite = DateTime.UtcNow.AddDays(3),
+            PuntajeMaximo = 5.0m,
+            Activo = true
+        };
+        db.Tareas.Add(tareaConAdjunto);
+        await db.SaveChangesAsync();
+
+        var contentsController = new ContentsController(db)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                    {
+                        new Claim(ClaimTypes.NameIdentifier, "docente.a"),
+                        new Claim(ClaimTypes.Role, "Teacher")
+                    }, "TestAuth"))
+                }
+            }
+        };
+
+        var result = await contentsController.GetContents();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var items = Assert.IsType<List<ContentDto>>(ok.Value);
+        var item = Assert.Single(items);
+        Assert.Equal("Guia de Ciencias", item.Title);
+        Assert.Equal("Leer la guia adjunta", item.Description);
+        Assert.Equal("/api/files/resources/guia.pdf", item.FileUrl);
+    }
+
     private sealed class NoOpFileStorageService : IFileStorageService
     {
         public string ProviderName => "NoOp";

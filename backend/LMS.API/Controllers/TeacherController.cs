@@ -93,7 +93,7 @@ public class TeacherController : ControllerBase
             .Include(a => a.Grado)
             .Include(a => a.Inscripciones)
                 .ThenInclude(i => i.Curso)
-            .Where(a => a.Usuario.Activo)
+            .Where(a => a.Usuario.Activo && a.Usuario.AnonymizedAt == null)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(grade))
@@ -543,7 +543,7 @@ public class TeacherController : ControllerBase
                 .ThenInclude(a => a!.Entregas)
             .Include(u => u.Alumno)
                 .ThenInclude(a => a!.Inscripciones)
-            .Where(u => u.Rol.Nombre == "ALUMNO" && u.Activo)
+            .Where(u => u.Rol.Nombre == "ALUMNO" && u.Activo && u.AnonymizedAt == null)
             .AsQueryable();
 
         if (!isAdmin)
@@ -664,7 +664,11 @@ public class TeacherController : ControllerBase
     [ProducesResponseType(typeof(SemaforoSummaryMetricsDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMetrics([FromQuery] string? gradeLevel = null)
     {
-        var cacheKey = $"semaforo_metrics_{gradeLevel ?? "ALL"}";
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null) return Unauthorized();
+        var isAdmin = IsAdmin(currentUser.Rol?.Nombre);
+
+        var cacheKey = $"semaforo_metrics_{currentUser.Id}_{gradeLevel ?? "ALL"}";
         if (_cache.TryGetValue(cacheKey, out SemaforoSummaryMetricsDto? cached) && cached != null)
         {
             return Ok(cached);
@@ -679,8 +683,24 @@ public class TeacherController : ControllerBase
                 .ThenInclude(a => a!.Entregas)
             .Include(u => u.Alumno)
                 .ThenInclude(a => a!.Inscripciones)
-            .Where(u => u.Rol.Nombre == "ALUMNO" && u.Activo)
+            .Where(u => u.Rol.Nombre == "ALUMNO" && u.Activo && u.AnonymizedAt == null)
             .AsQueryable();
+
+        if (!isAdmin)
+        {
+            var teacherCourses = await _context.Cursos
+                .AsNoTracking()
+                .Where(c => c.DocenteId == currentUser.Id && c.Activo)
+                .Select(c => new { c.Id, c.GradoId })
+                .ToListAsync();
+
+            var allowedCourseIds = teacherCourses.Select(c => c.Id).ToList();
+            var allowedGradeIds = teacherCourses.Select(c => c.GradoId).Distinct().ToList();
+
+            query = query.Where(u => u.Alumno != null && (
+                allowedGradeIds.Contains(u.Alumno.GradoId) ||
+                u.Alumno.Inscripciones.Any(i => i.Estado == "ACTIVA" && allowedCourseIds.Contains(i.CursoId))));
+        }
 
         if (!string.IsNullOrWhiteSpace(gradeLevel))
         {
