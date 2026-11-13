@@ -44,7 +44,7 @@ if not exist "%~dp0..\backend\LMS.API\appsettings.Local.json" (
     echo [OK] Archivo appsettings.Local.json generado correctamente.
     echo.
     echo [IMPORTANTE] Recuerda configurar tu conexion a Supabase y claves secretas
-    echo             en backend\LMS.API\appsettings.Local.json (ver SETUP_SECRETS.md).
+    echo             en backend\LMS.API\appsettings.Local.json - ver SETUP_SECRETS.md
 ) else (
     echo [OK] appsettings.Local.json encontrado.
 )

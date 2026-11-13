@@ -115,6 +115,12 @@ public class GoogleRecaptchaService : ICaptchaService
                     _logger.LogWarning("Validación de reCAPTCHA denegada. Códigos: {Errors}", errorCodes.ToString());
                 }
 
+                if (IsDevBypassEnabled())
+                {
+                    _logger.LogWarning("Bypass de reCAPTCHA aplicado en entorno de desarrollo (AllowDevBypass=true).");
+                    return true;
+                }
+
                 return false;
             }
 
