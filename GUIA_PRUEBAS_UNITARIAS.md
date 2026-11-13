@@ -29,6 +29,12 @@ El proyecto incluye un script en batch que detecta e instala automáticamente cu
 LMS\scripts\0_VERIFICAR_ENTORNO.bat
 ```
 
+### ⚡ Scripts de Ejecución Rápida (Doble Clic)
+Para ejecutar las pruebas sin preocuparse por rutas de SDKs ni variables de entorno:
+- **Suite completa (Backend + Frontend):** [`LMS\scripts\EJECUTAR_TODAS_LAS_PRUEBAS.bat`](file:///c:/Users/SNEIDER/Documents/Nueva%20carpeta/LMS%20(2)/LMS/scripts/EJECUTAR_TODAS_LAS_PRUEBAS.bat)
+- **Solo Backend (.NET 8):** [`LMS\scripts\EJECUTAR_PRUEBAS_BACKEND.bat`](file:///c:/Users/SNEIDER/Documents/Nueva%20carpeta/LMS%20(2)/LMS/scripts/EJECUTAR_PRUEBAS_BACKEND.bat)
+- **Solo Frontend (Karma/Jasmine):** [`LMS\scripts\EJECUTAR_PRUEBAS_FRONTEND.bat`](file:///c:/Users/SNEIDER/Documents/Nueva%20carpeta/LMS%20(2)/LMS/scripts/EJECUTAR_PRUEBAS_FRONTEND.bat)
+
 ---
 
 ## 🎨 2. Pruebas del Frontend (Angular 18 + Karma + Jasmine)
