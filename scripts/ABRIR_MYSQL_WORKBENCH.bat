@@ -1,32 +1,53 @@
 @echo off
 chcp 65001 > nul
-title LMS Primaria - Abrir MySQL Workbench
+title LMS Primaria - MySQL Workbench
 color 0A
 
 echo =====================================================================
-echo              🐬 ABRIENDO MYSQL WORKBENCH 8.0 🚀
+echo              [LMS PRIMARIA] - MYSQL WORKBENCH
 echo =====================================================================
 echo.
-echo MySQL Workbench es la herramienta visual para:
-echo   - Ver y editar las tablas del LMS (Users, Contents, Submissions)
-echo   - Ejecutar consultas SQL
-echo   - Modificar datos de los estudiantes y sus semaforos
+echo [NOTA INFORMATIVA]
+echo   La plataforma Sci-Kids / LMS Primaria opera principalmente sobre
+echo   PostgreSQL 17.6 alojado en Supabase Cloud.
+echo   Este script se mantiene para desarrollo y consulta en entornos locales
+echo   heredados con base de datos MySQL (lms_scikids).
 echo.
-echo Iniciando MySQL Workbench...
-echo.
+echo Buscando instalacion de MySQL Workbench...
 
+set "WB_EXE="
 if exist "C:\Program Files\MySQL\MySQL Workbench 8.0 CE\MySQLWorkbench.exe" (
-    start "" "C:\Program Files\MySQL\MySQL Workbench 8.0 CE\MySQLWorkbench.exe"
-    echo [OK] MySQL Workbench iniciado correctamente.
-    echo.
-    echo INSTRUCCIONES DENTRO DE WORKBENCH:
-    echo  1. Haz clic en la conexion 'Local instance MySQL80' (usuario: root)
-    echo  2. En el panel izquierdo, haz doble clic en 'lms_scikids'
-    echo  3. Expande 'Tables' para ver: usuarios, perfiles, alumnos, cursos, tareas, etc.
-    echo  4. Clic derecho en una tabla -^> Select Rows para ver todos los datos
+    set "WB_EXE=C:\Program Files\MySQL\MySQL Workbench 8.0 CE\MySQLWorkbench.exe"
+) else if exist "C:\Program Files\MySQL\MySQL Workbench 8.0\MySQLWorkbench.exe" (
+    set "WB_EXE=C:\Program Files\MySQL\MySQL Workbench 8.0\MySQLWorkbench.exe"
 ) else (
-    echo [ERROR] MySQL Workbench no se encontro en la ruta estandar.
-    echo Buscalo en el menu Inicio de Windows como "MySQL Workbench 8.0 CE".
+    for /d %%D in ("C:\Program Files\MySQL\MySQL Workbench*") do (
+        if exist "%%D\MySQLWorkbench.exe" set "WB_EXE=%%D\MySQLWorkbench.exe"
+    )
+)
+
+if not defined WB_EXE (
+    where mysqlworkbench.exe > nul 2>&1
+    if %ERRORLEVEL% EQU 0 set "WB_EXE=mysqlworkbench.exe"
+)
+
+if defined WB_EXE (
+    echo [OK] MySQL Workbench detectado. Iniciando aplicacion...
+    start "" "%WB_EXE%"
+    echo.
+    echo INSTRUCCIONES:
+    echo  1. Abre la conexion local (usuario: root)
+    echo  2. Selecciona la base de datos 'lms_scikids'
+    echo  3. Consulta las tablas: usuarios, alumnos, cursos, tareas, etc.
+) else (
+    echo.
+    echo [AVISO] MySQL Workbench no fue encontrado en las rutas habituales.
+    where winget > nul 2>&1
+    if %ERRORLEVEL% EQU 0 (
+        echo [INFO] Puedes instalarlo automaticamente ejecutando:
+        echo        winget install Oracle.MySQLWorkbench
+    )
+    echo Descarga oficial: https://dev.mysql.com/downloads/workbench/
 )
 
 timeout /t 5 > nul

@@ -1,0 +1,233 @@
+================================================================================
+MANUAL TÉCNICO
+Sistema de Gestión del Aprendizaje (LMS) "Sci-Kids"
+================================================================================
+Autores: Oscar Sneider Morales Florez | Santiago Julio Caballero
+Plataforma: LMS Primaria • Arquitectura: .NET 8 Web API + Angular 18 PWA + PostgreSQL (Supabase)
+Versión: 1.0 (Noviembre 2026)
+Estado: Documento Técnico Corregido y Alineado al Código Fuente
+
+--------------------------------------------------------------------------------
+1. DESCRIPCIÓN GENERAL DEL SISTEMA
+--------------------------------------------------------------------------------
+Objetivo del software:
+Desarrollar un sistema web de gestión del aprendizaje (LMS) para educación básica
+primaria que opere bajo principios de "Seguridad por Diseño" (Security by Design)
+y "Privacidad por Defecto" (Privacy by Default). Facilita el acceso a contenidos
+y actividades para estudiantes de primaria y optimiza la gestión del docente,
+garantizando el estricto cumplimiento del marco legal colombiano de protección
+de datos personales de menores (Ley Estatutaria 1581 de 2012, Decreto Reglamentario
+1377 de 2013 / Decreto 1074 de 2015 y Ley 1098 de 2006 - Código de la Infancia y la
+Adolescencia).
+
+Alcance funcional y Usuarios Objetivo:
+Usuarios objetivo: Estudiantes de básica primaria (6 a 11 años), Docentes y Administradores.
+El sistema contiene:
+• Portal de estudiante: Interfaz intuitiva, soporte multilingüe en tiempo real
+  (Español, Inglés, Chino, Japonés, Portugués) y capacidades PWA (Progressive Web
+  App con Service Worker para funcionamiento resiliente).
+• Semáforo Escolar de Alerta Temprana: Monitoreo automatizado del riesgo de
+  inactividad o deserción escolar (estados Verde, Amarillo y Rojo).
+• Gestión de consentimiento y Habeas Data: Captura obligatoria de consentimiento
+  informado previo suscrito por acudientes/tutores con firma inmutable HMAC-SHA256,
+  trazabilidad legal y radicación de solicitudes ARCO.
+• Control de acceso y evaluación: Control de acceso basado en roles canónicos
+  (Admin, Teacher, Student), subida segura con validación de cabeceras binarias
+  y libro de calificaciones centralizado.
+• Auditoría estructurada: Bitácora de accesos y operaciones sobre datos de menores
+  con persistencia desacoplada.
+
+Marco Normativo y Accesibilidad:
+• Marco Legal Colombiano: Ley 1581 de 2012 (Habeas Data), Decreto 1377 de 2013,
+  Ley 1098 de 2006 (Infancia y Adolescencia), Ley 1273 de 2009 (Delitos Informáticos)
+  y Circular Externa 002 de 2015 de la SIC.
+• Accesibilidad Web: NTC 5854 / WCAG 2.1 Nivel AA (navegación por teclado, contraste
+  verificado y diseño accesible para menores).
+
+--------------------------------------------------------------------------------
+2. REQUISITOS Y STACK TECNOLÓGICO
+--------------------------------------------------------------------------------
+| Capa / Dominio           | Tecnología                        | Versión / Detalles de Implementación                       |
+|--------------------------|-----------------------------------|------------------------------------------------------------|
+| Frontend (Cliente)       | Angular (Standalone, Signals)     | Angular 18.2+ con PWA Service Worker y modo offline        |
+| Backend (Servidor)       | .NET 8.0 SDK (C# 12) sobre Kestrel| ASP.NET Core Web API 8.0, arquitectura limpia desacoplada  |
+| Base de Datos            | PostgreSQL (Supabase Cloud)       | PostgreSQL 17.6 con Connection Pooler IPv4 y SSL Requerido |
+| ORM y Migraciones        | Entity Framework Core + Npgsql    | EF Core 8.0.11 con mapeo en snake_case e índices optimizados|
+| Seguridad Criptográfica  | BCrypt.Net-Next + HMAC-SHA256     | BCrypt 4.0.3 (factor 12), firmas HMAC independientes       |
+| Identidad y Antifraude   | JWT Bearer + Google OAuth + Captcha| JWT con session_token, Google Identity y reCAPTCHA v2      |
+| Entorno y Herramientas   | Node.js LTS (v20+), VS Code, Git  | Scripts automatizados .bat, Dockerfile para Linux Container|
+
+--------------------------------------------------------------------------------
+3. ARQUITECTURA DEL SISTEMA
+--------------------------------------------------------------------------------
+El sistema implementa una arquitectura cliente-servidor desacoplada de tres capas
+(Three-Tier Architecture):
+
+1. CAPA DE PRESENTACIÓN:
+   SPA desarrollada en Angular 18 con componentes Standalone, equipada con detector
+   de inactividad de sesión (SessionTimeoutService), guardián de autorización para
+   menores (minorConsentGuard), internacionalización en tiempo real y accesibilidad
+   WCAG 2.1 AA.
+
+2. CAPA DE APLICACIÓN (Web API):
+   API REST en ASP.NET Core 8 bajo Kestrel. Implementa protección contra fuerza bruta
+   y abuso mediante RateLimiter (política 'auth' de 60 req/min con cola de 15 peticiones;
+   'uploads' de 120 req/h; GlobalLimiter de 1200 req/min con exención ilimitada para
+   endpoints de salud). Manejo global de excepciones estandarizado bajo RFC 7807
+   (Problem Details), middleware de sesión única (SingleSessionMiddleware con caché
+   de 15s) y validación de cabeceras binarias (Magic Bytes) en FileSignatureValidator.
+
+3. CAPA DE PERSISTENCIA Y ALMACENAMIENTO:
+   PostgreSQL 17.6 en Supabase Cloud con Bóveda privada de archivos (fuera de wwwroot,
+   en App_Data/uploads o Supabase Storage bucket lms-uploads con descarga protegida y
+   autorizada en FilesController), y bitácora estructurada de auditoría tanto en
+   /logs/app-audit.log como en la tabla audit_logs mediante AuditLogDbBackgroundService.
+
+--------------------------------------------------------------------------------
+4. MÓDULOS Y ENDPOINTS PRINCIPALES (API v1)
+--------------------------------------------------------------------------------
+| Módulo               | Función Principal                             | Rutas Clave                            |
+|----------------------|-----------------------------------------------|----------------------------------------|
+| Autenticación (/auth)| Login, validación JWT, Google OAuth 2.0,      | POST /api/auth/login                   |
+|                      | verificación Google reCAPTCHA v2 y cambio     | POST /api/auth/google-login            |
+|                      | de contraseña.                                | POST /api/auth/logout                  |
+| Privacidad (/privacy)| Gestión de consentimiento acudientes (HMAC),  | GET  /api/privacy/policy               |
+|                      | consulta de políticas, portabilidad y ARCO.   | POST /api/privacy/consent              |
+|                      |                                               | POST /api/privacy/arco                 |
+|                      |                                               | GET  /api/privacy/my-data              |
+| Estudiante (/student)| Entrega segura de tareas con validación       | GET  /api/student/dashboard            |
+|                      | binaria, matrícula y métricas académicas.     | POST /api/student/upload-assignment    |
+|                      |                                               | GET  /api/student/metrics              |
+| Docente (/teacher)   | Semáforo escolar de alerta temprana,          | GET  /api/teacher/students-status      |
+|                      | evaluación/notas, publicación de tareas.      | POST /api/teacher/contents             |
+|                      |                                               | POST /api/teacher/submissions/{id}/grade|
+| Archivos (/files)    | Descarga protegida (MIME + Magic Bytes) desde | GET  /api/files/{**key}                |
+|                      | bóvedas privadas con validación de acceso.    |                                        |
+| Admin (/admin)       | Métricas globales, gestión de usuarios,       | GET  /api/admin/metrics                |
+|                      | consulta de auditoría y respaldo de base datos| GET  /api/admin/audit-logs             |
+|                      |                                               | GET  /api/admin/backup-database        |
+
+--------------------------------------------------------------------------------
+5. MODELO DE DATOS Y PERSISTENCIA
+--------------------------------------------------------------------------------
+El modelo de datos relacional opera sobre PostgreSQL 17.6 y consta de 13 tablas
+estructuradas. La antigua entidad 'perfiles' fue consolidada directamente dentro
+de 'usuarios' para suprimir JOINs redundantes, y se integraron entidades dedicadas
+a la protección probatoria de menores (Habeas Data) y solicitudes de derechos ARCO.
+
+Tablas Estructurales Clave (13 Tablas):
+1. usuarios: Cuentas del sistema, autenticación BCrypt, token de sesión única
+   (session_token), banderas de política aceptada y control de fuerza bruta.
+2. alumnos: Perfil pedagógico del estudiante vinculado a su grado escolar correspondiente.
+3. consentimientos_habeas_data: Evidencia probatoria legal suscrita por el acudiente
+   (documento enmascarado, firma HMAC-SHA256, hash SHA-256 de política, IP y User-Agent).
+4. solicitudes_arco: Radicación y seguimiento legal de derechos de Conocer,
+   Actualizar, Rectificar y Suprimir datos personales.
+5. cursos, grados e inscripciones: Estructura académica, niveles de básica
+   primaria (1° a 5°) y matrículas.
+6. tareas y entregas: Publicación de actividades escolares, recepción de soluciones
+   y retroalimentación docente.
+7. archivos_entrega y materiales: Metadatos de archivos adjuntos (ruta interna protegida,
+   mime_type validado, peso en bytes y hash SHA-256).
+8. audit_logs: Pista de auditoría inmutable de accesos y operaciones sensibles sobre
+   datos personales.
+
+Diccionario de Datos: Tabla "usuarios"
+| Columna                 | Tipo de Dato        | Nulo | Descripción Operativa y Reglas de Negocio                   |
+|-------------------------|---------------------|:----:|-------------------------------------------------------------|
+| id / username           | INT (PK)/VARCHAR(100)| No   | PK secuencial y carnet/documento único de acceso.           |
+| password_hash           | VARCHAR(255)        | No   | Hash criptográfico seguro BCrypt (workFactor: 12).           |
+| nombre / apellido       | VARCHAR(100)        | No   | Nombres y apellidos completos (unificados de perfiles).     |
+| session_token           | VARCHAR(255)        | Sí   | GUID de sesión activa para sesión única y revocación logout.|
+| data_policy_accepted    | BOOLEAN (def: false)| No   | Bandera de aceptación de la política vigente de datos.      |
+| data_policy_evidence    | TEXT                | Sí   | Evidencia técnica firmada con HMAC-SHA256 de aceptación.   |
+| access_failed_count     | INT (def: 0)        | No   | Intentos fallidos para bloqueo por fuerza bruta.            |
+| lockout_end             | TIMESTAMPTZ         | Sí   | Marca temporal de fin de bloqueo temporal.                  |
+
+Nota importante: Los datos del acudiente (acudiente_documento, acudiente_nombre)
+se encuentran desacoplados en la tabla dedicada consentimientos_habeas_data con
+enmascaramiento parcial, cumpliendo el principio de minimización de datos personales.
+
+--------------------------------------------------------------------------------
+6. DEVSECOPS Y SEGURIDAD INTEGRAL
+--------------------------------------------------------------------------------
+• Revocación Inmediata de Sesión: Validación en base de datos y caché de memoria
+  (TTL 15s) del identificador 'session_token' mediante SingleSessionMiddleware. Si el
+  usuario cierra sesión o inicia en otro navegador, el token previo queda obsoleto al instante.
+• Validación de Archivos (Magic Bytes): Prevención de malware analizando la cabecera
+  hexadecimal real del archivo (ej. 25 50 44 46 2D para PDF, FF D8 FF para JPEG,
+  89 50 4E 47 para PNG, 50 4B 03 04 para DOCX) sin confiar en la extensión.
+• Cabeceras HTTP Estrictas: Inyección automática de CSP (Content-Security-Policy),
+  HSTS (Strict-Transport-Security), X-Frame-Options (DENY), X-Content-Type-Options
+  (nosniff) y Permissions-Policy para blindar la aplicación cliente.
+• Doble Clave Criptográfica: Separación estricta de la clave de firmado de tokens JWT
+  (Jwt:SecretKey, min 48 caracteres) frente a la clave de firmado de evidencias
+  legales (Privacy:EvidenceHmacKey, min 32 caracteres).
+
+--------------------------------------------------------------------------------
+7. INSTALACIÓN Y CONFIGURACIÓN LOCAL
+--------------------------------------------------------------------------------
+1. Clonar el repositorio del proyecto desde GitHub y abrir la carpeta raíz en VS Code.
+2. Verificar dependencias del sistema: .NET 8.0 SDK para el backend y Node.js LTS
+   (v20+) para el frontend.
+3. Configuración de Secretos Locales (¡Nunca versionar en Git!):
+   Copiar la plantilla de secretos:
+     Copy-Item backend/LMS.API/appsettings.Example.json backend/LMS.API/appsettings.Local.json
+   Configurar en appsettings.Local.json o mediante variables de entorno:
+   - ConnectionStrings:DefaultConnection: Cadena de conexión a PostgreSQL en Supabase.
+   - Jwt:SecretKey: Clave aleatoria de al menos 48 caracteres.
+   - Privacy:EvidenceHmacKey: Clave aleatoria de al menos 32 caracteres (distinta de JWT).
+4. Instalar paquetes de Angular: ejecutar `npm install` dentro de la carpeta frontend/.
+5. Ejecutar los scripts automatizados ubicados en la raíz:
+   - Iniciar primero: `scripts\1_INICIAR_BACKEND.bat`
+   - Iniciar luego:   `scripts\2_INICIAR_FRONTEND.bat`
+6. Acceder a la plataforma desde el navegador web:
+   - Frontend SPA/PWA: http://localhost:4200
+   - Swagger Docs API:  http://localhost:5000/swagger (solo habilitado en Development).
+
+--------------------------------------------------------------------------------
+8. DESPLIEGUE EN PRODUCCIÓN
+--------------------------------------------------------------------------------
+El sistema se encuentra desplegado utilizando infraestructura cloud desacoplada:
+• GitHub Pages (Frontend): Despliegue de la interfaz de usuario SPA/PWA en
+  https://sneiderm2.github.io/LMS_PRIMARIA/
+• Render (Backend Web Service): Alojamiento y ejecución de la API REST .NET 8 en
+  https://lms-primaria.onrender.com/api con endpoint de salud en /api/ping.
+• Supabase Cloud (Base de Datos): Instancia de PostgreSQL 17.6 con Connection Pooler
+  IPv4 y SSL obligatorio (SSL Mode=Require).
+
+--------------------------------------------------------------------------------
+9. MANTENIMIENTO Y OPERACIÓN
+--------------------------------------------------------------------------------
+• Copias de Seguridad (Backups): Generación de volcados SQL estructurados desde el
+  panel administrativo mediante el endpoint GET /api/admin/backup-database
+  (archivo respaldo_scikids_{timestamp}.sql).
+• Procedimiento de Restauración: Conforme a docs/OPERACION_BACKUP.md, se realiza
+  mediante la herramienta estándar psql sobre PostgreSQL en Supabase, evitando la
+  ejecución de código SQL arbitrario desde la web por seguridad.
+• Tareas Desacopladas en Segundo Plano: Hosted Services de .NET 8 para procesamiento
+  asíncrono de logs (AuditLogDbBackgroundService), retención documental
+  (AuditLogRetentionBackgroundService) y simulación de anonimización a 36 meses
+  (InactivityAnonymizationBackgroundService).
+• Monitoreo Operativo: Supervisión de salud mediante /api/ping, inspección de
+  /logs/app-audit.log y optimización continua del Service Worker de la PWA.
+
+--------------------------------------------------------------------------------
+10. RECOMENDACIONES TÉCNICAS
+--------------------------------------------------------------------------------
+• Gestión de Secretos: Mantener las credenciales maestras y cadenas de conexión
+  exclusivamente como variables de entorno en el panel de Render y Supabase; nunca
+  incluirlas en commits de Git ni en appsettings.json.
+• Seguridad Criptográfica: Realizar respaldos periódicos de PostgreSQL antes de
+  actualizaciones mayores y validar que las claves Jwt:SecretKey y Privacy:EvidenceHmacKey
+  sean totalmente distintas.
+• Persistencia Cloud: Para almacenamiento de archivos en producción, activar
+  Storage:Provider=Supabase con SUPABASE_SERVICE_ROLE_KEY para evitar la pérdida
+  de adjuntos en contenedores efímeros de Render.
+• Políticas de Blindaje: Mantener activas las reglas de seguridad: filtros de
+  Magic Bytes, cabeceras HTTP (CSP, HSTS) y control de revocación inmediata (session_token).
+• Cumplimiento Habeas Data: Proteger la trazabilidad legal de firmas electrónicas
+  de acudientes para certificar el principio de Responsabilidad Demostrada ante la SIC.
+• Trazabilidad del Proyecto: Continuar documentando rigurosamente los cambios e
+  incidencias futuras como se hace en ERRORES_Y_SOLUCIONES.md.
+================================================================================
