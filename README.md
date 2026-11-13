@@ -609,6 +609,7 @@ trazas internas.
 | [PLAN_RESPUESTA_INCIDENTES.md](docs/PLAN_RESPUESTA_INCIDENTES.md) | Detección, contención, notificación y mejora |
 | [OPERACION_BACKUP.md](docs/OPERACION_BACKUP.md) | Respaldos cifrados, restauración y verificación |
 | [CALIDAD_Y_ACCESIBILIDAD.md](docs/CALIDAD_Y_ACCESIBILIDAD.md) | ISO/IEC 25010, NTC 5854 y plan de pruebas |
+| [GUIA_PRUEBAS_UNITARIAS.md](docs/GUIA_PRUEBAS_UNITARIAS.md) | Guía de pruebas unitarias y de seguridad (Backend y Frontend) |
 | [Política pública](frontend/public/privacidad.html) | Aviso de privacidad para titulares y acudientes |
 
 Prueba de humo de seguridad:
